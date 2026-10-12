@@ -1,5 +1,11 @@
-import { displayedPending, formatLoc, isOverThreshold, tileLayout } from '../engine.js'
-import { COLOR_CLASS, QUEUE_STATE, QUEUE_STATE_CLASS, TYPE_CLASS } from '../laneConfig.js'
+import { displayedPending, formatLoc, isOverThreshold } from '../engine.js'
+import {
+  COLOR_CLASS,
+  QUEUE_STATE,
+  QUEUE_STATE_CLASS,
+  TYPE_CLASS,
+  tileLayout,
+} from '../laneConfig.js'
 import { Icon } from './Icon.jsx'
 import { MetricValue } from './MetricValue.jsx'
 

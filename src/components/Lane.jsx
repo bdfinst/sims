@@ -9,7 +9,9 @@ function DerivedValue({ children }) {
   return (
     <p className={`${TYPE_CLASS.label} ${COLOR_CLASS.mutedText}`}>
       {children}{' '}
-      <span className={`rounded bg-white/10 px-1 uppercase tracking-wide ${TYPE_CLASS.label}`}>
+      <span
+        className={`rounded px-1 uppercase tracking-wide ${COLOR_CLASS.tag} ${TYPE_CLASS.label}`}
+      >
         derived
       </span>
     </p>

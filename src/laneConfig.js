@@ -86,6 +86,7 @@ export const COLOR_CLASS = Object.freeze({
   mutedText: 'text-gray-300',
   faintText: 'text-gray-400',
   lanePanel: 'bg-white/5',
+  tag: 'bg-white/10',
   idleBoxBorder: 'border-gray-600',
 })
 
@@ -100,3 +101,9 @@ export const QUEUE_STATE_CLASS = Object.freeze({
 // Tiles drawn per queue box before "+N more": a compact three or four rows of 12px tiles. The
 // phone layout test (375 px and 320 px) guards that they fit. The bounds are in laneConfig.test.js.
 export const TILE_CAPACITY = 48
+
+// How many tiles to draw for `displayed` pending PRs, and how many PRs they do not cover.
+export const tileLayout = (displayed, capacity) => ({
+  tileCount: Math.min(displayed, capacity),
+  overflowCount: Math.max(0, displayed - capacity),
+})

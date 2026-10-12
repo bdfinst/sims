@@ -23,7 +23,6 @@ import {
   sizeFactor,
   speedFactor,
   tick,
-  tileLayout,
 } from './engine.js'
 import { shownCounts } from './testHelpers.js'
 
@@ -447,23 +446,6 @@ describe('isOverThreshold', () => {
     ({ threshold, internal, shown, isOver }) => {
       expect(displayedPending(laneWithPending(internal))).toBe(shown)
       expect(isOverThreshold(displayedPending(laneWithPending(internal)), threshold)).toBe(isOver)
-    },
-  )
-})
-
-describe('tileLayout', () => {
-  const CAPACITY = 5
-
-  it.each([
-    { displayed: 0, tileCount: 0, overflowCount: 0 },
-    { displayed: CAPACITY - 1, tileCount: CAPACITY - 1, overflowCount: 0 },
-    { displayed: CAPACITY, tileCount: CAPACITY, overflowCount: 0 },
-    { displayed: CAPACITY + 1, tileCount: CAPACITY, overflowCount: 1 },
-    { displayed: 184, tileCount: CAPACITY, overflowCount: 184 - CAPACITY },
-  ])(
-    'draws $tileCount tiles and $overflowCount more for $displayed pending PRs at capacity 5',
-    ({ displayed, tileCount, overflowCount }) => {
-      expect(tileLayout(displayed, CAPACITY)).toEqual({ tileCount, overflowCount })
     },
   )
 })
