@@ -4,6 +4,8 @@ export default defineConfig({
   testDir: './e2e',
   timeout: 30000,
   retries: 0,
+  // Fails the run when a scenario's test drifts from its Gherkin steps (see tools/gherkin-sync).
+  reporter: [['list'], ['./tools/gherkin-sync/reporter.js']],
   use: {
     headless: true,
     baseURL: 'http://localhost:4173',

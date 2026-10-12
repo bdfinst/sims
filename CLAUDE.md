@@ -15,7 +15,7 @@ A collection of diagram and presentation assets about software delivery flow (Th
 - `before-value-stream.html` — Standalone value-stream slide. Not part of the simulator; don't modify it unless asked.
 - `sim.spec.md` — Original input spec for the simulator. Superseded by `docs/specs/ai-vs-human-code-review-simulator.md`, which is the model spec.
 - `docs/specs/ai-vs-human-code-review-simulator.md` — The simulator's spec: architecture, acceptance criteria, glossary, and the Research Sources table. Read it before changing model behavior or the research panel.
-- `index.html`, `src/`, `e2e/`, `features/`, `plans/`, and the root config files (`vite.config.js`, `vitest.config.js`, `playwright.config.js`, `eslint.config.js`, `.oxlintrc.json`, `prettier.config.js`) make up the simulator. See "Simulator app".
+- `index.html`, `src/`, `e2e/`, `features/`, `plans/`, `tools/`, and the root config files (`vite.config.js`, `vitest.config.js`, `playwright.config.js`, `eslint.config.js`, `.oxlintrc.json`, `prettier.config.js`) make up the simulator. See "Simulator app".
 
 ## Simulator app
 
@@ -34,14 +34,15 @@ Two lanes (human-authored vs. AI-authored code) run side by side; generation out
 - `src/research.js` — data for the collapsible research panel (findings, URLs, assumptions note). The assumption figures in the note come from `engine.MODEL_ASSUMPTIONS`, so change those constants in `engine.js`, never in `research.js`.
 - `src/components/` — React components; `src/App.jsx` owns the reducer and the 100 ms tick loop.
 - `e2e/` — Playwright specs plus `fixtures.js` (shared helpers and a request guard that fails any test that makes an external request). Specs run in parallel and use `page.clock` for time.
-- `features/ai-vs-human-code-review-simulator/slice-N-*.feature` — Gherkin scenarios exported from the plan, one file per slice. Tests that implement a scenario use its title.
+- `features/ai-vs-human-code-review-simulator/slice-N-*.feature` — Gherkin scenarios exported from the plan, one file per slice. Tests that implement a scenario use its title (outline tests append `: <row>`).
+- `tools/gherkin-sync/` — a Playwright reporter (wired in `playwright.config.js`) that fails the e2e run when a scenario test's top-level `test.step` titles differ from the scenario's step lines (keyword plus text, Background first, outline values filled in). Missing scenarios and Examples rows are reported only on a full, unfiltered run. `npx playwright test --list` checks just that every scenario has a test.
 - Unit tests sit next to their source (`src/**/*.test.js`); `src/testHelpers.js` holds their shared helpers.
 - `docs/specs/`, `plans/` — the spec and the implementation plan.
 
 Test rules:
 
 - Spec values that e2e tests check against (tick period, defaults, expected numbers) are declared in `e2e/fixtures.js` or the `*.spec.js` file that uses them, never imported from `src/`. A test that imports the value it checks can't catch that value being wrong.
-- A test's actions must match its Gherkin scenario's When steps exactly: the same keys, controls, and press counts. Change the scenario in the plan (and re-export it) before changing what the test does.
+- A test's actions must match its Gherkin scenario's steps exactly: the same keys, controls, and press counts. Wrap each step's code in `test.step('<exact step line>', …)`; the reporter checks the titles, and reviewers check that the code does what the title says. To change a scenario, edit it in the plan and re-export with `python3 <dev-team plugin>/scripts/plan_gherkin_export.py plans/ai-vs-human-code-review-simulator.md`, then change the test.
 
 ## Commands
 
