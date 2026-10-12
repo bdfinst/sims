@@ -18,21 +18,25 @@ The audience is people watching a talk or a demo. The presenter changes generati
 - A Vite + React (JSX) project at the repo root. `npm run build` produces **one self-contained offline file**, `dist/index.html`, with all JS and CSS inlined by `vite-plugin-singlefile`. It needs no network at runtime and can be opened straight from disk or shared as a single file.
 - Dependencies come from npm, not CDNs: `react`/`react-dom` 19, `lucide-react` for icons, and Tailwind CSS 4 through `@tailwindcss/vite`.
 - Source layout:
-  - `src/engine.js`: pure model, with no React or DOM.
-  - `src/research.js`: findings data.
+  - `src/engine.js`: pure model, with no React or DOM: constants, the numeric lane model, the slider table, the detection curve, `tick`, and the formatters.
+  - `src/reducer.js`: pure `reducer(state, action)` and `initialState` (`tick`, `start`, `pause`, `reset`, `setSetting`).
+  - `src/laneConfig.js`: presentation only: labels, icon names, and class strings per lane, plus the tile layout.
+  - `src/research.js`: findings data and the assumptions note.
   - `src/components/`: UI components.
-  - `src/App.jsx`: state, reducer, and effects.
+  - `src/App.jsx`: `useReducer`, the tick-interval and visibility effects, and the page layout.
   - `src/main.jsx`: entry point.
 
 **Components**
 
-- `App`: owns all state and the tick loop. Renders the header and both lanes.
-- `Header`: title, short description, a global warning-threshold slider, and the Start/Pause and Reset buttons.
+- `App`: owns the reducer state and the tick loop. Renders the header, the headline band, both lanes, and the research panel.
+- `Header`: title, short description, a global warning-threshold slider, the Start/Pause and Reset buttons, the Running/Paused status, and the elapsed work hours.
+- `HeadlineBand`: the AI ÷ Human incidents-per-PR ratio.
 - `Lane`: one instance per lane, configured by props (label, icons, color scheme, slider ranges).
 - `QueueBox`: shows the count, item tiles, the overflow indicator, and the warning state.
-- `LaneMetrics`: per-lane detection rate, incidents, incidents per PR, and pickup wait.
+- `LaneMetrics`: per-lane deployed, defects caught, incidents, incidents per PR, and pickup wait (shown through `MetricValue`).
 - `RateSlider`: a labeled range input.
 - `ResearchPanel`: a collapsible section below the lanes with the research findings and their citations.
+- `Icon`: maps an explicit set of icon names to named `lucide-react` imports and adds the `data-icon` hook.
 
 **Time scale:** 1 simulated second = 1 work hour. Each 100ms tick = 0.1 work hour. All rates are per work hour.
 
