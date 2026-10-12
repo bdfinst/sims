@@ -1,11 +1,12 @@
 import { SECONDS_PER_WORK_HOUR, formatElapsedHours } from '../engine.js'
+import { RateSlider } from './RateSlider.jsx'
 
 const TITLE = 'AI vs. Human Code Review Simulator'
 const DESCRIPTION =
   'Watch AI-speed code generation swamp human reviewers and push more defects into production.'
 const ELAPSED_CAPTION = `${SECONDS_PER_WORK_HOUR} s = 1 work hour`
 
-export function Header({ isRunning, ticks, onToggleRunning, onReset }) {
+export function Header({ isRunning, ticks, threshold, onToggleRunning, onReset, onSettingChange }) {
   return (
     <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
       <div>
@@ -34,6 +35,7 @@ export function Header({ isRunning, ticks, onToggleRunning, onReset }) {
           <span className="text-xl font-semibold">{formatElapsedHours(ticks)} work hours</span>{' '}
           <span className="text-gray-400">{ELAPSED_CAPTION}</span>
         </p>
+        <RateSlider settingKey="threshold" value={threshold} onSettingChange={onSettingChange} />
       </div>
     </header>
   )

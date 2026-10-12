@@ -18,6 +18,7 @@ import {
   formatLoc,
   formatPct,
   formatPickupWaitHours,
+  isOverThreshold,
   laneParams,
   sizeFactor,
   speedFactor,
@@ -417,4 +418,19 @@ describe('formatLoc', () => {
   ])('shows $shown for $loc', ({ loc, shown }) => {
     expect(formatLoc(loc)).toBe(shown)
   })
+})
+
+describe('isOverThreshold', () => {
+  const THRESHOLD = 15
+
+  it.each([
+    { displayed: THRESHOLD - 1, isOver: false },
+    { displayed: THRESHOLD, isOver: false },
+    { displayed: THRESHOLD + 1, isOver: true },
+  ])(
+    'is $isOver when $displayed PRs are pending against a threshold of 15',
+    ({ displayed, isOver }) => {
+      expect(isOverThreshold(displayed, THRESHOLD)).toBe(isOver)
+    },
+  )
 })

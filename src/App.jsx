@@ -9,6 +9,8 @@ import { ACTION, initialState, reducer } from './reducer.js'
 function App() {
   const [state, dispatch] = useReducer(reducer, initialState)
   const { isRunning } = state
+  const changeSetting = (settingKey, value) =>
+    dispatch({ type: ACTION.setSetting, settingKey, value })
 
   useEffect(() => {
     if (!isRunning) return undefined
@@ -29,8 +31,10 @@ function App() {
       <Header
         isRunning={isRunning}
         ticks={state.ticks}
+        threshold={state.settings.threshold}
         onToggleRunning={() => dispatch({ type: isRunning ? ACTION.pause : ACTION.start })}
         onReset={() => dispatch({ type: ACTION.reset })}
+        onSettingChange={changeSetting}
       />
       <main className="flex flex-col gap-6">
         <HeadlineBand lanes={state.lanes} />
@@ -40,9 +44,7 @@ function App() {
             laneId={laneId}
             lane={state.lanes[laneId]}
             settings={state.settings}
-            onSettingChange={(settingKey, value) =>
-              dispatch({ type: ACTION.setSetting, settingKey, value })
-            }
+            onSettingChange={changeSetting}
           />
         ))}
       </main>

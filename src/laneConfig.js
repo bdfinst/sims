@@ -57,4 +57,9 @@ export const SLIDER_PRESENTATION = Object.freeze({
     unit: '×',
     spokenUnit: 'times',
   }),
+  threshold: Object.freeze({
+    label: 'Warning threshold',
+    unit: ' PRs',
+    spokenUnit: 'PRs',
+  }),
 })

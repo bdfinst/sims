@@ -1,7 +1,15 @@
 import { SLIDERS } from '../engine.js'
 import { SLIDER_PRESENTATION } from '../laneConfig.js'
 
-export function RateSlider({ settingKey, value, onSettingChange, accentClass }) {
+// Sliders that belong to no lane (the warning threshold) use this neutral accent.
+const NEUTRAL_ACCENT_CLASS = 'accent-gray-300'
+
+export function RateSlider({
+  settingKey,
+  value,
+  onSettingChange,
+  accentClass = NEUTRAL_ACCENT_CLASS,
+}) {
   const { min, max, step } = SLIDERS[settingKey]
   const { label, unit, spokenUnit } = SLIDER_PRESENTATION[settingKey]
   const inputId = `slider-${settingKey}`

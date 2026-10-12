@@ -1,8 +1,8 @@
-import { LANE_MODELS, displayedPending, formatLoc, laneParams } from '../engine.js'
+import { LANE_MODELS, laneParams } from '../engine.js'
 import { LANE_PRESENTATION } from '../laneConfig.js'
 import { Icon } from './Icon.jsx'
 import { LaneMetrics } from './LaneMetrics.jsx'
-import { MetricValue } from './MetricValue.jsx'
+import { QueueBox } from './QueueBox.jsx'
 import { RateSlider } from './RateSlider.jsx'
 
 function DerivedValue({ children }) {
@@ -47,16 +47,7 @@ export function Lane({ laneId, lane, settings, onSettingChange }) {
           </DerivedValue>
         )}
       </div>
-      <dl className="rounded border border-gray-600 p-4">
-        <dt className="text-base">Pending Review</dt>
-        <dd className="text-4xl font-bold">
-          <MetricValue name="pending" value={displayedPending(lane)} />
-        </dd>
-        <dt className="text-base">Pending LOC</dt>
-        <dd className="text-xl font-semibold">
-          <MetricValue name="pendingLoc" value={formatLoc(lane.pendingLoc)} />
-        </dd>
-      </dl>
+      <QueueBox laneLabel={presentation.label} lane={lane} threshold={settings.threshold} />
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <Icon name={presentation.reviewIcon} className={presentation.accentTextClass} />

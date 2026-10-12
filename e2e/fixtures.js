@@ -98,6 +98,7 @@ export const AI_GEN_LABEL = 'AI generation (PRs/hr)'
 export const PR_SIZE_LABEL = 'PR size (LOC, both lanes)'
 export const REVIEWER_SPEED_LABEL = 'Reviewer speed (LOC/hr, both lanes)'
 export const AI_SKIM_LABEL = 'AI skim multiplier'
+export const THRESHOLD_LABEL = 'Warning threshold'
 
 // Expected values from the plan's reference model (plan, "Default arithmetic" under "Slices").
 // Per tick (0.1 h): a lane gains gen x 0.1 PRs of `size` LOC each, then reviews
@@ -145,6 +146,18 @@ export const REFERENCE = Object.freeze({
   humanPendingLocAtTick20WithHumanGen10: '4,400',
   humanPendingAtTick30AfterSizeChangeToPrSize500: 26,
   humanPendingLocAtTick30AfterSizeChangeToPrSize500: '9,100',
+  // Displayed Pending Review while the AI lane (2 PRs generated per tick, about 0.16 reviewed) and
+  // the Human lane at humanGen 10 (1 PR generated per tick, 0.12 reviewed) fall behind.
+  aiPendingAtTick5: 9,
+  aiPendingAtTick8: 14,
+  aiPendingAtTick9: 16,
+  aiPendingAtTick12: 22,
+  aiPendingAtTick20WithHumanGen10: 36, // the AI lane does not depend on humanGen
+  humanPendingAtTick18WithHumanGen10: 15,
+  humanPendingAtTick19WithHumanGen10: 16,
+  // Then humanGen 1 and reviewer speed 1000: each tick adds 0.1 PR and reviews 100 LOC (0.4 PR).
+  humanPendingAtTick25AfterDraining: 16,
+  humanPendingAtTick26AfterDraining: 15,
   humanDefectsCaughtWhenDrained: '6%', // PR size 250 at 1000 LOC/hr: 0.8 x 0.7625 x 0.1
   humanPendingAtTick20WithHumanGen10: 17,
   humanDeployedAtTick20WithHumanGen10: 2,
