@@ -15,6 +15,8 @@ import {
   buttonNamed,
   contrastRatio,
   expect,
+  expectSimulatorOpen,
+  expectViewport,
   expectNoHorizontalScroll,
   headline,
   laneLocator,
@@ -22,6 +24,7 @@ import {
   openSimulator,
   overflowIn,
   queueBox,
+  readTileCapacity,
   bottomOf,
   researchPanel,
   researchToggle,
@@ -53,6 +56,13 @@ const GENERATION_LABELS = {
   ai: [AI_GEN_LABEL],
 }
 const REVIEW_LABELS = { human: REVIEWER_SPEED_LABEL, ai: AI_SKIM_LABEL }
+
+// Background of every scenario in this feature: C is read from the queue box, so the page is
+// opened here (the box does not exist before it).
+const openAndReadCapacity = async (page) => {
+  await openSimulator(page)
+  expect(await readTileCapacity(page), 'queue tile capacity C').toBeGreaterThan(0)
+}
 
 const boxOf = async (locator, label) => {
   const box = await locator.boundingBox()
@@ -97,17 +107,25 @@ test.describe('Pending Review layout', () => {
     test.use({ viewport: PROJECTOR })
 
     test('Projector fit at 1280 × 720', async ({ page }) => {
-      await openSimulator(page)
-      await startAndRunFor(page, FULL_RUN_SECONDS)
+      await test.step('Given the queue tile capacity C is read from the queue box', async () => {
+        await openAndReadCapacity(page)
+      })
 
-      await expect(researchPanel(page), 'research panel is collapsed').not.toHaveAttribute('open')
-      await expectInsideViewport(page.getByRole('banner'), PROJECTOR, 'header')
-      await expectInsideViewport(headline(page), PROJECTOR, 'headline ratio')
-      for (const laneId of ALL_LANE_IDS) {
-        await expectInsideViewport(metric(page, laneId, 'pending'), PROJECTOR, `${laneId} count`)
-        await expectInsideViewport(metricsGrid(page, laneId), PROJECTOR, `${laneId} metrics`)
-        await expectInsideViewport(laneLocator(page, laneId), PROJECTOR, `${laneId} lane`)
-      }
+      await test.step('Given the viewport is 1280 × 720 and the simulation has run for 10 seconds', async () => {
+        await expectViewport(page, PROJECTOR)
+        await startAndRunFor(page, FULL_RUN_SECONDS)
+      })
+
+      await test.step("Then the header, the headline ratio, and both lanes' Pending Review counts and metric grids are fully visible without scrolling", async () => {
+        await expect(researchPanel(page), 'research panel is collapsed').not.toHaveAttribute('open')
+        await expectInsideViewport(page.getByRole('banner'), PROJECTOR, 'header')
+        await expectInsideViewport(headline(page), PROJECTOR, 'headline ratio')
+        for (const laneId of ALL_LANE_IDS) {
+          await expectInsideViewport(metric(page, laneId, 'pending'), PROJECTOR, `${laneId} count`)
+          await expectInsideViewport(metricsGrid(page, laneId), PROJECTOR, `${laneId} metrics`)
+          await expectInsideViewport(laneLocator(page, laneId), PROJECTOR, `${laneId} lane`)
+        }
+      })
     })
   })
 
@@ -115,20 +133,28 @@ test.describe('Pending Review layout', () => {
     test.use({ viewport: DESKTOP })
 
     test('Metric rows line up across lanes', async ({ page }) => {
-      await openSimulator(page)
+      await test.step('Given the queue tile capacity C is read from the queue box', async () => {
+        await openAndReadCapacity(page)
+      })
 
-      for (const row of METRIC_ROWS_TOP_TO_BOTTOM) {
-        const human = await boxOf(metric(page, 'human', row), `human ${row}`)
-        const ai = await boxOf(metric(page, 'ai', row), `ai ${row}`)
-        expect(ai.x, `${row} value left edge`).toBe(human.x)
-      }
-      const humanLabels = metricsGrid(page, 'human').locator('dt')
-      const aiLabels = metricsGrid(page, 'ai').locator('dt')
-      for (let row = 0; row < METRIC_ROWS_TOP_TO_BOTTOM.length; row += 1) {
-        const human = await boxOf(humanLabels.nth(row), `human label ${row}`)
-        const ai = await boxOf(aiLabels.nth(row), `ai label ${row}`)
-        expect(ai.x, `label ${row} left edge`).toBe(human.x)
-      }
+      await test.step('Given the viewport is 1280 × 800', async () => {
+        await expectViewport(page, DESKTOP)
+      })
+
+      await test.step('Then each metric row in the Human lane has the same left edge as the matching row in the AI lane', async () => {
+        for (const row of METRIC_ROWS_TOP_TO_BOTTOM) {
+          const human = await boxOf(metric(page, 'human', row), `human ${row}`)
+          const ai = await boxOf(metric(page, 'ai', row), `ai ${row}`)
+          expect(ai.x, `${row} value left edge`).toBe(human.x)
+        }
+        const humanLabels = metricsGrid(page, 'human').locator('dt')
+        const aiLabels = metricsGrid(page, 'ai').locator('dt')
+        for (let row = 0; row < METRIC_ROWS_TOP_TO_BOTTOM.length; row += 1) {
+          const human = await boxOf(humanLabels.nth(row), `human label ${row}`)
+          const ai = await boxOf(aiLabels.nth(row), `ai label ${row}`)
+          expect(ai.x, `label ${row} left edge`).toBe(human.x)
+        }
+      })
     })
 
     test('Metric rows keep one fixed order in both lanes', async ({ page }) => {
@@ -147,19 +173,30 @@ test.describe('Pending Review layout', () => {
     })
 
     test('Wide layout reads left to right', async ({ page }) => {
-      await openSimulator(page)
+      await test.step('Given the queue tile capacity C is read from the queue box', async () => {
+        await openAndReadCapacity(page)
+      })
 
-      for (const laneId of ALL_LANE_IDS) {
-        const { inputs, queue, review, metrics } = await laneGroups(page, laneId)
-        for (const input of inputs) expectLeftOf(input, queue, `${laneId} inputs left of queue`)
-        expectLeftOf(queue, review, `${laneId} queue left of review controls`)
-        expectLeftOf(review, metrics, `${laneId} review controls left of metrics`)
-      }
-      const title = await boxOf(page.getByRole('heading', { level: 1 }), 'title')
-      for (const name of ['Start', 'Reset']) {
-        const button = await boxOf(buttonNamed(page, name), name)
-        expect(button.x, `${name} is right of the title`).toBeGreaterThanOrEqual(rightOf(title))
-      }
+      await test.step('Given the viewport is 1280 × 800', async () => {
+        await expectViewport(page, DESKTOP)
+      })
+
+      await test.step('Then within each lane the inputs, the Pending Review box, and the review side appear left to right', async () => {
+        for (const laneId of ALL_LANE_IDS) {
+          const { inputs, queue, review, metrics } = await laneGroups(page, laneId)
+          for (const input of inputs) expectLeftOf(input, queue, `${laneId} inputs left of queue`)
+          expectLeftOf(queue, review, `${laneId} queue left of review controls`)
+          expectLeftOf(review, metrics, `${laneId} review controls left of metrics`)
+        }
+      })
+
+      await test.step('And the Start/Pause and Reset buttons sit to the right of the title', async () => {
+        const title = await boxOf(page.getByRole('heading', { level: 1 }), 'title')
+        for (const name of ['Start', 'Reset']) {
+          const button = await boxOf(buttonNamed(page, name), name)
+          expect(button.x, `${name} is right of the title`).toBeGreaterThanOrEqual(rightOf(title))
+        }
+      })
     })
 
     // AC13: the Deployed value is green in the lanes.
@@ -172,9 +209,17 @@ test.describe('Pending Review layout', () => {
     })
 
     test('Dark theme', async ({ page }) => {
-      await openSimulator(page)
+      await test.step('Given the queue tile capacity C is read from the queue box', async () => {
+        await openAndReadCapacity(page)
+      })
 
-      await expect(page.locator('body')).toHaveCSS('background-color', PAGE_BACKGROUND)
+      await test.step('Given I open the simulator', async () => {
+        await expectSimulatorOpen(page)
+      })
+
+      await test.step('Then the page background color is rgb(11, 13, 18)', async () => {
+        await expect(page.locator('body')).toHaveCSS('background-color', PAGE_BACKGROUND)
+      })
     })
 
     test('Text contrasts with its background (WCAG 1.4.3)', async ({ page }) => {
@@ -219,25 +264,45 @@ test.describe('Pending Review layout', () => {
     test.use({ viewport: PHONE })
 
     test('No horizontal scroll on a phone, even when overflowing', async ({ page }) => {
-      await openSimulator(page)
-      await startAndRunFor(page, FULL_RUN_SECONDS)
+      await test.step('Given the queue tile capacity C is read from the queue box', async () => {
+        await openAndReadCapacity(page)
+      })
 
-      await expect(overflowIn(page, 'ai')).toBeVisible()
-      await expectNoHorizontalScroll(page)
+      await test.step('Given the viewport is 375 × 667', async () => {
+        await expectViewport(page, PHONE)
+      })
 
-      const human = await boxOf(laneLocator(page, 'human'), 'human lane')
-      const ai = await boxOf(laneLocator(page, 'ai'), 'ai lane')
-      expectStackedBelow(human, ai, 'lanes are stacked')
+      await test.step('When I press Start and 10 seconds pass', async () => {
+        await startAndRunFor(page, FULL_RUN_SECONDS)
+      })
 
-      for (const laneId of ALL_LANE_IDS) {
-        const { inputs, queue, review, metrics } = await laneGroups(page, laneId)
-        expectStackedBelow(inputs.at(-1), queue, `${laneId} inputs above queue`)
-        expectStackedBelow(queue, review, `${laneId} queue above review`)
-        expectStackedBelow(review, metrics, `${laneId} review above metrics`)
-      }
+      await test.step('Then the AI lane shows a "+N more" indicator', async () => {
+        await expect(overflowIn(page, 'ai')).toBeVisible()
+      })
 
-      await expectInsideViewport(buttonNamed(page, 'Pause'), PHONE, 'Start/Pause button')
-      await expectInsideViewport(buttonNamed(page, 'Reset'), PHONE, 'Reset button')
+      await test.step('And the page does not scroll horizontally', async () => {
+        await expectNoHorizontalScroll(page)
+      })
+
+      await test.step('And the two lanes are stacked one above the other', async () => {
+        const human = await boxOf(laneLocator(page, 'human'), 'human lane')
+        const ai = await boxOf(laneLocator(page, 'ai'), 'ai lane')
+        expectStackedBelow(human, ai, 'lanes are stacked')
+      })
+
+      await test.step('And within each lane the inputs, the Pending Review box, and the review side appear top to bottom', async () => {
+        for (const laneId of ALL_LANE_IDS) {
+          const { inputs, queue, review, metrics } = await laneGroups(page, laneId)
+          expectStackedBelow(inputs.at(-1), queue, `${laneId} inputs above queue`)
+          expectStackedBelow(queue, review, `${laneId} queue above review`)
+          expectStackedBelow(review, metrics, `${laneId} review above metrics`)
+        }
+      })
+
+      await test.step('And the Start/Pause and Reset buttons are visible without scrolling', async () => {
+        await expectInsideViewport(buttonNamed(page, 'Pause'), PHONE, 'Start/Pause button')
+        await expectInsideViewport(buttonNamed(page, 'Reset'), PHONE, 'Reset button')
+      })
     })
   })
 
@@ -278,7 +343,6 @@ test.describe('Pending Review layout', () => {
   })
 
   test('Every control is keyboard reachable with a visible focus ring', async ({ page }) => {
-    await openSimulator(page)
     const inTabOrder = [
       ['Start', buttonNamed(page, 'Start')],
       ['Reset', buttonNamed(page, 'Reset')],
@@ -290,23 +354,48 @@ test.describe('Pending Review layout', () => {
       [AI_SKIM_LABEL, slider(page, AI_SKIM_LABEL)],
       [RESEARCH_TITLE, researchToggle(page)],
     ]
+    const tookFocus = {}
 
-    for (const [name, control] of inTabOrder) {
-      await page.keyboard.press('Tab')
-      await expect(control, `${name} is next in the Tab order`).toBeFocused()
-      await expect(control).toHaveAccessibleName(name)
-      await expect(control, `${name} focus ring colour`).toHaveCSS(
-        'outline-color',
-        FOCUS_RING_COLOR,
-      )
-      const focusRing = await control.evaluate((element) => ({
-        isFocusVisible: element.matches(':focus-visible'),
-        outlineStyle: getComputedStyle(element).outlineStyle,
-        outlineWidth: Number.parseFloat(getComputedStyle(element).outlineWidth),
-      }))
-      expect(focusRing.isFocusVisible, `${name} matches :focus-visible`).toBe(true)
-      expect(focusRing.outlineStyle, `${name} outline style`).not.toBe('none')
-      expect(focusRing.outlineWidth, `${name} outline width`).toBeGreaterThan(0)
-    }
+    await test.step('Given the queue tile capacity C is read from the queue box', async () => {
+      await openAndReadCapacity(page)
+    })
+
+    await test.step('Given I open the simulator', async () => {
+      await expectSimulatorOpen(page)
+    })
+
+    await test.step('When I Tab through the page', async () => {
+      for (const [name, control] of inTabOrder) {
+        await page.keyboard.press('Tab')
+        tookFocus[name] = await control.evaluate((element) => element === document.activeElement)
+      }
+    })
+
+    await test.step('Then focus visits Start, Reset, the threshold slider, and all five model sliders', async () => {
+      const expected = Object.fromEntries(inTabOrder.map(([name]) => [name, true]))
+      expect(tookFocus, 'each control took focus, in Tab order').toEqual(expected)
+    })
+
+    await test.step('And each has an accessible name and a non-none outline when focused', async () => {
+      // Focus is on the last control after the Tab pass; Shift+Tab walks back through each one.
+      for (let index = inTabOrder.length - 1; index >= 0; index -= 1) {
+        const [name, control] = inTabOrder[index]
+        await expect(control, `${name} holds focus`).toBeFocused()
+        await expect(control).toHaveAccessibleName(name)
+        await expect(control, `${name} focus ring colour`).toHaveCSS(
+          'outline-color',
+          FOCUS_RING_COLOR,
+        )
+        const focusRing = await control.evaluate((element) => ({
+          isFocusVisible: element.matches(':focus-visible'),
+          outlineStyle: getComputedStyle(element).outlineStyle,
+          outlineWidth: Number.parseFloat(getComputedStyle(element).outlineWidth),
+        }))
+        expect(focusRing.isFocusVisible, `${name} matches :focus-visible`).toBe(true)
+        expect(focusRing.outlineStyle, `${name} outline style`).not.toBe('none')
+        expect(focusRing.outlineWidth, `${name} outline width`).toBeGreaterThan(0)
+        if (index > 0) await page.keyboard.press('Shift+Tab')
+      }
+    })
   })
 })

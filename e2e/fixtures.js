@@ -78,12 +78,17 @@ export const expectLiveIntervals = (page, count) =>
     })
     .toBe(count)
 
+export const expectSimulatorOpen = (page) =>
+  expect(page.getByRole('heading', { name: SIMULATOR_TITLE })).toBeVisible()
+
+export const expectViewport = (page, viewport) => expect(page.viewportSize()).toEqual(viewport)
+
 // Opens the page under a fake clock that then stops: time only moves through page.clock.runFor.
 export const openSimulator = async (page, url = '/') => {
   await page.clock.install({ time: FIXED_START_MS })
   await page.addInitScript(trackLiveIntervals)
   await page.goto(url)
-  await expect(page.getByRole('heading', { name: SIMULATOR_TITLE })).toBeVisible()
+  await expectSimulatorOpen(page)
   await page.clock.pauseAt(FIXED_START_MS + CLOCK_PAUSE_OFFSET_MS)
 }
 
@@ -157,16 +162,19 @@ export const expectQueueState = async (page, laneId, count, state) => {
   await expect(queueBox(page, laneId)).toHaveAttribute('data-state', state)
 }
 
-// Everything a warning looks like: the state, the alert icon, the red border, the announcement.
-export const expectWarningShown = async (page, laneId) => {
+// What a warning box looks like: the state, the alert icon, and the red border.
+export const expectWarningBox = async (page, laneId) => {
   const box = queueBox(page, laneId)
   await expect(box).toHaveAttribute('data-state', QUEUE_STATE.warning)
   await expect(box.locator('[data-icon="triangle-alert"]')).toBeVisible()
   await expect(box).toHaveCSS('border-color', WARNING_BORDER_COLOR)
-  await expect(laneLocator(page, laneId).getByRole('status')).toHaveText(
+}
+
+// The lane's status element announces the warning.
+export const expectWarningAnnounced = (page, laneId) =>
+  expect(laneLocator(page, laneId).getByRole('status')).toHaveText(
     `${QUEUE_LABEL_BY_LANE[laneId]} Pending Review over threshold`,
   )
-}
 
 // The tiles a queue box draws and the overflow text it adds ("+N more").
 export const tilesIn = (page, laneId) => queueBox(page, laneId).locator('[data-tile]')

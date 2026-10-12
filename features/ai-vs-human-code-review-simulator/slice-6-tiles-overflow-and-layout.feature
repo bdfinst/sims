@@ -14,10 +14,10 @@ Feature: Pending Review tiles and layout
 
   Scenario: Exactly at capacity has no overflow indicator
     Given I set "Human generation (PRs/hr)" to 10, "PR size (LOC, both lanes)" to 1000, and "Reviewer speed (LOC/hr, both lanes)" to 100
-    When I press Start and advance one tick at a time until the Human lane shows Pending Review C
-    Then the Human lane shows C tiles and no overflow indicator
+    When I press Start and C + 1 ticks pass
+    Then the Human lane shows Pending Review C, C tiles, and no overflow indicator
     When 0.1 more seconds pass
-    Then the Human lane shows C tiles and the text "+1 more"
+    Then the Human lane shows Pending Review C + 1, C tiles, and the text "+1 more"
 
   Scenario: Overflow beyond capacity
     Given I open the simulator

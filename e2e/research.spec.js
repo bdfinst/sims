@@ -6,6 +6,7 @@ import {
   contrastRatio,
   expect,
   expectNoHorizontalScroll,
+  expectViewport,
   openResearchPanel,
   openSimulator,
   researchPanel,
@@ -74,35 +75,86 @@ const assumptionsParagraph = (page) =>
 
 test.describe('Research behind the simulation', () => {
   test('Panel is collapsed by default', async ({ page }) => {
-    await openSimulator(page)
+    await test.step('Given I open the simulator', async () => {
+      await openSimulator(page)
+    })
 
-    await expect(researchToggle(page)).toBeVisible()
-    await expect(researchPanel(page)).not.toHaveAttribute('open')
-    const hiddenContent = [
-      ...SOURCES.map(({ wording }) => researchPanel(page).getByText(wording)),
-      assumptionsParagraph(page),
-    ]
-    for (const content of hiddenContent) {
-      await expect(content, 'is in the page').toHaveCount(1)
-      await expect(content, 'is not visible').toBeHidden()
-    }
+    await test.step('Then the "Research behind this simulation" toggle is collapsed', async () => {
+      await expect(researchToggle(page)).toBeVisible()
+      await expect(researchPanel(page)).not.toHaveAttribute('open')
+    })
+
+    await test.step('And no research findings are visible', async () => {
+      const hiddenContent = [
+        ...SOURCES.map(({ wording }) => researchPanel(page).getByText(wording)),
+        assumptionsParagraph(page),
+      ]
+      for (const content of hiddenContent) {
+        await expect(content, 'is in the page').toHaveCount(1)
+        await expect(content, 'is not visible').toBeHidden()
+      }
+    })
   })
 
   test('Expanding shows every finding verbatim with its source', async ({ page }) => {
-    await openSimulator(page)
+    await test.step('Given I open the simulator', async () => {
+      await openSimulator(page)
+    })
 
-    await openResearchPanel(page)
+    await test.step('When I expand "Research behind this simulation"', async () => {
+      await openResearchPanel(page)
+    })
 
-    for (const { wording, label, url } of SOURCES) {
-      await expect(researchPanel(page).getByText(wording), label).toBeVisible()
-      const link = sourceLink(page, url)
-      await expect(link, url).toHaveCount(1)
-      await expect(link, `${url} opens in a new tab`).toHaveAttribute('target', '_blank')
-      await expect(link, `${url} protects the opener`).toHaveAttribute('rel', /noopener/)
-      await expect(link, `${url} is named by its source`).toHaveAccessibleName(
-        `${label}${NEW_TAB_NOTICE}`,
-      )
-    }
+    await test.step('Then the panel contains "2,500 reviews of 3.2 million lines of code over 10 months"', async () => {
+      await expect(
+        researchPanel(page).getByText(SOURCES[0].wording),
+        SOURCES[0].label,
+      ).toBeVisible()
+    })
+
+    await test.step('And the panel contains "Review no more than 200–400 LOC at a time"', async () => {
+      await expect(
+        researchPanel(page).getByText(SOURCES[1].wording),
+        SOURCES[1].label,
+      ).toBeVisible()
+    })
+
+    await test.step('And the panel contains "faster than 500 LOC/hour"', async () => {
+      await expect(researchPanel(page)).toContainText('faster than 500 LOC/hour')
+    })
+
+    await test.step('And the panel contains "PR size +51%" and "(+242.7%)"', async () => {
+      await expect(
+        researchPanel(page).getByText(SOURCES[2].wording),
+        SOURCES[2].label,
+      ).toBeVisible()
+    })
+
+    await test.step('And the panel contains "AI PRs wait 4.6× longer before review, but are reviewed 2× faster once picked up"', async () => {
+      await expect(
+        researchPanel(page).getByText(SOURCES[3].wording),
+        SOURCES[3].label,
+      ).toBeVisible()
+    })
+
+    await test.step('And the panel contains "practitioner observation" and "locally coherent but globally brittle"', async () => {
+      await expect(
+        researchPanel(page).getByText(SOURCES[4].wording),
+        SOURCES[4].label,
+      ).toBeVisible()
+    })
+
+    await test.step("And the panel links to all five source URLs from the spec's Research Sources table, each opening in a new tab", async () => {
+      for (const { label, url } of SOURCES) {
+        const link = sourceLink(page, url)
+        await expect(link, url).toHaveCount(1)
+        await expect(link, `${url} opens in a new tab`).toHaveAttribute('target', '_blank')
+        await expect(link, `${url} protects the opener`).toHaveAttribute('rel', /noopener/)
+        await expect(link, `${url} is named by its source`).toHaveAccessibleName(
+          `${label}${NEW_TAB_NOTICE}`,
+        )
+      }
+    })
   })
 
   // No scenario of its own: the plan's accessibility rule (WCAG 1.4.3) applied to the panel's links.
@@ -117,53 +169,79 @@ test.describe('Research behind the simulation', () => {
   })
 
   test('Unsupported or misattributing wording never appears', async ({ page }) => {
-    await openSimulator(page)
-    await openResearchPanel(page)
+    await test.step('Given I expand "Research behind this simulation"', async () => {
+      await openSimulator(page)
+      await openResearchPanel(page)
+    })
 
-    const pageText = (await page.locator('body').innerText()).toLowerCase()
-    for (const phrase of FORBIDDEN_PHRASES) {
-      expect(pageText, `page text contains "${phrase}"`).not.toContain(phrase)
-    }
+    await test.step('Then the page does not contain "near zero", "coined", or "originated"', async () => {
+      const pageText = (await page.locator('body').innerText()).toLowerCase()
+      for (const phrase of FORBIDDEN_PHRASES) {
+        expect(pageText, `page text contains "${phrase}"`).not.toContain(phrase)
+      }
+    })
   })
 
   test('Model assumptions and calibration are stated', async ({ page }) => {
-    await openSimulator(page)
-    await openResearchPanel(page)
+    await test.step('Given I expand "Research behind this simulation"', async () => {
+      await openSimulator(page)
+      await openResearchPanel(page)
+    })
 
-    const note = assumptionsParagraph(page)
-    for (const phrase of [...ASSUMPTION_PHRASES, CALIBRATION_SENTENCE]) {
-      await expect(note).toContainText(phrase)
-    }
-    await expect(note.locator(`a[href="${FAROS_URL}"]`), 'the figure links its source').toHaveCount(
-      1,
-    )
+    await test.step('Then the panel states that defect density, the base detection rate, the detection floors, the curve thresholds, and the 1.51 size multiplier are modeling choices', async () => {
+      for (const phrase of ASSUMPTION_PHRASES) {
+        await expect(assumptionsParagraph(page)).toContainText(phrase)
+      }
+    })
+
+    await test.step("And the panel states that the defaults were calibrated to land near Faros's +242.7% incidents per PR", async () => {
+      const note = assumptionsParagraph(page)
+      await expect(note).toContainText(CALIBRATION_SENTENCE)
+      await expect(
+        note.locator(`a[href="${FAROS_URL}"]`),
+        'the figure links its source',
+      ).toHaveCount(1)
+    })
   })
 
   test('Panel is keyboard operable and does not interrupt the simulation', async ({ page }) => {
-    await openSimulator(page)
-    await startAndRunFor(page, SECONDS_BEFORE_EXPANDING)
+    await test.step('Given the simulation is running', async () => {
+      await openSimulator(page)
+      await startAndRunFor(page, SECONDS_BEFORE_EXPANDING)
+    })
 
-    await tabTo(page, researchToggle(page))
-    await page.keyboard.press('Enter')
+    await test.step('When I Tab to the research toggle and press Enter', async () => {
+      await tabTo(page, researchToggle(page))
+      await page.keyboard.press('Enter')
+    })
 
-    await expect(researchPanel(page)).toHaveAttribute('open', '')
-    await expect(page.getByText('Running', { exact: true })).toBeVisible()
-    await advanceSeconds(
-      page,
-      SECONDS_AFTER_EXPANDING,
-      SECONDS_BEFORE_EXPANDING + SECONDS_AFTER_EXPANDING,
-    )
+    await test.step('Then the panel expands and the status still reads "Running"', async () => {
+      await expect(researchPanel(page)).toHaveAttribute('open', '')
+      await expect(page.getByText('Running', { exact: true })).toBeVisible()
+      await advanceSeconds(
+        page,
+        SECONDS_AFTER_EXPANDING,
+        SECONDS_BEFORE_EXPANDING + SECONDS_AFTER_EXPANDING,
+      )
+    })
   })
 
   test.describe('on a phone', () => {
     test.use({ viewport: PHONE })
 
     test('Panel fits a phone', async ({ page }) => {
-      await openSimulator(page)
+      await test.step('Given the viewport is 375 × 667', async () => {
+        await openSimulator(page)
+        await expectViewport(page, PHONE)
+      })
 
-      await openResearchPanel(page)
+      await test.step('When I expand "Research behind this simulation"', async () => {
+        await openResearchPanel(page)
+      })
 
-      await expectNoHorizontalScroll(page)
+      await test.step('Then the page does not scroll horizontally', async () => {
+        await expectNoHorizontalScroll(page)
+      })
     })
   })
 
