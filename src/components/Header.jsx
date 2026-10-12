@@ -41,7 +41,7 @@ export function Header({ isRunning, ticks, threshold, onToggleRunning, onReset, 
             settingKey="threshold"
             value={threshold}
             onSettingChange={onSettingChange}
-            isTipAlwaysBelow
+            isAlwaysBelow
           />
         </div>
       </div>

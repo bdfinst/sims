@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { MODEL_ASSUMPTIONS } from './engine.js'
 import { FINDINGS, FINDING_KIND, assumptionsNote } from './research.js'
 
-const FORBIDDEN_PHRASES = ['near zero', 'coined', 'originated']
+const UNSUPPORTED_WORDING = ['near zero', 'coined', 'originated']
 const FAROS_URL = 'https://faros.ai/research/ai-acceleration-whiplash'
 const SMARTBEAR_PRACTICES_URL =
   'https://smartbear.com/learn/code-review/best-practices-for-peer-code-review/'
@@ -44,7 +44,7 @@ const ASSUMPTION_SCENARIO_PHRASES = [
   "the base detection rate (0.8, picked from SmartBear's 70–90% range)",
   'the detection floors (0.05 for large PRs and 0.1 for fast reviewing)',
   'the curve thresholds (PR size 200 to 400 LOC, reviewer speed 500 to 1,000 LOC/hr)',
-  'the human-lane defaults (30 LOC/hr and 1 PR per day)',
+  'the human-lane defaults, an assumption (30 LOC/hr and 1 PR per day)',
   "The AI lane's PR size (1.51× the human PR size) and default volume (giving 1.162× the human PRs per day) come from Faros",
   "The human defaults were chosen to land near Faros's +242.7% incidents per PR",
 ]
@@ -90,7 +90,9 @@ describe('assumptionsNote', () => {
         humanDefaultPrsPerDay: 2,
       }),
     )
-    expect(note).toContain('the human-lane defaults (1,500 LOC/hr and 2 PRs per day)')
+    expect(note).toContain(
+      'the human-lane defaults, an assumption (1,500 LOC/hr and 2 PRs per day)',
+    )
   })
 
   it('links the SmartBear range, the Faros multipliers, and the calibration figure to their sources', () => {
@@ -126,6 +128,6 @@ describe('research data', () => {
     const everyText = [...FINDINGS.map(({ text }) => text), renderedNote(assumptionsNote())]
       .join(' ')
       .toLowerCase()
-    for (const phrase of FORBIDDEN_PHRASES) expect(everyText).not.toContain(phrase)
+    for (const phrase of UNSUPPORTED_WORDING) expect(everyText).not.toContain(phrase)
   })
 })

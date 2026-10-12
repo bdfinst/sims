@@ -154,6 +154,7 @@ export const FULL_RUN_SECONDS = 10
 export const LAST_TICK_BEFORE_FIRST_HUMAN_PR_SECONDS = 7.9
 export const MAX_SKIM = 3
 export const QUARTER_PR_PER_DAY = 0.25
+export const HALF_PR_PER_DAY = 0.5
 // The busy-AI preset leaves 115 PRs pending after 30 s, beyond any tile capacity C (at most 98).
 export const OVERFLOW_RUN_SECONDS = 30
 // Declared here on purpose: data-state is a fixed hook, so a rename in the app must fail the tests.
@@ -203,8 +204,8 @@ export const AI_CODE_WRITTEN_LABEL = 'AI code written (LOC/hr)'
 export const REVIEWER_SPEED_LABEL = 'Reviewer speed (LOC/hr, both lanes)'
 export const AI_SKIM_LABEL = 'AI skim multiplier'
 export const THRESHOLD_LABEL = 'Warning threshold'
-// Every slider, in page order: the header threshold, then the Human lane, then the AI lane. From
-// the plan's Slice 6 keyboard scenario, independent of src.
+// Every slider's label, in page order: the header threshold, then the Human lane, then the AI
+// lane. Independent of src.
 export const SLIDER_LABELS = Object.freeze([
   THRESHOLD_LABEL,
   HUMAN_CODE_WRITTEN_LABEL,
@@ -291,15 +292,15 @@ export const REFERENCE = Object.freeze({
   // AI code written 600, equal to the effective review speed: the queue stays empty.
   aiCodeWritten600PendingAtTick100: 0,
   aiCodeWritten600DeployedAtTick100: 16, // (16.556)
-  // Plan, Slice 2 check: from the busy-AI state at 1 s, one more tick with reviewer speed 1000 and
+  // A mid-run review-speed change: from the busy-AI state at 1 s, one more tick with reviewer speed 1000 and
   // skim 3 reviews 300 LOC (AI deployed 2.483); with reviewer speed 100, pending reaches 4.360.
   busyAiDeployedAtTick11WithFasterReview: 2,
   busyAiPendingAtTick11WithSlowReview: 4,
-  // Plan, Slice 4: paused at 2 s, Human PRs per day set to 0.5 (AI PR size 724.8), then 1 s more.
+  // A PR-size change while paused: at 2 s, Human PRs per day set to 0.5 (AI PR size 724.8), then 1 s more.
   // The 2,800 queued LOC keep their size; 10 more ticks add 140 LOC each.
   busyAiPendingAtTick30AfterHumanPrsPerDay05: 9,
   busyAiPendingLocAtTick30AfterHumanPrsPerDay05: '4,200',
-  // Plan, Slice 5 check: from 5 s, AI_DRAIN_SETTINGS remove 0.551 PR per tick (16.01 at 5.6 s,
+  // Draining the busy-AI queue: from 5 s, AI_DRAIN_SETTINGS remove 0.551 PR per tick (16.01 at 5.6 s,
   // 15.46 at 5.7 s); from 2 s they empty the queue well within 6 s.
   drainedAiPendingAtTick56: 16,
   drainedAiPendingAtTick57: 15,
@@ -332,8 +333,12 @@ export const expectNeverDecreases = (samples) => {
   expect(decreases).toEqual([])
 }
 
-// Every sample is greater than the one before it.
+// Every sample is a finite number greater than the one before it. Needs two or more samples, so
+// the check never passes vacuously.
 export const expectStrictlyIncreasing = (samples, label) => {
+  expect(samples.length, `${label}: samples to compare`).toBeGreaterThan(1)
+  const notFinite = samples.filter((sample) => !Number.isFinite(sample))
+  expect(notFinite, `${label}: every sample is a finite number`).toEqual([])
   const notIncreasing = samples.slice(1).filter((sample, index) => !(sample > samples[index]))
   expect(notIncreasing, label).toEqual([])
 }
@@ -349,61 +354,11 @@ export const slider = (page, name) => page.getByRole('slider', { name, exact: tr
 // A slider's info button, named "About <slider label>".
 export const infoButton = (page, sliderLabel) => buttonNamed(page, `About ${sliderLabel}`)
 
-// The info tips on screen (getByRole skips hidden ones).
-export const shownTips = (page) => page.getByRole('tooltip')
-
-// The centre of an element's layout box.
-export const centreOf = async (locator) => {
-  const box = await locator.boundingBox()
-  expect(box, 'element has a layout box').not.toBeNull()
-  return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
-}
-
-// Moves the real mouse pointer to the centre of an element (a hover, with no click), scrolling it
-// into view first so the pointer lands on it.
-export const movePointerTo = async (page, locator) => {
-  await locator.scrollIntoViewIfNeeded()
-  const { x, y } = await centreOf(locator)
-  await page.mouse.move(x, y)
-}
-
-// Glides the mouse from the button's centre straight to the tip's nearest edge, one pixel per
-// move event, then into the tip. Any gap between button and tip is crossed, as a real pointer would.
-export const movePointerOnto = async (page, button, tip) => {
-  const start = await centreOf(button)
-  const tipBox = await boxOf(tip, 'tip')
-  const isTipAbove = tipBox.y < start.y
-  const edgeY = isTipAbove ? tipBox.y + tipBox.height - 1 : tipBox.y + 1
-  await page.mouse.move(start.x, start.y)
-  await page.mouse.move(start.x, edgeY, { steps: Math.ceil(Math.abs(edgeY - start.y)) })
-  await movePointerTo(page, tip)
-}
-
+// An element's layout box, failing with `label` when it has none.
 export const boxOf = async (locator, label) => {
   const box = await locator.boundingBox()
   expect(box, `${label} has a layout box`).not.toBeNull()
   return box
-}
-
-export const overlaps = (first, second) =>
-  first.x < second.x + second.width &&
-  second.x < first.x + first.width &&
-  first.y < second.y + second.height &&
-  second.y < first.y + first.height
-
-// The first button or input after the slider's label, in document order.
-export const controlAfterLabel = (page, control) =>
-  slider(page, control).evaluate((input) => {
-    const label = document.querySelector(`label[for="${input.id}"]`)
-    const following = [...document.querySelectorAll('button, input')].find(
-      (element) => label.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING,
-    )
-    return following?.getAttribute('aria-label') ?? following?.id
-  })
-
-export const labelOf = async (page, control) => {
-  const inputId = await slider(page, control).getAttribute('id')
-  return page.locator(`label[for="${inputId}"]`)
 }
 
 // Where every element in both lanes sits, except the tips (which appear when opened).
@@ -533,6 +488,7 @@ export const idleFor = async (page, seconds) => {
   await flushPendingRenders(page)
 }
 
+export const PROJECTOR = { width: 1280, height: 720 }
 export const PHONE = { width: 375, height: 667 }
 export const NARROWEST_PHONE = { width: 320, height: 568 } // WCAG 1.4.10 reflow
 export const MIN_TEXT_CONTRAST = 4.5 // WCAG 1.4.3, normal-size text
@@ -588,5 +544,11 @@ export const contrastRatio = ({ foreground, background }) => {
   const [lighter, darker] = [luminance(foreground), luminance(background)].sort((a, b) => b - a)
   return (lighter + 0.05) / (darker + 0.05)
 }
+
+// Escapes `text` for use as a literal inside a RegExp.
+export const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+// Wording the page must never use: unsupported or misattributing claims.
+export const UNSUPPORTED_WORDING = Object.freeze(['near zero', 'coined', 'originated'])
 
 export { expect }

@@ -363,7 +363,7 @@ describe('formatHeadlineRatio', () => {
     ).toBe(NO_VALUE)
   })
 
-  it('is blank until the Human lane displays Deployed 1', () => {
+  it('is blank while the Human lane has shipped less than one whole PR (0.9 deployed)', () => {
     expect(
       formatHeadlineRatio(lanesOf({ ai: laneWithTotals(5, 30), human: laneWithTotals(0.9, 1.7) })),
     ).toBe(NO_VALUE)
@@ -453,6 +453,24 @@ describe('mid-run changes from the defaults at 1 second (AC7c)', () => {
       expect(formatIncidentsPerPr(human)).toBe(incidentsPerPr)
     },
   )
+
+  it('leaves AI PR size, detection, and escapes per reviewed LOC unchanged by AI code written', () => {
+    // 15% caught: 0.8 x sizeFactor(362.4) x speedFactor(600) = 0.8 x 0.2286 x 0.82 = 0.14996.
+    // Each reviewed LOC lets 0.02 x (1 - 0.14996) = 0.0170008 defects escape.
+    const escapedPerReviewedLoc = (params) => {
+      const lane = tick(emptyLane(), params)
+      return lane.escapedDefects / lane.deployedLoc
+    }
+    for (const aiLocPerHour of [53, 2000]) {
+      const params = paramsFor(AI, { aiLocPerHour })
+      expect(params.size, `size at ${aiLocPerHour}`).toBeCloseTo(362.4, 10)
+      expect(detection(params.size, params.effSpeed), `detection at ${aiLocPerHour}`).toBeCloseTo(
+        0.14996,
+        5,
+      )
+      expect(escapedPerReviewedLoc(params), `escapes at ${aiLocPerHour}`).toBeCloseTo(0.0170008, 6)
+    }
+  })
 
   it('keeps 0.406 PRs deployed and 5.395 defects escaped after the 0.25 PRs per day change', () => {
     const human = afterSettingChange(HUMAN, {
@@ -556,8 +574,8 @@ describe('AI code written against the AI lane effective review speed (AC7d)', ()
 
   it('shows Pending Review 11 at 10 seconds and 16 (16.556) at 15 seconds, first reaching 16 at tick 145', () => {
     const trace = traceTicks(emptyLane(), AI_AT_1000, FIFTEEN_SECONDS_IN_TICKS)
-    expect(displayedPending(trace[99])).toBe(11)
-    expect(trace[149].pendingPrs).toBeCloseTo(16.556, 3)
+    expect(displayedPending(trace[TEN_SECONDS_IN_TICKS - 1])).toBe(11)
+    expect(trace[FIFTEEN_SECONDS_IN_TICKS - 1].pendingPrs).toBeCloseTo(16.556, 3)
     expect(displayedPending(trace[143])).toBe(15)
     expect(displayedPending(trace[144])).toBe(16)
   })
@@ -582,8 +600,8 @@ describe('AI code written against the AI lane effective review speed (AC7d)', ()
     })
 
     it('deploys 16 PRs (16.556) in 10 seconds', () => {
-      expect(displayedDeployed(trace[99])).toBe(16)
-      expect(trace[99].deployedPrs).toBeCloseTo(16.556, 3)
+      expect(displayedDeployed(trace[TEN_SECONDS_IN_TICKS - 1])).toBe(16)
+      expect(trace[TEN_SECONDS_IN_TICKS - 1].deployedPrs).toBeCloseTo(16.556, 3)
     })
   })
 
@@ -718,7 +736,11 @@ describe('queued PRs keep their size when the PR size changes', () => {
     const queued = runTicks(emptyLane(), paramsFor(AI, BUSY_AI), 20)
     expect([displayedPending(queued), formatLoc(queued.pendingLoc)]).toEqual([7, '2,800'])
 
-    const resized = runTicks(queued, paramsFor(AI, { ...BUSY_AI, humanPrsPerDay: 0.5 }), 10)
+    const resized = runTicks(
+      queued,
+      paramsFor(AI, { ...BUSY_AI, humanPrsPerDay: 0.5 }),
+      ONE_SECOND_IN_TICKS,
+    )
 
     expect([displayedPending(resized), formatLoc(resized.pendingLoc)]).toEqual([9, '4,200'])
   })

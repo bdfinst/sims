@@ -9,6 +9,7 @@ import {
   NEXT_TICK_SECONDS,
   REVIEWER_SPEED_LABEL,
   REFERENCE,
+  SLIDER_LABELS,
   THRESHOLD_LABEL,
   TICKS_PER_SECOND,
   expect,
@@ -32,6 +33,15 @@ import {
 } from './fixtures.js'
 
 const DRAIN_START_SECONDS = 2
+
+// The sliders in `scope` have exactly these accessible names, in order.
+const expectSliderNames = async (scope, names) => {
+  const sliders = scope.getByRole('slider')
+  await expect(sliders).toHaveCount(names.length)
+  for (const [index, name] of names.entries()) {
+    await expect(sliders.nth(index)).toHaveAccessibleName(name)
+  }
+}
 
 const DEFAULT_CONTROLS = [
   {
@@ -143,12 +153,6 @@ test.describe('Adjust the model live', () => {
   test('Derived PR sizes, AI PRs per day, and effective speed are read-only', async ({ page }) => {
     const humanLane = laneLocator(page, 'human')
     const aiLane = laneLocator(page, 'ai')
-    const derivedTexts = [
-      [humanLane, 'PR size 240 LOC (derived)'],
-      [aiLane, 'PR size 362 LOC (1.51× human)'],
-      [aiLane, '1.17 PRs/day (derived)'],
-      [aiLane, 'Effective speed 600 LOC/hr'],
-    ]
 
     await test.step('Given I open the simulator', async () => {
       await openSimulator(page)
@@ -165,14 +169,10 @@ test.describe('Adjust the model live', () => {
     })
 
     await test.step('And none of the derived values is a slider', async () => {
-      // The only sliders on the page are the six controls of "Controls start at their defaults",
-      // and the AI lane's are its code-written and skim sliders.
-      await expect(page.getByRole('slider')).toHaveCount(DEFAULT_CONTROLS.length)
-      await expect(aiLane.getByRole('slider')).toHaveCount(2)
-      for (const [lane, text] of derivedTexts) {
-        await expect(lane.getByRole('slider', { name: text })).toHaveCount(0)
-        await expect(lane.getByText(text)).not.toHaveJSProperty('tagName', 'INPUT')
-      }
+      // The only sliders on the page are the six labelled controls, in page order, and the AI
+      // lane's are exactly its code-written and skim sliders.
+      await expectSliderNames(page, SLIDER_LABELS)
+      await expectSliderNames(aiLane, [AI_CODE_WRITTEN_LABEL, AI_SKIM_LABEL])
     })
 
     await test.step('When I set "Human PRs per day" to 2 and "AI skim multiplier" to 3', async () => {

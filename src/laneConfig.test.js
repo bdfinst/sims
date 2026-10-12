@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   FAROS_MERGE_RATE_INCREASE_PCT,
   FAROS_PR_SIZE_INCREASE_PCT,
-  FAROS_PR_SIZE_MULTIPLIER,
   LANE_IDS,
   LANE_MODELS,
   SLIDERS,
@@ -204,11 +203,12 @@ describe('slider info tips', () => {
   )
 
   it('takes every "8" from WORK_HOURS_PER_DAY, so another work day leaves no "8" in any tip', () => {
+    // Faros figures with no "8" in them, so any "8" left can only be a hard-coded work day.
     const texts = sliderInfoTexts({
       workHoursPerDay: 7,
-      prSizeIncreasePct: FAROS_PR_SIZE_INCREASE_PCT,
-      prSizeMultiplier: FAROS_PR_SIZE_MULTIPLIER,
-      mergeRateIncreasePct: FAROS_MERGE_RATE_INCREASE_PCT,
+      prSizeIncreasePct: 60,
+      prSizeMultiplier: 1.6,
+      mergeRateIncreasePct: 20.5,
     })
     expect(Object.values(texts).filter((text) => text.includes('8'))).toEqual([])
     expect(texts.humanPrsPerDay).toContain('per 7-hour work day')
@@ -229,7 +229,7 @@ describe('slider info tips', () => {
   it("quotes the engine's Faros constants in the human and AI tips", () => {
     const { humanLocPerHour, aiLocPerHour } = SLIDER_PRESENTATION
     expect(humanLocPerHour.info).toContain(`PR size +${FAROS_PR_SIZE_INCREASE_PCT}%`)
-    expect(humanLocPerHour.info).toContain(`${FAROS_PR_SIZE_MULTIPLIER}×`)
+    expect(humanLocPerHour.info).toContain('1.51×')
     expect(aiLocPerHour.info).toContain(`PR size +${FAROS_PR_SIZE_INCREASE_PCT}%`)
     expect(aiLocPerHour.info).toContain(`PR merge rate +${FAROS_MERGE_RATE_INCREASE_PCT}%`)
   })

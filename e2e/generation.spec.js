@@ -3,6 +3,7 @@ import {
   BUSY_AI_PRESET,
   HUMAN_CODE_WRITTEN_LABEL,
   HUMAN_PRS_PER_DAY_LABEL,
+  HALF_PR_PER_DAY,
   QUARTER_PR_PER_DAY,
   QUEUE_STATE,
   REFERENCE,
@@ -26,7 +27,6 @@ import {
 test.describe.configure({ mode: 'parallel' })
 
 // Inputs the scenarios set (expected values come from REFERENCE and the plan's "Derived display").
-const HALF_PR_PER_DAY = 0.5
 const ROUNDING_CODE_WRITTEN = 35
 const ROUNDING_PRS_PER_DAY = 0.75
 const OVER_CAPACITY_AI_CODE_WRITTEN = 1000

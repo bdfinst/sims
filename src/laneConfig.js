@@ -4,7 +4,6 @@
 import {
   FAROS_MERGE_RATE_INCREASE_PCT,
   FAROS_PR_SIZE_INCREASE_PCT,
-  FAROS_PR_SIZE_MULTIPLIER,
   LANE_IDS,
   LANE_MODELS,
   WORK_HOURS_PER_DAY,
@@ -81,11 +80,12 @@ export const LANE_PRESENTATION = Object.freeze({
 
 export const LANE_ORDER = Object.freeze(Object.values(LANE_IDS))
 
-// The figures the info tips quote. They come from engine.js, never literal numbers.
+// Model figures the tips quote come from engine.js. Research quotes (SmartBear 500 LOC/hour,
+// LinearB 2×) are verbatim literals shared with research.js and pinned by laneConfig.test.js.
 const TIP_FIGURES = Object.freeze({
   workHoursPerDay: WORK_HOURS_PER_DAY,
   prSizeIncreasePct: FAROS_PR_SIZE_INCREASE_PCT,
-  prSizeMultiplier: FAROS_PR_SIZE_MULTIPLIER,
+  prSizeMultiplier: LANE_MODELS[LANE_IDS.ai].sizeMultiplier,
   mergeRateIncreasePct: FAROS_MERGE_RATE_INCREASE_PCT,
 })
 

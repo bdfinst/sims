@@ -9,6 +9,7 @@ import {
   MAX_SKIM,
   NEXT_TICK_SECONDS,
   NO_VALUE,
+  HALF_PR_PER_DAY,
   QUARTER_PR_PER_DAY,
   REFERENCE,
   REVIEWER_SPEED_LABEL,
@@ -66,7 +67,6 @@ const CHANGE_AT_SECONDS = 1
 const LARGE_PR_CODE_WRITTEN = 50
 const MID_RUN_REVIEWER_SPEED = 900
 const QUEUE_BUILDING_SECONDS = 2
-const HALVED_PRS_PER_DAY = 0.5
 const RESIZED_QUEUE_SECONDS = 1
 const RESEARCH_RATIO_FLOOR = 3
 const RESEARCH_RATIO_CEILING = 4
@@ -414,7 +414,7 @@ test.describe('Review quality metrics', () => {
 
     await test.step('When I pause, set "Human PRs per day" to 0.5, and press Start', async () => {
       await pauseSimulation(page)
-      await setSliders(page, { [HUMAN_PRS_PER_DAY_LABEL]: HALVED_PRS_PER_DAY })
+      await setSliders(page, { [HUMAN_PRS_PER_DAY_LABEL]: HALF_PR_PER_DAY })
       await startSimulation(page)
     })
 

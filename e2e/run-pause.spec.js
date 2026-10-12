@@ -41,6 +41,11 @@ const HUMAN_BLUE = 'rgb(59, 130, 246)'
 const AI_PURPLE = 'rgb(168, 85, 247)'
 
 const PAUSE_AFTER_SECONDS = 3
+const ONE_SECOND = 1
+// Time left idle, unstarted or paused, to show that nothing moves.
+const IDLE_SECONDS = 5
+const HIDDEN_SECONDS = 3
+const VISIBLE_AGAIN_SECONDS = 2
 
 // The lane's identity icons: every icon except those inside a slider's info button.
 const iconNames = (laneRoot) =>
@@ -142,7 +147,7 @@ test.describe('Run and pause the simulation', () => {
     })
 
     await test.step('When 5 seconds pass without pressing Start', async () => {
-      await idleFor(page, 5)
+      await idleFor(page, IDLE_SECONDS)
     })
 
     await test.step('Then both lanes still show Pending Review 0 and Deployed 0', async () => {
@@ -230,7 +235,7 @@ test.describe('Run and pause the simulation', () => {
 
     await test.step('When I press Pause and 5 more seconds pass', async () => {
       await pauseSimulation(page)
-      await idleFor(page, 5)
+      await idleFor(page, IDLE_SECONDS)
       // Pausing leaves no tick interval running.
       await expectLiveIntervals(page, 0)
     })
@@ -259,7 +264,7 @@ test.describe('Run and pause the simulation', () => {
     })
 
     await test.step('When I press Start and 1 second passes', async () => {
-      await startAndRunFor(page, 1)
+      await startAndRunFor(page, ONE_SECOND)
     })
 
     await test.step('Then the AI lane shows Pending Review 15 and Deployed 6', async () => {
@@ -299,7 +304,7 @@ test.describe('Run and pause the simulation', () => {
   test('Hiding the tab auto-pauses', async ({ page }) => {
     await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 1 second', async () => {
       await openWithSliders(page, BUSY_AI_PRESET)
-      await startAndRunFor(page, 1)
+      await startAndRunFor(page, ONE_SECOND)
     })
 
     await test.step('When the page becomes hidden', async () => {
@@ -308,7 +313,7 @@ test.describe('Run and pause the simulation', () => {
     })
 
     await test.step('And 3 seconds pass', async () => {
-      await idleFor(page, 3)
+      await idleFor(page, HIDDEN_SECONDS)
     })
 
     await test.step('Then the status reads "Paused" and the AI lane still shows Pending Review 3', async () => {
@@ -322,7 +327,7 @@ test.describe('Run and pause the simulation', () => {
   test('Showing the tab again stays paused', async ({ page }) => {
     await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation auto-paused when the page became hidden after 1 second', async () => {
       await openWithSliders(page, BUSY_AI_PRESET)
-      await startAndRunFor(page, 1)
+      await startAndRunFor(page, ONE_SECOND)
       await setVisibility(page, 'hidden')
       await expect(buttonNamed(page, 'Start')).toBeVisible()
     })
@@ -332,7 +337,7 @@ test.describe('Run and pause the simulation', () => {
     })
 
     await test.step('And 2 seconds pass', async () => {
-      await idleFor(page, 2)
+      await idleFor(page, VISIBLE_AGAIN_SECONDS)
     })
 
     await test.step('Then the status reads "Paused" and the AI lane still shows Pending Review 3', async () => {
@@ -375,7 +380,7 @@ test.describe('Run and pause the simulation', () => {
 
     await test.step('When I set "AI code written (LOC/hr)" to 2000, press Start, and 1 second passes', async () => {
       await setSliders(page, BUSY_AI_PRESET)
-      await startAndRunFor(page, 1)
+      await startAndRunFor(page, ONE_SECOND)
     })
 
     await test.step('Then the AI lane shows Pending Review 3', async () => {

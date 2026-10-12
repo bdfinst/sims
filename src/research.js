@@ -8,12 +8,6 @@ import {
   formatMultiplier,
 } from './engine.js'
 
-// FINDINGS is data: each text is the spec's Research Sources "Panel wording", copied verbatim; the
-// practitioner observation is a quoted paraphrase with an example link, never an attributed source.
-// Figures read from engine constants: the Faros finding's "+51%", "+16.2%", and "+242.7%"; the
-// calibration link's "+242.7%"; and every number in the assumptions note's modeling choices except
-// "70–90%" and "1,000" in "per 1,000 LOC". Every other figure, including the Faros "3×" (the
-// source's own rounded phrase), is literal text.
 export const RESEARCH_TITLE = 'Research behind this simulation'
 
 // The calibration target is quoted twice (the Faros finding and the assumptions note), so it is
@@ -27,6 +21,12 @@ const FAROS_INCIDENTS_INCREASE = `+${FAROS_INCIDENTS_PER_PR_INCREASE_PCT}%`
 // Whether a finding is published research or a practitioner observation (never attributed to a source).
 export const FINDING_KIND = Object.freeze({ research: 'research', practitioner: 'practitioner' })
 
+// FINDINGS is data: each text is the spec's Research Sources "Panel wording", copied verbatim; the
+// practitioner observation is a quoted paraphrase with an example link, never an attributed source.
+// Figures read from engine constants: the Faros finding's "+51%", "+16.2%", and "+242.7%"; the
+// calibration link's "+242.7%"; and every number in the assumptions note's modeling choices except
+// "70–90%" and "1,000" in "per 1,000 LOC". Every other figure, including the Faros "3×" (the
+// source's own rounded phrase), is literal text.
 export const FINDINGS = Object.freeze([
   Object.freeze({
     id: 'cisco-study',
@@ -83,7 +83,7 @@ const formatPrsPerDayPhrase = (prsPerDay) =>
 export const assumptionsNote = (assumptions = MODEL_ASSUMPTIONS) => [
   `Model assumptions. These are modeling choices, not research findings: the defect density (${assumptions.defectsPerKloc} defects per 1,000 LOC), the base detection rate (${assumptions.baseDetection}, picked from `,
   { text: "SmartBear's 70–90%", url: SMARTBEAR_PRACTICES_URL },
-  ` range), the detection floors (${assumptions.sizeFloor} for large PRs and ${assumptions.speedFloor} for fast reviewing), the curve thresholds (PR size ${assumptions.sizeKnee} to ${assumptions.sizeWall} LOC, reviewer speed ${formatCount(assumptions.speedKnee)} to ${formatCount(assumptions.speedWall)} LOC/hr), and the human-lane defaults (${formatLocPerHour(assumptions.humanDefaultLocPerHour)} and ${formatPrsPerDayPhrase(assumptions.humanDefaultPrsPerDay)}). The AI lane's PR size (${formatMultiplier(assumptions.aiSizeMultiplier)} the human PR size) and default volume (giving ${formatMultiplier(assumptions.aiMergeRateMultiplier)} the human PRs per day) `,
+  ` range), the detection floors (${assumptions.sizeFloor} for large PRs and ${assumptions.speedFloor} for fast reviewing), the curve thresholds (PR size ${assumptions.sizeKnee} to ${assumptions.sizeWall} LOC, reviewer speed ${formatCount(assumptions.speedKnee)} to ${formatCount(assumptions.speedWall)} LOC/hr), and the human-lane defaults, an assumption (${formatLocPerHour(assumptions.humanDefaultLocPerHour)} and ${formatPrsPerDayPhrase(assumptions.humanDefaultPrsPerDay)}). The AI lane's PR size (${formatMultiplier(assumptions.aiSizeMultiplier)} the human PR size) and default volume (giving ${formatMultiplier(assumptions.aiMergeRateMultiplier)} the human PRs per day) `,
   { text: 'come from Faros', url: FAROS_URL },
   '. The human defaults were chosen to land near ',
   { text: `Faros's ${FAROS_INCIDENTS_INCREASE} incidents per PR`, url: FAROS_URL },

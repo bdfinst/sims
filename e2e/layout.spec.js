@@ -10,9 +10,11 @@ import {
   NARROWEST_PHONE,
   OVERFLOW_RUN_SECONDS,
   PHONE,
+  PROJECTOR,
   RESEARCH_TITLE,
   REVIEWER_SPEED_LABEL,
   SLIDER_LABELS,
+  boxOf,
   buttonNamed,
   contrastRatio,
   expect,
@@ -41,7 +43,6 @@ import {
 
 test.describe.configure({ mode: 'parallel' })
 
-const PROJECTOR = { width: 1280, height: 720 }
 const DESKTOP = { width: 1280, height: 800 }
 const TABLET = { width: 768, height: 1024 }
 // --color-deployed (#22c55e) in src/index.css
@@ -66,12 +67,6 @@ const REVIEW_LABELS = { human: REVIEWER_SPEED_LABEL, ai: AI_SKIM_LABEL }
 // The right and bottom edges of a bounding box.
 const rightOf = ({ x, width }) => x + width
 const bottomOf = ({ y, height }) => y + height
-
-const boxOf = async (locator, label) => {
-  const box = await locator.boundingBox()
-  expect(box, `${label} has a layout box`).not.toBeNull()
-  return box
-}
 
 const expectInsideViewport = async (locator, viewport, label) => {
   const { x, y, width, height } = await boxOf(locator, label)

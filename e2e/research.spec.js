@@ -2,8 +2,10 @@ import {
   MIN_TEXT_CONTRAST,
   NARROWEST_PHONE,
   PHONE,
+  UNSUPPORTED_WORDING,
   runFor,
   contrastRatio,
+  escapeRegExp,
   expect,
   expectNoHorizontalScroll,
   expectViewport,
@@ -61,7 +63,6 @@ const SOURCES = [
   },
 ]
 const NEW_TAB_NOTICE = ' (opens in new tab)'
-const FORBIDDEN_PHRASES = ['near zero', 'coined', 'originated']
 const ASSUMPTIONS_START = 'Model assumptions'
 const CALIBRATION_SENTENCE =
   "The human defaults were chosen to land near Faros's +242.7% incidents per PR"
@@ -87,8 +88,6 @@ const expectPanelContains = (page, text) => expect(researchPanel(page)).toContai
 const expectFindingShown = async (page, { shown, url }) => {
   for (const text of shown) await expect(researchPanel(page).getByText(text), url).toBeVisible()
 }
-
-const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 // The link opens in a new tab, protects the opener, and its accessible name contains `name` and
 // ends with the new-tab notice.
@@ -190,7 +189,7 @@ test.describe('Research behind the simulation', () => {
 
     await test.step('Then the page does not contain "near zero", "coined", or "originated"', async () => {
       const pageText = (await page.locator('body').innerText()).toLowerCase()
-      for (const phrase of FORBIDDEN_PHRASES) {
+      for (const phrase of UNSUPPORTED_WORDING) {
         expect(pageText, `page text contains "${phrase}"`).not.toContain(phrase)
       }
     })
@@ -240,8 +239,11 @@ test.describe('Research behind the simulation', () => {
       )
     })
 
-    await test.step('And the panel contains "the human-lane defaults (30 LOC/hr and 1 PR per day)"', async () => {
-      await expectPanelContains(page, 'the human-lane defaults (30 LOC/hr and 1 PR per day)')
+    await test.step('And the panel contains "the human-lane defaults, an assumption (30 LOC/hr and 1 PR per day)"', async () => {
+      await expectPanelContains(
+        page,
+        'the human-lane defaults, an assumption (30 LOC/hr and 1 PR per day)',
+      )
     })
 
     await test.step('And the panel contains "The AI lane\'s PR size (1.51× the human PR size) and default volume (giving 1.162× the human PRs per day) come from Faros"', async () => {

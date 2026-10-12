@@ -58,7 +58,7 @@ Derived lane parameters (read-only, recomputed from the current settings every t
 
 - Human PR size (LOC) = human code written × 8 ÷ human PRs per day (240 at default).
 - AI PR size (LOC) = human PR size × 1.51 (Faros: PR size +51%; 362.4 at default, shown as 362).
-- AI PRs per day = AI code written × 8 ÷ AI PR size (1.17 at default, which is Faros's PR merge rate +16.2%, rounded).
+- AI PRs per day = AI code written × 8 ÷ AI PR size (1.17 at default; the Faros merge-rate input is ×1.162, and rounding the default AI code written to 53 gives ×1.170).
 - PRs per hour for each lane = code written ÷ PR size.
 - The AI code-written default 53 is the human default × 1.51 × 1.162 (= 52.6), rounded to the slider step.
 - The model uses unrounded sizes; the UI rounds displayed sizes to whole LOC and AI PRs per day to two decimals.
@@ -70,7 +70,7 @@ Derived lane parameters (read-only, recomputed from the current settings every t
 
 **Engine** (per lane, per tick)
 
-1. Generate: add `prsPerHour × 0.1` PRs and `codeWritten × 0.1` LOC to pending (equivalently, `prsPerHour × 0.1 × prSize` LOC).
+1. Generate: add `codeWritten ÷ prSize × 0.1` PRs and `codeWritten × 0.1` LOC to pending.
 2. Review: `reviewedLoc = min(pendingLoc, effectiveSpeed × 0.1)`. PRs reviewed = `pendingPrs × reviewedLoc / pendingLoc`; this handles queued PRs of mixed size after a size change. Move both to deployed. Clamp pending to ≥ 0.
 3. Detection rate `d = 0.8 × sizeFactor(avgPendingPrSize) × speedFactor(effectiveSpeed)`, where:
    - `sizeFactor(L)` = 1 for L ≤ 200; falls linearly to 0.05 at L = 400; 0.05 for L > 400.

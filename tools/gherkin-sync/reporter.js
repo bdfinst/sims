@@ -10,7 +10,17 @@ import { compareScenariosWithTests, pendingReport } from './compare.js'
 import { scenariosFromFeature } from './expectations.js'
 
 const MATCH_EVERYTHING = String(/.*/)
-const NARROWING_FLAGS = ['--last-failed', '--only-changed']
+// Command-line flags that select only some tests, as `--flag value` or `--flag=value`.
+const NARROWING_FLAGS = [
+  '-g',
+  '--grep',
+  '-G',
+  '--grep-invert',
+  '--last-failed',
+  '--only-changed',
+  '--test-list',
+  '--test-list-invert',
+]
 
 const filesWithExtension = (dir, ext) =>
   readdirSync(dir, { recursive: true })
@@ -28,7 +38,11 @@ const specFilesIn = (testDir) => filesWithExtension(testDir, '.spec.js')
 const isUnfiltered = (grep) =>
   [grep].flat().every((pattern) => String(pattern) === MATCH_EVERYTHING)
 
-const wholeSuiteSelected = (config, suite) => {
+// Whether the command line narrows the run to some of the tests.
+export const hasNarrowingFlag = (argv) =>
+  argv.some((arg) => NARROWING_FLAGS.some((flag) => arg === flag || arg.startsWith(`${flag}=`)))
+
+const wholeSuiteSelected = (config, suite, argv) => {
   const selectedFiles = new Set(suite.allTests().map(({ location }) => location.file))
   return (
     !config.shard &&
@@ -38,7 +52,7 @@ const wholeSuiteSelected = (config, suite) => {
         !grepInvert &&
         specFilesIn(testDir).every((file) => selectedFiles.has(file)),
     ) &&
-    !process.argv.some((arg) => NARROWING_FLAGS.includes(arg))
+    !hasNarrowingFlag(argv)
   )
 }
 
@@ -103,7 +117,7 @@ export default function createGherkinSyncReporter({ featuresDir = 'features' } =
           steps: outcome?.steps ?? [],
         }
       })
-      const complete = wholeSuiteSelected(config, suite)
+      const complete = wholeSuiteSelected(config, suite, process.argv)
       const scenarios = loadScenarios(featuresDir)
       const problems = compareScenariosWithTests(scenarios, tests, { complete })
       const pending = pendingReport(scenarios, { strict: isStrict() })

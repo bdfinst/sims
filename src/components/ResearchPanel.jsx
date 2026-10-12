@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { COLOR_CLASS, TYPE_CLASS } from '../laneConfig.js'
 import { FINDINGS, RESEARCH_TITLE, assumptionsNote } from '../research.js'
 
@@ -17,7 +18,8 @@ function NewTabLink({ href, text }) {
   )
 }
 
-export function ResearchPanel() {
+// Static content, so memo skips it on every tick.
+export const ResearchPanel = memo(function ResearchPanel() {
   return (
     <details className={`rounded p-3 break-words ${COLOR_CLASS.lanePanel}`}>
       <summary className={`cursor-pointer ${TYPE_CLASS.value}`}>
@@ -42,4 +44,4 @@ export function ResearchPanel() {
       </p>
     </details>
   )
-}
+})

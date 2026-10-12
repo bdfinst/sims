@@ -107,7 +107,7 @@ const DEFECTS_PER_KLOC = DEFECTS_PER_LOC * LOC_PER_KLOC
 // The modeling choices and Faros inputs the model is built from, as the research panel discloses
 // them. aiMergeRateMultiplier is the Faros input, not the simulated result: the AI code-written
 // default is rounded to its slider step (53 LOC/hr), so the simulated AI-to-human PRs-per-day
-// ratio is about ×1.162, not exactly (53 ÷ 45.3 ≈ 1.170).
+// ratio is 53 ÷ 45.3 ≈ ×1.170, not exactly the Faros input ×1.162.
 export const MODEL_ASSUMPTIONS = Object.freeze({
   defectsPerKloc: DEFECTS_PER_KLOC,
   baseDetection: BASE_DETECTION,

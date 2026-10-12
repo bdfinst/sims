@@ -7,7 +7,7 @@ export function RateSlider({
   value,
   onSettingChange,
   accentClass = COLOR_CLASS.neutralSliderAccent, // the threshold slider belongs to no lane
-  isTipAlwaysBelow = false, // the header's threshold tip opens below its button
+  isAlwaysBelow = false, // the header's threshold tip opens below its button
 }) {
   const { min, max, step } = SLIDERS[settingKey]
   const { label, unit, spokenUnit, info } = SLIDER_PRESENTATION[settingKey]
@@ -20,7 +20,7 @@ export function RateSlider({
         <label htmlFor={inputId} className={TYPE_CLASS.label}>
           {label}
         </label>
-        <InfoTip id={tipId} label={label} text={info} isAlwaysBelow={isTipAlwaysBelow} />
+        <InfoTip id={tipId} label={label} text={info} isAlwaysBelow={isAlwaysBelow} />
       </div>
       <div className="flex items-center gap-3">
         <input

@@ -160,6 +160,54 @@ describe('openTipReducer, named cases', () => {
     ).toEqual(NONE_SHOWN)
   })
 
+  it('keeps a focused tip closed by Escape closed when a hover on another tip ends', () => {
+    expect(
+      shownAfter(keyboardFocus(TIP), ESCAPE, mouseEnter(OTHER_TIP), pointerLeave(OTHER_TIP)),
+    ).toEqual(NONE_SHOWN)
+  })
+
+  it.each([
+    ['its button loses and regains focus', [blur(TIP), keyboardFocus(TIP)]],
+    ['its button is pressed', [press(TIP), press(TIP), press(TIP)]],
+  ])('forgets that Escape closed a focused tip once %s', (_how, events) => {
+    expect(
+      shownAfter(
+        keyboardFocus(TIP),
+        ESCAPE,
+        ...events,
+        mouseEnter(OTHER_TIP),
+        pointerLeave(OTHER_TIP),
+      ),
+    ).toEqual([TIP])
+  })
+
+  it('shows the hovered tip again when keyboard focus leaves another tip', () => {
+    expect(shownAfter(mouseEnter(TIP), keyboardFocus(OTHER_TIP))).toEqual([OTHER_TIP])
+    expect(shownAfter(mouseEnter(TIP), keyboardFocus(OTHER_TIP), blur(OTHER_TIP))).toEqual([TIP])
+  })
+
+  it('keeps a hovered tip closed by Escape closed when focus leaves another tip', () => {
+    expect(shownAfter(mouseEnter(TIP), ESCAPE, keyboardFocus(OTHER_TIP), blur(OTHER_TIP))).toEqual(
+      NONE_SHOWN,
+    )
+    expect(shownAfter(mouseEnter(TIP), keyboardFocus(OTHER_TIP), ESCAPE, blur(OTHER_TIP))).toEqual(
+      NONE_SHOWN,
+    )
+  })
+
+  it('forgets that Escape closed a hovered tip once the mouse leaves and re-enters it', () => {
+    expect(
+      shownAfter(
+        mouseEnter(TIP),
+        ESCAPE,
+        pointerLeave(TIP),
+        mouseEnter(TIP),
+        keyboardFocus(OTHER_TIP),
+        blur(OTHER_TIP),
+      ),
+    ).toEqual([TIP])
+  })
+
   it('does not open on pointer-initiated focus alone', () => {
     expect(shownAfter(pointerFocus(TIP))).toEqual(NONE_SHOWN)
   })

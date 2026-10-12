@@ -55,12 +55,16 @@ describe('start and pause', () => {
 
 describe('tick', () => {
   it('advances ticks and both lanes while running', () => {
-    const state = dispatchAll(initialState, ACTION.start, ...repeat(ACTION.tick, 100))
+    const state = dispatchAll(
+      initialState,
+      ACTION.start,
+      ...repeat(ACTION.tick, TEN_SECONDS_IN_TICKS),
+    )
     expect({
       ticks: state.ticks,
       human: shownCounts(state.lanes.human),
       ai: shownCounts(state.lanes.ai),
-    }).toEqual({ ticks: 100, human: [0, 1], ai: [0, 1] })
+    }).toEqual({ ticks: TEN_SECONDS_IN_TICKS, human: [0, 1], ai: [0, 1] })
   })
 
   it('is a no-op while paused', () => {
@@ -77,7 +81,7 @@ describe('tick', () => {
     const paused = dispatchAll(busy, ACTION.start, ...repeat(ACTION.tick, 30), ACTION.pause)
     expect(shownCounts(paused.lanes.ai)).toEqual([11, 4])
 
-    const resumed = dispatchAll(paused, ACTION.start, ...repeat(ACTION.tick, 10))
+    const resumed = dispatchAll(paused, ACTION.start, ...repeat(ACTION.tick, ONE_SECOND_IN_TICKS))
     expect(shownCounts(resumed.lanes.ai)).toEqual([15, 6])
   })
 

@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from 'react'
+import { useCallback, useEffect, useReducer } from 'react'
 import { Header } from './components/Header.jsx'
 import { HeadlineBand } from './components/HeadlineBand.jsx'
 import { Lane } from './components/Lane.jsx'
@@ -12,8 +12,16 @@ function App() {
   const [state, dispatch] = useReducer(reducer, initialState)
   const openTip = useOpenTip()
   const { isRunning } = state
-  const changeSetting = (settingKey, value) =>
-    dispatch({ type: ACTION.setSetting, settingKey, value })
+  // Stable handlers, so a tick re-renders no control whose own props are unchanged.
+  const changeSetting = useCallback(
+    (settingKey, value) => dispatch({ type: ACTION.setSetting, settingKey, value }),
+    [],
+  )
+  const onToggleRunning = useCallback(
+    () => dispatch({ type: isRunning ? ACTION.pause : ACTION.start }),
+    [isRunning],
+  )
+  const onReset = useCallback(() => dispatch({ type: ACTION.reset }), [])
 
   useEffect(() => {
     if (!isRunning) return undefined
@@ -36,8 +44,8 @@ function App() {
           isRunning={isRunning}
           ticks={state.ticks}
           threshold={state.settings.threshold}
-          onToggleRunning={() => dispatch({ type: isRunning ? ACTION.pause : ACTION.start })}
-          onReset={() => dispatch({ type: ACTION.reset })}
+          onToggleRunning={onToggleRunning}
+          onReset={onReset}
           onSettingChange={changeSetting}
         />
         <main className="flex flex-col gap-3">

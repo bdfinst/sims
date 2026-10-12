@@ -8,43 +8,46 @@ import {
   PHONE,
   REVIEWER_SPEED_LABEL,
   THRESHOLD_LABEL,
+  UNSUPPORTED_WORDING,
+  PROJECTOR,
   boxOf,
-  centreOf,
   contrastRatio,
-  controlAfterLabel,
+  escapeRegExp,
   expect,
   expectNoHorizontalScroll,
   expectViewport,
   flushPendingRenders,
   infoButton,
-  labelOf,
   laneElementBoxes,
-  movePointerOnto,
-  movePointerTo,
   openSimulator,
-  overlaps,
   pageTitle,
   runFor,
-  shownTips,
   slider,
   startSimulation,
   tabTo,
   test,
   textColors,
 } from './fixtures.js'
+import {
+  centreOf,
+  controlAfterLabel,
+  labelOf,
+  movePointerOnto,
+  movePointerTo,
+  overlaps,
+  shownTips,
+} from './tipHelpers.js'
 
 test.describe.configure({ mode: 'parallel' })
 
-const PROJECTOR = { width: 1280, height: 720 }
 // WCAG 2.5.8: a target is at least 24 × 24 CSS px.
 const MIN_TARGET_PX = 24
 // "Directly follows": the button sits on the label's row, at most this far to its right.
 const MAX_LABEL_TO_BUTTON_GAP_PX = 8
 const INFO_ICON = 'info'
-const UNSUPPORTED_WORDING = ['near zero', 'coined', 'originated']
 
-// Slice 9 Examples: each slider, in page order, and a phrase its tip must contain. Copied from the
-// plan, never imported from src/laneConfig.js, so a change to a tip fails these tests.
+// Each slider, in page order, and a phrase its tip must contain. Literal copies, never imported
+// from src/laneConfig.js, so a change to a tip fails these tests.
 const TIP_PHRASES = [
   [THRESHOLD_LABEL, 'turns red when its count is above this many PRs'],
   [HUMAN_CODE_WRITTEN_LABEL, 'lines of code the human lane writes, in LOC/hr'],
@@ -67,8 +70,6 @@ const NARROW_SCREENS = [
   ...ALL_CONTROLS.map((control) => ({ viewport: NARROWEST_PHONE, control })),
   { viewport: PHONE, control: AI_CODE_WRITTEN_LABEL },
 ]
-
-const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 // The tip a slider names as its accessible description (aria-describedby).
 const tipFor = async (page, control) => {
@@ -383,6 +384,22 @@ test.describe('Slider info tips', () => {
     await movePointerTo(page, pageTitle(page))
     await expectOneTipContaining(page, PHRASE_BY_CONTROL[HUMAN_PRS_PER_DAY_LABEL])
     await expect(focusedButton).toBeFocused()
+  })
+
+  // AC26, the other way round: the pointer still hovers a tip, so ending focus elsewhere hands the
+  // tip back to the hover.
+  test('A hovered tip reappears after the focused info button loses focus', async ({ page }) => {
+    const focusedButton = infoButton(page, HUMAN_PRS_PER_DAY_LABEL)
+    await openSimulator(page)
+    await movePointerTo(page, infoButton(page, REVIEWER_SPEED_LABEL))
+    await expectOneTipContaining(page, PHRASE_BY_CONTROL[REVIEWER_SPEED_LABEL])
+
+    await tabTo(page, focusedButton)
+    await expectOneTipContaining(page, PHRASE_BY_CONTROL[HUMAN_PRS_PER_DAY_LABEL])
+
+    await page.keyboard.press('Tab')
+    await expect(focusedButton).not.toBeFocused()
+    await expectOneTipContaining(page, PHRASE_BY_CONTROL[REVIEWER_SPEED_LABEL])
   })
 
   // The Escape listener must exist by the time a tip first paints. A MutationObserver callback runs

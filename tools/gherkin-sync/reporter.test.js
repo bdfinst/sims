@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { pendingReport } from './compare.js'
-import { loadScenarios, syncOutcome } from './reporter.js'
+import { hasNarrowingFlag, loadScenarios, syncOutcome } from './reporter.js'
 
 const SCOPE = 'all scenarios'
 const PLAIN = { wip: false }
@@ -40,6 +40,34 @@ describe('syncOutcome', () => {
   })
 })
 
+describe('hasNarrowingFlag', () => {
+  const PLAYWRIGHT = ['node', 'playwright', 'test']
+
+  it.each([
+    ['--grep AI', ['--grep', 'AI']],
+    ['-g AI', ['-g', 'AI']],
+    ['--grep=AI', ['--grep=AI']],
+    ['-G AI', ['-G', 'AI']],
+    ['--grep-invert=AI', ['--grep-invert=AI']],
+    ['--last-failed', ['--last-failed']],
+    ['--only-changed', ['--only-changed']],
+    ['--only-changed=main', ['--only-changed=main']],
+    ['--test-list tests.txt', ['--test-list', 'tests.txt']],
+    ['--test-list-invert=tests.txt', ['--test-list-invert=tests.txt']],
+  ])('treats %s as a partial run', (_flag, args) => {
+    expect(hasNarrowingFlag([...PLAYWRIGHT, ...args])).toBe(true)
+  })
+
+  it('treats a plain run, or one with only non-narrowing flags, as a whole run', () => {
+    expect(hasNarrowingFlag(PLAYWRIGHT)).toBe(false)
+    expect(hasNarrowingFlag([...PLAYWRIGHT, '--repeat-each=5', '--reporter', 'list'])).toBe(false)
+  })
+
+  it('does not mistake a flag that merely starts with a narrowing flag for one', () => {
+    expect(hasNarrowingFlag([...PLAYWRIGHT, '--grepx', '--last-failed-report'])).toBe(false)
+  })
+})
+
 describe('the exported features', () => {
   const featuresDir = fileURLToPath(
     new URL('../../features/ai-vs-human-code-review-simulator', import.meta.url),
@@ -61,6 +89,9 @@ describe('the exported features', () => {
       })
     })
 
+  // Well below the plan's scenario count, so a parser that finds almost none fails.
+  const MIN_PLAN_SCENARIOS = 50
+
   const wipNames = (scenarios) =>
     scenarios
       .filter(({ wip }) => wip)
@@ -71,7 +102,7 @@ describe('the exported features', () => {
     const exported = loadScenarios(featuresDir)
     const planned = planScenarios()
 
-    expect(planned.length, 'the plan has its scenarios').toBeGreaterThan(50)
+    expect(planned.length, 'the plan has its scenarios').toBeGreaterThan(MIN_PLAN_SCENARIOS)
     expect(exported.length, 'one exported scenario per plan Scenario line').toBe(planned.length)
     expect(wipNames(exported)).toEqual(wipNames(planned))
   })
