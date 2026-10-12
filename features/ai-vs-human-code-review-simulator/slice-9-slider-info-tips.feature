@@ -62,23 +62,6 @@ Feature: Slider info tips
     When I press Tab
     Then no tip is shown
 
-  Scenario: A focused tip stays open when the pointer leaves
-    Given I Tab to "About Human PRs per day" and hover it
-    When I move the pointer to the page title
-    Then the tip for "About Human PRs per day" is still shown
-
-  Scenario: A hovered tip stays open when focus moves away
-    Given I Tab to "About Human PRs per day" and hover it
-    When I press Tab
-    Then the tip for "About Human PRs per day" is still shown
-
-  Scenario: Escape closes a hovered tip without moving the pointer
-    Given I hover "About Human PRs per day"
-    When I press Escape
-    Then no tip is shown
-    When I move the pointer to the page title and back onto "About Human PRs per day"
-    Then the tip for "About Human PRs per day" is shown
-
   Scenario: Clicking the info button toggles its tip
     Given I open the simulator
     When I Tab to "About Warning threshold" and press Enter

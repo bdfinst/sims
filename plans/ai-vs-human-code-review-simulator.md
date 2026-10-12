@@ -1176,23 +1176,6 @@ Feature: Slider info tips
     When I press Tab
     Then no tip is shown
 
-  Scenario: A focused tip stays open when the pointer leaves
-    Given I Tab to "About Human PRs per day" and hover it
-    When I move the pointer to the page title
-    Then the tip for "About Human PRs per day" is still shown
-
-  Scenario: A hovered tip stays open when focus moves away
-    Given I Tab to "About Human PRs per day" and hover it
-    When I press Tab
-    Then the tip for "About Human PRs per day" is still shown
-
-  Scenario: Escape closes a hovered tip without moving the pointer
-    Given I hover "About Human PRs per day"
-    When I press Escape
-    Then no tip is shown
-    When I move the pointer to the page title and back onto "About Human PRs per day"
-    Then the tip for "About Human PRs per day" is shown
-
   Scenario: Clicking the info button toggles its tip
     Given I open the simulator
     When I Tab to "About Warning threshold" and press Enter
@@ -1428,6 +1411,7 @@ Decided by the stakeholder after the build:
 - **Research note ratio:** the note gives the AI default volume as the ratio the model shows at the defaults, "1.17× the human PRs per day", computed from `laneParams`, not the Faros input 1.162× (the rounded AI default of 53 only approximates it).
 - **Purity lint rule:** ESLint `no-restricted-globals` forbids DOM, browser-storage, network, and timer globals in `engine.js`, `reducer.js`, and `openTip.js`.
 - **Duplicated number tables trimmed from e2e:** `src/engine.test.js` owns the numeric tables. The e2e suite keeps one wiring row per derived field or curve: "Defects caught follows PR size" (300 LOC → 42%) and "Defects caught follows reviewer speed" (900 LOC/hr → 22%) are now single scenarios; "A human PR can span several days" and "Derived values round to whole LOC and two decimals" are removed; "Derived PR sizes, AI PRs per day, and effective speed are read-only" keeps only its skim change.
+- **Duplicated info-tip truth-table rows trimmed from e2e:** `src/openTip.test.js` owns the open/close truth table. The e2e suite keeps one test per input channel (hover, keyboard focus, Enter, mouse click, touch tap, Escape), Escape the moment a tip appears, "Opening one tip closes the other" (the only browser check that tips share one state), and the layout tests. "A focused tip stays open when the pointer leaves", "A hovered tip stays open when focus moves away", and "Escape closes a hovered tip without moving the pointer" are removed, with the two unscripted "reappears" tests.
 
 ## Build Progress
 
