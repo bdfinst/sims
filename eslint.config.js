@@ -49,6 +49,32 @@ export default [
       'no-console': 'warn',
     },
   },
+  // The engine is pure: it must not reach into React, icons, or components.
+  {
+    files: ['src/engine.js'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                'react',
+                'react/*',
+                'react-dom',
+                'react-dom/*',
+                'lucide-react',
+                'lucide-react/*',
+                './components/*',
+                '**/components/*',
+              ],
+              message: 'engine.js must stay pure: no React, icons, or components.',
+            },
+          ],
+        },
+      ],
+    },
+  },
   {
     ignores: [
       'node_modules/',
