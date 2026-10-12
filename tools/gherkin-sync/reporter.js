@@ -2,10 +2,11 @@
 // Each scenario test wraps its steps in test.step() titled with the exact step line from the
 // .feature file ('When I press Start and 10 seconds pass'); this reporter compares those
 // titles with the scenarios. Missing scenarios and Examples rows are reported only when the
-// whole suite was selected, so running one file or one --grep stays usable.
+// whole suite was selected, so running one file or one --grep stays usable. Scenarios tagged
+// @wip are skipped and counted; with GHERKIN_SYNC_STRICT=1 any pending scenario fails the run.
 import { readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
-import { compareScenariosWithTests } from './compare.js'
+import { compareScenariosWithTests, pendingReport } from './compare.js'
 import { scenariosFromFeature } from './expectations.js'
 
 const MATCH_EVERYTHING = String(/.*/)
@@ -41,6 +42,10 @@ const wholeSuiteSelected = (config, suite) => {
     !process.argv.some((arg) => NARROWING_FLAGS.includes(arg))
   )
 }
+
+const STRICT_ENV = 'GHERKIN_SYNC_STRICT'
+
+const isStrict = () => process.env[STRICT_ENV] === '1'
 
 const relative = (file) => path.relative(process.cwd(), file)
 
@@ -78,17 +83,26 @@ export default function createGherkinSyncReporter({ featuresDir = 'features' } =
         }
       })
       const complete = wholeSuiteSelected(config, suite)
-      const problems = compareScenariosWithTests(loadScenarios(featuresDir), tests, { complete })
+      const scenarios = loadScenarios(featuresDir)
+      const problems = compareScenariosWithTests(scenarios, tests, { complete })
+      const pending = pendingReport(scenarios, { strict: isStrict() })
       const scope = complete ? 'all scenarios' : 'selected tests only (partial run)'
+      const pendingLine = pending.message ? `${pending.message}\n` : ''
 
-      if (problems.length === 0) {
-        process.stdout.write(`\nGherkin sync: tests follow their scenarios (${scope}).\n`)
-        return undefined
+      if (problems.length > 0) {
+        process.stderr.write(
+          `\nGherkin sync: ${problems.length} problem(s) (${scope}):\n${problems.map((problem) => `  - ${problem}`).join('\n')}\n${pendingLine}`,
+        )
+        return { status: 'failed' }
       }
-      process.stderr.write(
-        `\nGherkin sync: ${problems.length} problem(s) (${scope}):\n${problems.map((problem) => `  - ${problem}`).join('\n')}\n`,
+      if (pending.failed) {
+        process.stderr.write(`\nGherkin sync: ${STRICT_ENV}=1 and ${pending.message}.\n`)
+        return { status: 'failed' }
+      }
+      process.stdout.write(
+        `\nGherkin sync: tests follow their scenarios (${scope}).\n${pendingLine}`,
       )
-      return { status: 'failed' }
+      return undefined
     },
   }
 }

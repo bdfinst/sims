@@ -16,6 +16,7 @@ describe('scenariosFromFeature', () => {
       {
         name: 'Start',
         location: `${URI}:2`,
+        wip: false,
         variants: [
           {
             example: null,
@@ -97,6 +98,57 @@ describe('scenariosFromFeature', () => {
       ['Outside', ['Given the feature setup', 'Then outside outcome']],
       ['Ruled', ['Given the feature setup', 'Given the rule setup', 'Then ruled outcome']],
     ])
+  })
+
+  it('marks a scenario tagged @wip as wip and leaves other tags and untagged scenarios alone', () => {
+    const source = `Feature: Tags
+  @wip
+  Scenario: Pending
+    Then pending outcome
+
+  @smoke @wip
+  Scenario: Pending among other tags
+    Then another pending outcome
+
+  @smoke
+  Scenario: Other tag
+    Then other outcome
+
+  Scenario: Untagged
+    Then untagged outcome
+`
+    const wipByName = scenariosFromFeature(source, URI).map(({ name, wip }) => [name, wip])
+    expect(wipByName).toEqual([
+      ['Pending', true],
+      ['Pending among other tags', true],
+      ['Other tag', false],
+      ['Untagged', false],
+    ])
+  })
+
+  it('marks a scenario wip when it is tagged inside a Rule', () => {
+    const source = `Feature: Rules
+  Rule: Inside
+    @wip
+    Scenario: Ruled
+      Then ruled outcome
+`
+    expect(scenariosFromFeature(source, URI).map(({ wip }) => wip)).toEqual([true])
+  })
+
+  it('treats a tagged Scenario Outline as one wip scenario whose every row is pending', () => {
+    const source = `Feature: Bounds
+  @wip
+  Scenario Outline: Sliders stop at their bounds
+    When I press <key>
+
+    Examples:
+      | key        |
+      | ArrowRight |
+      | ArrowLeft  |
+`
+    const scenarios = scenariosFromFeature(source, URI)
+    expect(scenarios.map(({ wip, variants }) => [wip, variants.length])).toEqual([[true, 2]])
   })
 
   it('returns no scenarios for a file with no Feature', () => {

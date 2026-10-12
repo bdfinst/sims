@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compareScenariosWithTests } from './compare.js'
+import { compareScenariosWithTests, pendingReport } from './compare.js'
 
 const START = {
   name: 'Start switches the button to Pause',
@@ -15,6 +15,9 @@ const BOUNDS = {
     { example: 'AI gen | ArrowLeft | 5', steps: ['When I press ArrowLeft 200 times'] },
   ],
 }
+
+const WIP_START = { ...START, wip: true }
+const WIP_BOUNDS = { ...BOUNDS, wip: true }
 
 const passedTest = (title, steps) => ({
   title,
@@ -120,5 +123,72 @@ describe('compareScenariosWithTests', () => {
     expect(compareScenariosWithTests([START, twin], [], PARTIAL)).toEqual([
       'Scenario name "Start switches the button to Pause" is used twice (features/run.feature:3, features/other.feature:7)',
     ])
+  })
+
+  it('reports no problem for a wip scenario whose test drifted from its steps', () => {
+    const drifted = passedTest(START.name, ['Given I open the simulator', 'When I press Reset'])
+
+    expect(compareScenariosWithTests([WIP_START], [drifted], FULL)).toEqual([])
+  })
+
+  it('reports no problem for a wip scenario that has no test, on a full run', () => {
+    expect(compareScenariosWithTests([WIP_START, WIP_BOUNDS], [], FULL)).toEqual([])
+  })
+
+  it('reports no missing Examples row for a wip outline', () => {
+    const tests = [passedTest(`${BOUNDS.name}: ArrowRight`, BOUNDS.variants[0].steps)]
+
+    expect(compareScenariosWithTests([WIP_BOUNDS], tests, FULL)).toEqual([])
+  })
+
+  it('still reports the same drift and the same gap for an untagged scenario', () => {
+    const drifted = passedTest(START.name, ['Given I open the simulator', 'When I press Reset'])
+
+    expect(compareScenariosWithTests([START], [drifted], FULL)).toHaveLength(1)
+    expect(compareScenariosWithTests([START], [], FULL)).toHaveLength(1)
+  })
+
+  it('does not let a wip scenario hide a test that claims a different, untagged scenario', () => {
+    const drifted = passedTest(START.name, ['Given I open the simulator', 'When I press Reset'])
+
+    expect(compareScenariosWithTests([WIP_BOUNDS, START], [drifted], FULL)).toHaveLength(1)
+  })
+
+  it('still reports two scenarios that share a name when one of them is wip', () => {
+    const twin = { ...WIP_START, location: 'features/other.feature:7' }
+
+    expect(compareScenariosWithTests([START, twin], [], PARTIAL)).toEqual([
+      'Scenario name "Start switches the button to Pause" is used twice (features/run.feature:3, features/other.feature:7)',
+    ])
+  })
+})
+
+describe('pendingReport', () => {
+  it('counts wip scenarios, one per scenario even for an outline, and words the count', () => {
+    expect(pendingReport([START, WIP_START, WIP_BOUNDS], { strict: false })).toEqual({
+      count: 2,
+      message: '2 @wip scenario(s) pending',
+      failed: false,
+    })
+  })
+
+  it('reports nothing pending when no scenario is wip', () => {
+    expect(pendingReport([START, BOUNDS], { strict: false })).toEqual({
+      count: 0,
+      message: null,
+      failed: false,
+    })
+  })
+
+  it('fails in strict mode with one wip scenario', () => {
+    expect(pendingReport([START, WIP_START], { strict: true })).toEqual({
+      count: 1,
+      message: '1 @wip scenario(s) pending',
+      failed: true,
+    })
+  })
+
+  it('passes in strict mode with no wip scenarios', () => {
+    expect(pendingReport([START, BOUNDS], { strict: true }).failed).toBe(false)
   })
 })

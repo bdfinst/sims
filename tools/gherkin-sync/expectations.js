@@ -4,6 +4,8 @@
 import { AstBuilder, GherkinClassicTokenMatcher, Parser } from '@cucumber/gherkin'
 import { IdGenerator } from '@cucumber/messages'
 
+const WIP_TAG = '@wip'
+
 const stepLine = ({ keyword, text }) => `${keyword.trim()} ${text}`
 
 const fillPlaceholders = (line, header, row) =>
@@ -29,6 +31,10 @@ const variantsOf = (scenario, lines) => {
 const backgroundStepsOf = (children) =>
   children.flatMap(({ background }) => (background ? background.steps.map(stepLine) : []))
 
+// A scenario tagged @wip is pending: its tests are not checked yet. A tagged Scenario Outline
+// is pending as a whole, so every Examples row is.
+const isWip = ({ tags }) => tags.some(({ name }) => name === WIP_TAG)
+
 const scenariosOf = (children, inheritedSteps, uri) => {
   const backgroundSteps = [...inheritedSteps, ...backgroundStepsOf(children)]
   return children.flatMap(({ rule, scenario }) => {
@@ -39,6 +45,7 @@ const scenariosOf = (children, inheritedSteps, uri) => {
       {
         name: scenario.name,
         location: `${uri}:${scenario.location.line}`,
+        wip: isWip(scenario),
         variants: variantsOf(scenario, lines),
       },
     ]
