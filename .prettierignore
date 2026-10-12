@@ -1,0 +1,16 @@
+# Generated output
+dist/
+coverage/
+playwright-report/
+test-results/
+package-lock.json
+
+# Pre-existing hand-authored content: not reformatted by tooling
+crt.html
+*.mermaid
+CLAUDE.md
+sim.spec.md
+docs/
+plans/
+features/
+.claude/

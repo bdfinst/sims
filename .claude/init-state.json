@@ -1,0 +1,22 @@
+{
+  "codegraph": {
+    "install_declined": true
+  },
+  "repowise": {
+    "install_declined": true
+  },
+  "graphify": {
+    "install_declined": true
+  },
+  "mcp_hygiene": {
+    "gitignore": "added"
+  },
+  "last_run": {
+    "stack": [
+      "js"
+    ],
+    "all_slots_bound": true,
+    "capability_tools_resolved": true,
+    "checked_at": "2026-10-12T11:08:18.399295+00:00"
+  }
+}
