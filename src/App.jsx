@@ -19,6 +19,14 @@ function App() {
     return () => clearInterval(intervalId)
   }, [isRunning])
 
+  useEffect(() => {
+    const pauseWhenHidden = () => {
+      if (document.visibilityState === 'hidden') dispatch({ type: 'pause' })
+    }
+    document.addEventListener('visibilitychange', pauseWhenHidden)
+    return () => document.removeEventListener('visibilitychange', pauseWhenHidden)
+  }, [])
+
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6 p-6">
       <Header

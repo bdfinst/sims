@@ -19,6 +19,12 @@ const iconNames = (laneLocator) =>
 
 const toggleButton = (page, name) => page.getByRole('button', { name, exact: true })
 
+const setVisibility = (page, visibilityState) =>
+  page.evaluate((state) => {
+    Object.defineProperty(document, 'visibilityState', { value: state, configurable: true })
+    document.dispatchEvent(new Event('visibilitychange'))
+  }, visibilityState)
+
 const expectCounts = async (page, laneId, { pending, deployed }) => {
   await expect(metric(page, laneId, 'pending')).toHaveText(String(pending))
   await expect(metric(page, laneId, 'deployed')).toHaveText(String(deployed))
@@ -166,6 +172,40 @@ test.describe('Run and pause the simulation', () => {
       .filter((now, i) => now.some((count, lane) => count < samples[i][lane]))
     expect(decreases).toEqual([])
     expect(samples.at(-1)).toEqual([10, 15])
+  })
+
+  test('Hiding the tab auto-pauses', async ({ page }) => {
+    await openSimulator(page)
+    await toggleButton(page, 'Start').click()
+    await page.clock.runFor(1 * SECOND_MS)
+
+    await setVisibility(page, 'hidden')
+    await page.clock.runFor(3 * SECOND_MS)
+
+    await expect(page.getByText('Paused', { exact: true })).toBeVisible()
+    await expect(metric(page, 'ai', 'pending')).toHaveText('18')
+  })
+
+  test('Showing the tab again stays paused', async ({ page }) => {
+    await openSimulator(page)
+    await toggleButton(page, 'Start').click()
+    await page.clock.runFor(1 * SECOND_MS)
+    await setVisibility(page, 'hidden')
+
+    await setVisibility(page, 'visible')
+    await page.clock.runFor(2 * SECOND_MS)
+
+    await expect(page.getByText('Paused', { exact: true })).toBeVisible()
+    await expect(metric(page, 'ai', 'pending')).toHaveText('18')
+  })
+
+  test('Hiding the tab while paused changes nothing', async ({ page }) => {
+    await openSimulator(page)
+
+    await setVisibility(page, 'hidden')
+
+    await expect(page.getByText('Paused', { exact: true })).toBeVisible()
+    await expectEmptyLanes(page)
   })
 
   test('The built file runs from disk with no other requests', async ({ page }) => {

@@ -27,6 +27,10 @@ describe('start and pause', () => {
     expect(dispatchAll(initialState, 'start', 'pause').isRunning).toBe(false)
   })
 
+  it('pausing while already paused changes nothing', () => {
+    expect(dispatchAll(initialState, 'pause')).toEqual(initialState)
+  })
+
   it('does not change lanes or ticks', () => {
     const toggled = dispatchAll(initialState, 'start', 'pause')
     expect([toggled.lanes, toggled.ticks]).toEqual([initialState.lanes, initialState.ticks])
