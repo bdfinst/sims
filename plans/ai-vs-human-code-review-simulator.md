@@ -1002,8 +1002,8 @@ At the build's project-init gate, you chose a build step instead of the single-H
 
 #### Wave 5
 
-- [ ] Slice 5: Warning threshold
-  - [ ] Step 5.1: Global threshold and warning state
+- [x] Slice 5: Warning threshold
+  - [x] Step 5.1: Global threshold and warning state
 
 #### Wave 6
 
