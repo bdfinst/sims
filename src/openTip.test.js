@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { INITIAL_TIP_STATE, TIP_EVENT, isTipShown, openTipReducer } from './openTip.js'
+import { INITIAL_TIP_STATE, TIP_EVENT, isTipShown, openTipReducer, shownTipKey } from './openTip.js'
 
 const TIP = 'tip-a'
 const OTHER_TIP = 'tip-b'
@@ -139,6 +139,27 @@ describe('openTipReducer, named cases', () => {
     expect(shownAfter(touchEnter(TIP))).toEqual(NONE_SHOWN)
   })
 
+  it('shows the keyboard-focused tip again when a hover on another tip ends', () => {
+    expect(shownAfter(keyboardFocus(TIP), mouseEnter(OTHER_TIP))).toEqual([OTHER_TIP])
+    expect(shownAfter(keyboardFocus(TIP), mouseEnter(OTHER_TIP), pointerLeave(OTHER_TIP))).toEqual([
+      TIP,
+    ])
+  })
+
+  it('keeps a pinned or dismissed hovered tip in charge when its hover ends', () => {
+    expect(
+      shownAfter(
+        keyboardFocus(TIP),
+        mouseEnter(OTHER_TIP),
+        press(OTHER_TIP),
+        pointerLeave(OTHER_TIP),
+      ),
+    ).toEqual([OTHER_TIP])
+    expect(
+      shownAfter(keyboardFocus(TIP), mouseEnter(OTHER_TIP), ESCAPE, pointerLeave(OTHER_TIP)),
+    ).toEqual(NONE_SHOWN)
+  })
+
   it('does not open on pointer-initiated focus alone', () => {
     expect(shownAfter(pointerFocus(TIP))).toEqual(NONE_SHOWN)
   })
@@ -150,5 +171,14 @@ describe('openTipReducer, named cases', () => {
   it('ignores Escape and unknown events when no tip is shown', () => {
     expect(after(ESCAPE)).toEqual(INITIAL_TIP_STATE)
     expect(after({ type: 'unknown' })).toEqual(INITIAL_TIP_STATE)
+  })
+})
+
+describe('shownTipKey', () => {
+  it('names the shown tip, or null when none is shown', () => {
+    expect(shownTipKey(INITIAL_TIP_STATE)).toBeNull()
+    expect(shownTipKey(after(mouseEnter(TIP)))).toBe(TIP)
+    expect(shownTipKey(after(mouseEnter(TIP), pointerLeave(TIP)))).toBeNull()
+    expect(shownTipKey(after(mouseEnter(TIP), ESCAPE))).toBeNull()
   })
 })

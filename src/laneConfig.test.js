@@ -17,6 +17,7 @@ import {
   sliderInfoTexts,
   tileLayout,
 } from './laneConfig.js'
+import { FINDINGS } from './research.js'
 
 // 22 is the busy-AI queue at 5.7 s, and each of those PRs must get a tile. With the exact AI preset
 // the queue is n pending after n ticks, up to 100, so 98 is the largest capacity C for which both C
@@ -155,6 +156,20 @@ const TIP_ORACLES = [
     info: 'How much faster reviewers read AI-generated code (×) in the AI lane: effective speed is reviewer speed × this value. AI PRs are reviewed 2× faster once picked up (LinearB).',
   },
 ]
+const QUOTED_FINDINGS = [
+  {
+    settingKey: 'reviewerSpeed',
+    findingId: 'review-limits',
+    source: 'SmartBear',
+    clause: 'Defect discovery drops significantly faster than 500 LOC/hour',
+  },
+  {
+    settingKey: 'skim',
+    findingId: 'linearb-wait',
+    source: 'LinearB',
+    clause: 'reviewed 2× faster once picked up',
+  },
+]
 const MAX_LEAD_SENTENCE_WORDS = 25
 const UNSUPPORTED_WORDING = ['near zero', 'coined', 'originated']
 const leadSentence = (text) => text.split(/(?<=\.)\s/)[0]
@@ -167,18 +182,17 @@ describe('slider info tips', () => {
     )
   })
 
+  // The oracle pins each tip word for word, so the plan's rules on unit, lanes, and unsupported
+  // wording are checked once here, against the pinned text.
   it.each(TIP_ORACLES)(
-    "gives $settingKey the plan's tip text, unit, and lanes",
+    "gives $settingKey the plan's tip text, unit, and lanes, naming both and no unsupported wording",
     ({ settingKey, ...tip }) => {
       expect(SLIDER_PRESENTATION[settingKey]).toMatchObject(tip)
+      expect(tip.info).toContain(tip.unitName)
+      expect(tip.info).toContain(tip.lanes)
+      expect(UNSUPPORTED_WORDING.filter((phrase) => tip.info.includes(phrase))).toEqual([])
     },
   )
-
-  it.each(Object.keys(SLIDERS))('names the unit and lanes of %s in its tip', (settingKey) => {
-    const { info, unitName, lanes } = SLIDER_PRESENTATION[settingKey]
-    expect(info).toContain(unitName)
-    expect(info).toContain(lanes)
-  })
 
   it.each(Object.keys(SLIDERS))(
     `leads the %s tip with a sentence of at most ${MAX_LEAD_SENTENCE_WORDS} words`,
@@ -188,11 +202,6 @@ describe('slider info tips', () => {
       expect(wordCount(lead)).toBeLessThanOrEqual(MAX_LEAD_SENTENCE_WORDS)
     },
   )
-
-  it.each(Object.keys(SLIDERS))('keeps unsupported wording out of the %s tip', (settingKey) => {
-    const { info } = SLIDER_PRESENTATION[settingKey]
-    expect(UNSUPPORTED_WORDING.filter((phrase) => info.includes(phrase))).toEqual([])
-  })
 
   it('takes every "8" from WORK_HOURS_PER_DAY, so another work day leaves no "8" in any tip', () => {
     const texts = sliderInfoTexts({
@@ -205,6 +214,17 @@ describe('slider info tips', () => {
     expect(texts.humanPrsPerDay).toContain('per 7-hour work day')
     expect(texts.humanPrsPerDay).toContain('LOC/hr × 7 ÷ PRs/day')
   })
+
+  // Each clause appears in both a tip and a research-panel finding; this keeps the copies in step.
+  it.each(QUOTED_FINDINGS)(
+    'quotes the $findingId finding word for word in the $settingKey tip',
+    ({ settingKey, findingId, source, clause }) => {
+      const finding = FINDINGS.find(({ id }) => id === findingId)
+      expect(SLIDER_PRESENTATION[settingKey].info).toContain(`${clause} (${source})`)
+      expect(finding.text).toContain(clause)
+      expect(finding.source.label).toContain(source)
+    },
+  )
 
   it("quotes the engine's Faros constants in the human and AI tips", () => {
     const { humanLocPerHour, aiLocPerHour } = SLIDER_PRESENTATION

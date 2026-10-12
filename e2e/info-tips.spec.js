@@ -8,15 +8,21 @@ import {
   PHONE,
   REVIEWER_SPEED_LABEL,
   THRESHOLD_LABEL,
+  boxOf,
   centreOf,
   contrastRatio,
+  controlAfterLabel,
   expect,
   expectNoHorizontalScroll,
   expectViewport,
   flushPendingRenders,
   infoButton,
+  labelOf,
+  laneElementBoxes,
+  movePointerOnto,
   movePointerTo,
   openSimulator,
+  overlaps,
   pageTitle,
   runFor,
   shownTips,
@@ -83,55 +89,11 @@ const expectTipStillShown = async (page, control) => {
   await expect(await tipFor(page, control)).toBeVisible()
 }
 
-// Glides the mouse from the button's centre straight to the tip's nearest edge, one pixel per
-// move event, then into the tip. Any gap between button and tip is crossed, as a real pointer would.
-const movePointerOnto = async (page, button, tip) => {
-  const start = await centreOf(button)
-  const tipBox = await boxOf(tip, 'tip')
-  const isTipAbove = tipBox.y < start.y
-  const edgeY = isTipAbove ? tipBox.y + tipBox.height - 1 : tipBox.y + 1
-  await page.mouse.move(start.x, start.y)
-  await page.mouse.move(start.x, edgeY, { steps: Math.ceil(Math.abs(edgeY - start.y)) })
-  await movePointerTo(page, tip)
+// Hovers a slider's info button and waits for its tip to show.
+const hoverInfoButton = async (page, control) => {
+  await movePointerTo(page, infoButton(page, control))
+  await expect(await tipFor(page, control)).toBeVisible()
 }
-
-const boxOf = async (locator, label) => {
-  const box = await locator.boundingBox()
-  expect(box, `${label} has a layout box`).not.toBeNull()
-  return box
-}
-
-const overlaps = (first, second) =>
-  first.x < second.x + second.width &&
-  second.x < first.x + first.width &&
-  first.y < second.y + second.height &&
-  second.y < first.y + first.height
-
-// The first button or input after the slider's label, in document order.
-const controlAfterLabel = (page, control) =>
-  slider(page, control).evaluate((input) => {
-    const label = document.querySelector(`label[for="${input.id}"]`)
-    const following = [...document.querySelectorAll('button, input')].find(
-      (element) => label.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING,
-    )
-    return following?.getAttribute('aria-label') ?? following?.id
-  })
-
-const labelOf = async (page, control) => {
-  const inputId = await slider(page, control).getAttribute('id')
-  return page.locator(`label[for="${inputId}"]`)
-}
-
-// Where every element in both lanes sits, except the tips (which appear when opened).
-const laneElementBoxes = (page) =>
-  page.evaluate(() =>
-    [...document.querySelectorAll('[data-lane] *')]
-      .filter((element) => !element.closest('[role="tooltip"]'))
-      .map((element) => {
-        const { x, y, width, height } = element.getBoundingClientRect()
-        return { x, y, width, height }
-      }),
-  )
 
 test.describe('Slider info tips', () => {
   for (const control of ALL_CONTROLS) {
@@ -176,9 +138,10 @@ test.describe('Slider info tips', () => {
       })
 
       await test.step(`Then the "${control}" slider's accessible description contains "${phrase}"`, async () => {
-        await expect(slider(page, control)).toHaveAccessibleDescription(
-          new RegExp(escapeRegExp(phrase)),
-        )
+        const description = new RegExp(escapeRegExp(phrase))
+        await expect(slider(page, control)).toHaveAccessibleDescription(description)
+        // The info button names the tip as its description too (APG tooltip pattern).
+        await expect(infoButton(page, control)).toHaveAccessibleDescription(description)
       })
 
       await test.step(`When I hover "About ${control}"`, async () => {
@@ -210,8 +173,7 @@ test.describe('Slider info tips', () => {
   test('The tip stays open while the pointer moves onto it', async ({ page }) => {
     await test.step('Given I hover "About Reviewer speed (LOC/hr, both lanes)"', async () => {
       await openSimulator(page)
-      await movePointerTo(page, infoButton(page, REVIEWER_SPEED_LABEL))
-      await expect(await tipFor(page, REVIEWER_SPEED_LABEL)).toBeVisible()
+      await hoverInfoButton(page, REVIEWER_SPEED_LABEL)
     })
 
     await test.step('When I move the pointer onto the tip', async () => {
@@ -230,8 +192,7 @@ test.describe('Slider info tips', () => {
   test('Moving the pointer away closes the tip', async ({ page }) => {
     await test.step('Given I hover "About Reviewer speed (LOC/hr, both lanes)"', async () => {
       await openSimulator(page)
-      await movePointerTo(page, infoButton(page, REVIEWER_SPEED_LABEL))
-      await expect(await tipFor(page, REVIEWER_SPEED_LABEL)).toBeVisible()
+      await hoverInfoButton(page, REVIEWER_SPEED_LABEL)
     })
 
     await test.step('When I move the pointer to the page title', async () => {
@@ -255,7 +216,7 @@ test.describe('Slider info tips', () => {
     })
 
     await test.step('Then a tip is shown that contains "AI PRs are reviewed 2× faster once picked up"', async () => {
-      await expectOneTipContaining(page, 'AI PRs are reviewed 2× faster once picked up')
+      await expectOneTipContaining(page, PHRASE_BY_CONTROL[AI_SKIM_LABEL])
     })
 
     await test.step('When I press Escape', async () => {
@@ -291,8 +252,7 @@ test.describe('Slider info tips', () => {
     await test.step('Given I Tab to "About Human PRs per day" and hover it', async () => {
       await openSimulator(page)
       await tabTo(page, infoButton(page, HUMAN_PRS_PER_DAY_LABEL))
-      await movePointerTo(page, infoButton(page, HUMAN_PRS_PER_DAY_LABEL))
-      await expect(await tipFor(page, HUMAN_PRS_PER_DAY_LABEL)).toBeVisible()
+      await hoverInfoButton(page, HUMAN_PRS_PER_DAY_LABEL)
     })
 
     await test.step('When I move the pointer to the page title', async () => {
@@ -308,8 +268,7 @@ test.describe('Slider info tips', () => {
     await test.step('Given I Tab to "About Human PRs per day" and hover it', async () => {
       await openSimulator(page)
       await tabTo(page, infoButton(page, HUMAN_PRS_PER_DAY_LABEL))
-      await movePointerTo(page, infoButton(page, HUMAN_PRS_PER_DAY_LABEL))
-      await expect(await tipFor(page, HUMAN_PRS_PER_DAY_LABEL)).toBeVisible()
+      await hoverInfoButton(page, HUMAN_PRS_PER_DAY_LABEL)
     })
 
     await test.step('When I press Tab', async () => {
@@ -327,8 +286,7 @@ test.describe('Slider info tips', () => {
 
     await test.step('Given I hover "About Human PRs per day"', async () => {
       await openSimulator(page)
-      await movePointerTo(page, button)
-      await expect(await tipFor(page, HUMAN_PRS_PER_DAY_LABEL)).toBeVisible()
+      await hoverInfoButton(page, HUMAN_PRS_PER_DAY_LABEL)
     })
 
     await test.step('When I press Escape', async () => {
@@ -350,6 +308,43 @@ test.describe('Slider info tips', () => {
     await test.step('Then the tip for "About Human PRs per day" is shown', async () => {
       await expect(await tipFor(page, HUMAN_PRS_PER_DAY_LABEL)).toBeVisible()
     })
+  })
+
+  // AC26: keyboard focus shows the tip, so ending a hover elsewhere hands the tip back to focus.
+  test('A focused tip reappears after hovering another info button ends', async ({ page }) => {
+    const focusedButton = infoButton(page, HUMAN_PRS_PER_DAY_LABEL)
+    await openSimulator(page)
+    await tabTo(page, focusedButton)
+    await expectOneTipContaining(page, PHRASE_BY_CONTROL[HUMAN_PRS_PER_DAY_LABEL])
+
+    await movePointerTo(page, infoButton(page, REVIEWER_SPEED_LABEL))
+    await expectOneTipContaining(page, PHRASE_BY_CONTROL[REVIEWER_SPEED_LABEL])
+
+    await movePointerTo(page, pageTitle(page))
+    await expectOneTipContaining(page, PHRASE_BY_CONTROL[HUMAN_PRS_PER_DAY_LABEL])
+    await expect(focusedButton).toBeFocused()
+  })
+
+  // The Escape listener must exist by the time a tip first paints. A MutationObserver callback runs
+  // after React's commit and before the browser paints or runs a passive effect, so an Escape sent
+  // from it is exactly "Escape the moment the tip appears".
+  test('Escape pressed the moment a hovered tip appears closes it', async ({ page }) => {
+    await openSimulator(page)
+    const tip = await tipFor(page, HUMAN_PRS_PER_DAY_LABEL)
+    await tip.evaluate((element) => {
+      const observer = new MutationObserver(() => {
+        if (element.hidden) return
+        observer.disconnect()
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+        window.escapeSentOnAppear = true
+      })
+      observer.observe(element, { attributes: true, attributeFilter: ['hidden'] })
+    })
+
+    await movePointerTo(page, infoButton(page, HUMAN_PRS_PER_DAY_LABEL))
+
+    await expect.poll(() => page.evaluate(() => window.escapeSentOnAppear)).toBe(true)
+    await expectNoTipShown(page)
   })
 
   test('Clicking the info button toggles its tip', async ({ page }) => {
@@ -391,8 +386,7 @@ test.describe('Slider info tips', () => {
 
     await test.step('Given I hover "About Reviewer speed (LOC/hr, both lanes)"', async () => {
       await openSimulator(page)
-      await movePointerTo(page, button)
-      await expect(await tipFor(page, REVIEWER_SPEED_LABEL)).toBeVisible()
+      await hoverInfoButton(page, REVIEWER_SPEED_LABEL)
     })
 
     await test.step('When I click "About Reviewer speed (LOC/hr, both lanes)"', async () => {
@@ -428,7 +422,18 @@ test.describe('Slider info tips', () => {
       })
 
       await test.step('When I tap "About AI code written (LOC/hr)"', async () => {
-        await infoButton(page, AI_CODE_WRITTEN_LABEL).tap()
+        // The same touchStart and touchEnd that locator.tap() sends, split so the test sees that a
+        // touch entering the button is not a hover: no tip until the tap completes.
+        const button = infoButton(page, AI_CODE_WRITTEN_LABEL)
+        await button.scrollIntoViewIfNeeded()
+        const { x, y } = await centreOf(button)
+        const touchscreen = await page.context().newCDPSession(page)
+        await touchscreen.send('Input.dispatchTouchEvent', {
+          type: 'touchStart',
+          touchPoints: [{ x, y }],
+        })
+        await expectNoTipShown(page)
+        await touchscreen.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
       })
 
       await test.step('Then the tip for "About AI code written (LOC/hr)" is shown', async () => {
@@ -448,8 +453,7 @@ test.describe('Slider info tips', () => {
   test('Opening one tip closes the other', async ({ page }) => {
     await test.step('Given I hover "About Human PRs per day"', async () => {
       await openSimulator(page)
-      await movePointerTo(page, infoButton(page, HUMAN_PRS_PER_DAY_LABEL))
-      await expect(await tipFor(page, HUMAN_PRS_PER_DAY_LABEL)).toBeVisible()
+      await hoverInfoButton(page, HUMAN_PRS_PER_DAY_LABEL)
     })
 
     await test.step('When I Tab to "About Warning threshold"', async () => {
@@ -458,7 +462,7 @@ test.describe('Slider info tips', () => {
 
     await test.step('Then exactly one tip is shown and it contains "turns red when its count is above this many PRs"', async () => {
       await flushPendingRenders(page)
-      await expectOneTipContaining(page, 'turns red when its count is above this many PRs')
+      await expectOneTipContaining(page, PHRASE_BY_CONTROL[THRESHOLD_LABEL])
     })
   })
 
@@ -507,8 +511,7 @@ test.describe('Slider info tips', () => {
     })
 
     await test.step('When I hover "About AI code written (LOC/hr)"', async () => {
-      await movePointerTo(page, infoButton(page, AI_CODE_WRITTEN_LABEL))
-      await expect(await tipFor(page, AI_CODE_WRITTEN_LABEL)).toBeVisible()
+      await hoverInfoButton(page, AI_CODE_WRITTEN_LABEL)
     })
 
     await test.step('Then the status still reads "Running"', async () => {
@@ -548,14 +551,51 @@ test.describe('Slider info tips', () => {
       })
 
       await test.step('When I hover "About Reviewer speed (LOC/hr, both lanes)"', async () => {
-        await movePointerTo(page, infoButton(page, REVIEWER_SPEED_LABEL))
-        await expect(await tipFor(page, REVIEWER_SPEED_LABEL)).toBeVisible()
+        await hoverInfoButton(page, REVIEWER_SPEED_LABEL)
       })
 
       await test.step('Then no element in either lane has moved', async () => {
         expect(closedBoxes.length, 'lane elements measured').toBeGreaterThan(0)
         expect(await laneElementBoxes(page)).toEqual(closedBoxes)
       })
+    })
+  })
+
+  test.describe('on a phone, while the page scrolls', () => {
+    test.use({ viewport: PHONE })
+
+    // The above-or-below choice is measured again on scroll, not only when the tip opens.
+    test('A shown tip flips below and back as the page scrolls', async ({ page }) => {
+      const button = infoButton(page, REVIEWER_SPEED_LABEL)
+      // Scrolls so the tip's anchor (its offsetParent) starts `offset` px below the viewport's top,
+      // and returns where it ended up.
+      const scrollAnchorTo = (offset) =>
+        shownTips(page).evaluate((tip, top) => {
+          window.scrollBy(0, tip.offsetParent.getBoundingClientRect().top - top)
+          return tip.offsetParent.getBoundingClientRect().top
+        }, offset)
+      const tipBox = () => boxOf(shownTips(page), 'tip')
+      const buttonBox = () => boxOf(button, `About ${REVIEWER_SPEED_LABEL}`)
+
+      await openSimulator(page)
+      await tabTo(page, button)
+      await expectOneTipContaining(page, PHRASE_BY_CONTROL[REVIEWER_SPEED_LABEL])
+
+      expect(await scrollAnchorTo(0), 'anchor scrolled to the top').toBeCloseTo(0, 0)
+      const { y: buttonTopAtTop } = await buttonBox()
+      await expect
+        .poll(async () => (await tipBox()).y, 'tip top, flipped below the button')
+        .toBeGreaterThan(buttonTopAtTop)
+
+      const middle = Math.floor(PHONE.height / 2)
+      expect(await scrollAnchorTo(middle), 'anchor scrolled to the middle').toBeCloseTo(middle, 0)
+      const { y: buttonTopAtMiddle } = await buttonBox()
+      await expect
+        .poll(async () => {
+          const { y, height } = await tipBox()
+          return y + height
+        }, 'tip bottom, back above the button')
+        .toBeLessThanOrEqual(buttonTopAtMiddle)
     })
   })
 

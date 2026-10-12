@@ -29,6 +29,9 @@ export const isTipShown = (state, key) =>
   !state.isDismissed &&
   (key === state.hoveredKey || key === state.focusedKey || state.isPinned)
 
+// The key of the tip on screen, or null when none is shown.
+export const shownTipKey = (state) => (isTipShown(state, state.activeKey) ? state.activeKey : null)
+
 // Makes `key` the active, undismissed tip. Switching to another tip drops the old tip's pin.
 const activate = (state, key) => ({
   ...state,
@@ -39,7 +42,16 @@ const activate = (state, key) => ({
 
 const dismiss = (state) => ({ ...state, isPinned: false, isDismissed: true })
 
-const press = (state, key) => {
+// A hover ends. If that leaves no tip shown, a tip whose button still has keyboard focus shows
+// again (AC26). A pinned or dismissed tip stays in charge.
+const endHover = (state) => {
+  const unhovered = { ...state, hoveredKey: null }
+  const isFocusedTipWaiting =
+    shownTipKey(unhovered) === null && state.focusedKey !== null && !state.isDismissed
+  return isFocusedTipWaiting ? activate(unhovered, state.focusedKey) : unhovered
+}
+
+const pressTip = (state, key) => {
   if (!isTipShown(state, key)) return { ...activate(state, key), isPinned: true }
   return state.isPinned ? dismiss(state) : { ...state, isPinned: true }
 }
@@ -50,18 +62,18 @@ export const openTipReducer = (state, event) => {
       if (event.pointerType !== HOVER_POINTER_TYPE) return state
       return { ...activate(state, event.key), hoveredKey: event.key }
     case TIP_EVENT.pointerLeave:
-      return event.key === state.hoveredKey ? { ...state, hoveredKey: null } : state
+      return event.key === state.hoveredKey ? endHover(state) : state
     case TIP_EVENT.focus:
       if (!event.isFocusVisible) return state
       return { ...activate(state, event.key), focusedKey: event.key }
     case TIP_EVENT.blur:
       return event.key === state.focusedKey ? { ...state, focusedKey: null } : state
     case TIP_EVENT.press:
-      return press(state, event.key)
+      return pressTip(state, event.key)
     case TIP_EVENT.pointerDownOutside:
       return state.isPinned ? dismiss(state) : state
     case TIP_EVENT.escape:
-      return isTipShown(state, state.activeKey) ? dismiss(state) : state
+      return shownTipKey(state) === null ? state : dismiss(state)
     default:
       return state
   }

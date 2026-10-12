@@ -349,11 +349,63 @@ export const centreOf = async (locator) => {
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
 }
 
-// Moves the real mouse pointer to the centre of an element (a hover, with no click).
+// Moves the real mouse pointer to the centre of an element (a hover, with no click), scrolling it
+// into view first so the pointer lands on it.
 export const movePointerTo = async (page, locator) => {
+  await locator.scrollIntoViewIfNeeded()
   const { x, y } = await centreOf(locator)
   await page.mouse.move(x, y)
 }
+
+// Glides the mouse from the button's centre straight to the tip's nearest edge, one pixel per
+// move event, then into the tip. Any gap between button and tip is crossed, as a real pointer would.
+export const movePointerOnto = async (page, button, tip) => {
+  const start = await centreOf(button)
+  const tipBox = await boxOf(tip, 'tip')
+  const isTipAbove = tipBox.y < start.y
+  const edgeY = isTipAbove ? tipBox.y + tipBox.height - 1 : tipBox.y + 1
+  await page.mouse.move(start.x, start.y)
+  await page.mouse.move(start.x, edgeY, { steps: Math.ceil(Math.abs(edgeY - start.y)) })
+  await movePointerTo(page, tip)
+}
+
+export const boxOf = async (locator, label) => {
+  const box = await locator.boundingBox()
+  expect(box, `${label} has a layout box`).not.toBeNull()
+  return box
+}
+
+export const overlaps = (first, second) =>
+  first.x < second.x + second.width &&
+  second.x < first.x + first.width &&
+  first.y < second.y + second.height &&
+  second.y < first.y + first.height
+
+// The first button or input after the slider's label, in document order.
+export const controlAfterLabel = (page, control) =>
+  slider(page, control).evaluate((input) => {
+    const label = document.querySelector(`label[for="${input.id}"]`)
+    const following = [...document.querySelectorAll('button, input')].find(
+      (element) => label.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING,
+    )
+    return following?.getAttribute('aria-label') ?? following?.id
+  })
+
+export const labelOf = async (page, control) => {
+  const inputId = await slider(page, control).getAttribute('id')
+  return page.locator(`label[for="${inputId}"]`)
+}
+
+// Where every element in both lanes sits, except the tips (which appear when opened).
+export const laneElementBoxes = (page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('[data-lane] *')]
+      .filter((element) => !element.closest('[role="tooltip"]'))
+      .map((element) => {
+        const { x, y, width, height } = element.getBoundingClientRect()
+        return { x, y, width, height }
+      }),
+  )
 
 export const pageTitle = (page) => page.getByRole('heading', { level: 1 })
 
@@ -413,15 +465,20 @@ export const sampleEachTick = async (page, { startTick, tickCount, read }) => {
   return samples
 }
 
-const MAX_TABS_TO_REACH_A_CONTROL = 15
+// Everything on the page that Tab can stop on.
+const TAB_STOPS =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])'
 
-// Presses real Tab keys until the target holds focus; proves keyboard reachability.
+// Presses real Tab keys until the target holds focus; proves keyboard reachability. One press per
+// tab stop, plus one for the stop outside the page, is a full cycle, so it reaches any reachable
+// control from wherever focus starts.
 export const tabTo = async (page, target) => {
-  for (let presses = 0; presses < MAX_TABS_TO_REACH_A_CONTROL; presses += 1) {
+  const maxPresses = (await page.locator(TAB_STOPS).count()) + 1
+  for (let presses = 0; presses < maxPresses; presses += 1) {
     await page.keyboard.press('Tab')
     if (await target.evaluate((element) => element === document.activeElement)) return
   }
-  throw new Error('Tab never reached the control')
+  throw new Error(`Tab never reached ${target} in ${maxPresses} presses`)
 }
 
 // The elapsed readout in ticks ("3.0 work hours" is 30).
