@@ -63,3 +63,11 @@ export const SLIDER_PRESENTATION = Object.freeze({
     spokenUnit: 'PRs',
   }),
 })
+
+export const QUEUE_STATE = Object.freeze({ warning: 'warning', normal: 'normal' })
+
+// Complete class literals per state, so Tailwind's scanner finds them.
+export const QUEUE_STATE_CLASS = Object.freeze({
+  [QUEUE_STATE.warning]: 'border-warning bg-warning/10',
+  [QUEUE_STATE.normal]: 'border-gray-600',
+})

@@ -1,76 +1,86 @@
 import {
   HUMAN_GEN_LABEL,
+  QUEUE_STATE,
   REFERENCE,
   REVIEWER_SPEED_LABEL,
-  SECOND_MS,
   THRESHOLD_LABEL,
-  TICKS_PER_SECOND,
+  advanceSeconds,
   buttonNamed,
   expect,
-  expectElapsedAtTick,
+  expectPending,
+  expectQueueState,
+  expectWarningShown,
   laneLocator,
-  metric,
   openSimulator,
   pauseSimulation,
+  queueBox,
   setSlider,
   slider,
   startAndRunFor,
   startSimulation,
   test,
+  visibleValue,
 } from './fixtures.js'
 
-const WARNING_RED = 'rgb(239, 68, 68)'
+test.describe.configure({ mode: 'parallel' })
+
+// The spec's threshold oracle: kept as literals, independent of the app's slider table.
 const DEFAULT_THRESHOLD = 15
 const MIN_THRESHOLD = 5
 const MAX_THRESHOLD = 50
 const THRESHOLD_STEP = 1
+
 const BUSY_HUMAN_GEN = 10
 const QUIET_HUMAN_GEN = 1
 const FAST_REVIEWER_SPEED = 1000
-const THRESHOLD_BETWEEN_LANES = 17 // Human shows 17, AI shows 36
-const THRESHOLD_BELOW_BOTH_LANES = 16
-const THRESHOLD_AT_AI_PENDING = 18
-const RAISED_THRESHOLD = 25
-const LOWEST_THRESHOLD = MIN_THRESHOLD
+
+// Thresholds derived from the displayed queues they are meant to straddle.
+const HUMAN_PENDING = REFERENCE.humanPendingAtTick20WithHumanGen10 // 17, with the AI lane at 36
+const THRESHOLD_BETWEEN_LANES = HUMAN_PENDING
+const THRESHOLD_BELOW_BOTH_LANES = HUMAN_PENDING - 1
+const THRESHOLD_AT_AI_PENDING = REFERENCE.aiPendingAtTick10
+const RAISED_THRESHOLD = REFERENCE.aiPendingAtTick12 + 3
 const KEPT_THRESHOLD = 30
+
+const SECONDS_TO_AI_PENDING_14 = 0.8
+const SECONDS_TO_AI_PENDING_16 = 0.9
+const SECONDS_TO_AI_PENDING_22 = 1.2
+const SECONDS_TO_AI_PENDING_9 = 0.5
+const SECONDS_TO_HUMAN_PENDING_15 = 1.8
+const SECONDS_TO_HUMAN_PENDING_16 = 1.9
+const SECONDS_TO_BUILD_BACKLOG = 2
+const SECONDS_TO_AI_PENDING_18 = 1
 const HALF_SECOND = 0.5
 const TENTH_SECOND = 0.1
-const RUN_FOR_AI_PENDING_22_SECONDS = 1.2
-const NEARLY_WARNING_SECONDS = 0.8
 
-const queueBox = (page, laneId) => laneLocator(page, laneId).locator('[data-state]')
-const expectWarning = (page, laneId) =>
-  expect(queueBox(page, laneId)).toHaveAttribute('data-state', 'warning')
-const expectNoWarning = (page, laneId) =>
-  expect(queueBox(page, laneId)).toHaveAttribute('data-state', 'normal')
-const expectPending = (page, laneId, count) =>
-  expect(metric(page, laneId, 'pending')).toHaveText(String(count))
-const ticksAt = (seconds) => Math.round(seconds * TICKS_PER_SECOND)
+const openWithBusyHuman = async (page) => {
+  await openSimulator(page)
+  await setSlider(page, HUMAN_GEN_LABEL, BUSY_HUMAN_GEN)
+}
+
+// Waits for the slider's own shown value, so later checks cannot pass on the old threshold.
+const setThreshold = async (page, value) => {
+  await setSlider(page, THRESHOLD_LABEL, value)
+  await expect(await visibleValue(slider(page, THRESHOLD_LABEL))).toHaveText(`${value} PRs`)
+}
 
 test.describe('Pending Review overload warning', () => {
   test('AI queue turns red once it exceeds the default threshold', async ({ page }) => {
     await openSimulator(page)
     await startSimulation(page)
 
-    await page.clock.runFor(NEARLY_WARNING_SECONDS * SECOND_MS)
-    await expectElapsedAtTick(page, ticksAt(NEARLY_WARNING_SECONDS))
-    await expectPending(page, 'ai', REFERENCE.aiPendingAtTick8)
-    await expectNoWarning(page, 'ai')
+    await advanceSeconds(page, SECONDS_TO_AI_PENDING_14, SECONDS_TO_AI_PENDING_14)
+    await expectQueueState(page, 'ai', REFERENCE.aiPendingAtTick8, QUEUE_STATE.normal)
 
-    await page.clock.runFor(TENTH_SECOND * SECOND_MS)
-    await expectElapsedAtTick(page, ticksAt(NEARLY_WARNING_SECONDS + TENTH_SECOND))
-    await expectPending(page, 'ai', REFERENCE.aiPendingAtTick9)
-    await expectWarning(page, 'ai')
-    await expect(queueBox(page, 'ai').locator('[data-icon="triangle-alert"]')).toBeVisible()
-    await expect(queueBox(page, 'ai')).toHaveCSS('border-color', WARNING_RED)
-    await expect(laneLocator(page, 'ai').getByRole('status')).toHaveText(
-      'AI Pending Review over threshold',
-    )
-    await expectNoWarning(page, 'human')
+    await advanceSeconds(page, TENTH_SECOND, SECONDS_TO_AI_PENDING_16)
+    await expectQueueState(page, 'ai', REFERENCE.aiPendingAtTick9, QUEUE_STATE.warning)
+    await expectWarningShown(page, 'ai')
+    await expect(queueBox(page, 'human')).toHaveAttribute('data-state', QUEUE_STATE.normal)
     await expect(queueBox(page, 'human').locator('[data-icon]')).toHaveCount(0)
     await expect(laneLocator(page, 'human').getByRole('status')).toHaveText('')
   })
 
+  // Plan line 173: counts have no aria-live, and each lane's role="status" is its only announcer.
   test('Each lane has exactly one status element, and counts are not live regions', async ({
     page,
   }) => {
@@ -84,90 +94,100 @@ test.describe('Pending Review overload warning', () => {
   test('Displayed value at the threshold is not a warning even if the internal value is above it', async ({
     page,
   }) => {
-    await openSimulator(page)
-    await setSlider(page, HUMAN_GEN_LABEL, BUSY_HUMAN_GEN)
+    await openWithBusyHuman(page)
     await startSimulation(page)
 
-    await page.clock.runFor(1.8 * SECOND_MS)
-    await expectElapsedAtTick(page, ticksAt(1.8))
-    await expectPending(page, 'human', REFERENCE.humanPendingAtTick18WithHumanGen10)
-    await expectNoWarning(page, 'human')
+    await advanceSeconds(page, SECONDS_TO_HUMAN_PENDING_15, SECONDS_TO_HUMAN_PENDING_15)
+    await expectQueueState(
+      page,
+      'human',
+      REFERENCE.humanPendingAtTick18WithHumanGen10,
+      QUEUE_STATE.normal,
+    )
 
-    await page.clock.runFor(TENTH_SECOND * SECOND_MS)
-    await expectElapsedAtTick(page, ticksAt(1.9))
-    await expectPending(page, 'human', REFERENCE.humanPendingAtTick19WithHumanGen10)
-    await expectWarning(page, 'human')
+    await advanceSeconds(page, TENTH_SECOND, SECONDS_TO_HUMAN_PENDING_16)
+    await expectQueueState(
+      page,
+      'human',
+      REFERENCE.humanPendingAtTick19WithHumanGen10,
+      QUEUE_STATE.warning,
+    )
   })
 
   test('A custom threshold applies to both lanes', async ({ page }) => {
-    await openSimulator(page)
-    await setSlider(page, HUMAN_GEN_LABEL, BUSY_HUMAN_GEN)
-    await startAndRunFor(page, 2)
+    await openWithBusyHuman(page)
+    await startAndRunFor(page, SECONDS_TO_BUILD_BACKLOG)
     await pauseSimulation(page)
     await expectPending(page, 'human', REFERENCE.humanPendingAtTick20WithHumanGen10)
     await expectPending(page, 'ai', REFERENCE.aiPendingAtTick20WithHumanGen10)
 
-    await setSlider(page, THRESHOLD_LABEL, THRESHOLD_BETWEEN_LANES)
-    await expectNoWarning(page, 'human')
-    await expectWarning(page, 'ai')
+    await setThreshold(page, THRESHOLD_BETWEEN_LANES)
+    await expect(queueBox(page, 'human')).toHaveAttribute('data-state', QUEUE_STATE.normal)
+    await expect(queueBox(page, 'ai')).toHaveAttribute('data-state', QUEUE_STATE.warning)
 
-    await setSlider(page, THRESHOLD_LABEL, THRESHOLD_BELOW_BOTH_LANES)
-    await expectWarning(page, 'human')
-    await expectWarning(page, 'ai')
+    await setThreshold(page, THRESHOLD_BELOW_BOTH_LANES)
+    await expect(queueBox(page, 'human')).toHaveAttribute('data-state', QUEUE_STATE.warning)
+    await expect(queueBox(page, 'ai')).toHaveAttribute('data-state', QUEUE_STATE.warning)
   })
 
   test('Exactly at a custom threshold is not a warning', async ({ page }) => {
     await openSimulator(page)
-    await setSlider(page, THRESHOLD_LABEL, THRESHOLD_AT_AI_PENDING)
+    await setThreshold(page, THRESHOLD_AT_AI_PENDING)
 
-    await startAndRunFor(page, 1)
+    await startAndRunFor(page, SECONDS_TO_AI_PENDING_18)
 
-    await expectPending(page, 'ai', REFERENCE.aiPendingAtTick10)
-    await expectNoWarning(page, 'ai')
+    await expectQueueState(page, 'ai', REFERENCE.aiPendingAtTick10, QUEUE_STATE.normal)
   })
 
   test('Raising the threshold while paused clears the warning', async ({ page }) => {
     await openSimulator(page)
-    await startAndRunFor(page, RUN_FOR_AI_PENDING_22_SECONDS)
+    await startAndRunFor(page, SECONDS_TO_AI_PENDING_22)
     await pauseSimulation(page)
-    await expectPending(page, 'ai', REFERENCE.aiPendingAtTick12)
-    await expectWarning(page, 'ai')
+    await expectQueueState(page, 'ai', REFERENCE.aiPendingAtTick12, QUEUE_STATE.warning)
 
-    await setSlider(page, THRESHOLD_LABEL, RAISED_THRESHOLD)
+    await setThreshold(page, RAISED_THRESHOLD)
 
-    await expectNoWarning(page, 'ai')
+    await expectQueueState(page, 'ai', REFERENCE.aiPendingAtTick12, QUEUE_STATE.normal)
   })
 
   test('Lowering the threshold while running applies immediately', async ({ page }) => {
     await openSimulator(page)
-    await startAndRunFor(page, HALF_SECOND)
-    await expectPending(page, 'ai', REFERENCE.aiPendingAtTick5)
-    await expectNoWarning(page, 'ai')
+    await startAndRunFor(page, SECONDS_TO_AI_PENDING_9)
+    await expectQueueState(page, 'ai', REFERENCE.aiPendingAtTick5, QUEUE_STATE.normal)
 
-    await setSlider(page, THRESHOLD_LABEL, LOWEST_THRESHOLD)
+    await setThreshold(page, MIN_THRESHOLD)
 
-    await expectWarning(page, 'ai')
+    await expectQueueState(page, 'ai', REFERENCE.aiPendingAtTick5, QUEUE_STATE.warning)
     await expect(buttonNamed(page, 'Pause')).toBeVisible()
   })
 
   test('Warning clears when the queue drains to the threshold', async ({ page }) => {
-    await openSimulator(page)
-    await setSlider(page, HUMAN_GEN_LABEL, BUSY_HUMAN_GEN)
-    await startAndRunFor(page, 2)
-    await expectPending(page, 'human', REFERENCE.humanPendingAtTick20WithHumanGen10)
-    await expectWarning(page, 'human')
+    await openWithBusyHuman(page)
+    await startAndRunFor(page, SECONDS_TO_BUILD_BACKLOG)
+    await expectQueueState(
+      page,
+      'human',
+      REFERENCE.humanPendingAtTick20WithHumanGen10,
+      QUEUE_STATE.warning,
+    )
 
     await setSlider(page, HUMAN_GEN_LABEL, QUIET_HUMAN_GEN)
     await setSlider(page, REVIEWER_SPEED_LABEL, FAST_REVIEWER_SPEED)
-    await page.clock.runFor(HALF_SECOND * SECOND_MS)
-    await expectElapsedAtTick(page, ticksAt(2 + HALF_SECOND))
-    await expectPending(page, 'human', REFERENCE.humanPendingAtTick25AfterDraining)
-    await expectWarning(page, 'human')
+    await advanceSeconds(page, HALF_SECOND, SECONDS_TO_BUILD_BACKLOG + HALF_SECOND)
+    await expectQueueState(
+      page,
+      'human',
+      REFERENCE.humanPendingAtTick25AfterDraining,
+      QUEUE_STATE.warning,
+    )
 
-    await page.clock.runFor(TENTH_SECOND * SECOND_MS)
-    await expectElapsedAtTick(page, ticksAt(2 + HALF_SECOND + TENTH_SECOND))
-    await expectPending(page, 'human', REFERENCE.humanPendingAtTick26AfterDraining)
-    await expectNoWarning(page, 'human')
+    await advanceSeconds(page, TENTH_SECOND, SECONDS_TO_BUILD_BACKLOG + HALF_SECOND + TENTH_SECOND)
+    await expectQueueState(
+      page,
+      'human',
+      REFERENCE.humanPendingAtTick26AfterDraining,
+      QUEUE_STATE.normal,
+    )
   })
 
   test('Threshold slider default and bounds', async ({ page }) => {
@@ -182,7 +202,7 @@ test.describe('Pending Review overload warning', () => {
 
   test('Reset keeps the threshold', async ({ page }) => {
     await openSimulator(page)
-    await setSlider(page, THRESHOLD_LABEL, KEPT_THRESHOLD)
+    await setThreshold(page, KEPT_THRESHOLD)
 
     await buttonNamed(page, 'Reset').click()
 

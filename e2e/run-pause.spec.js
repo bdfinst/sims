@@ -40,6 +40,8 @@ const setVisibility = (page, visibilityState) =>
     document.dispatchEvent(new Event('visibilitychange'))
   }, visibilityState)
 
+test.describe.configure({ mode: 'parallel' })
+
 test.describe('Run and pause the simulation', () => {
   test('Page loads paused with empty lanes', async ({ page }) => {
     await openSimulator(page)

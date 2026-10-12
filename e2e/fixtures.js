@@ -1,5 +1,6 @@
 import { test as base, expect } from '@playwright/test'
 import { TICK_MS } from '../src/engine.js'
+import { QUEUE_STATE } from '../src/laneConfig.js'
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1'])
 export const INLINE_PROTOCOLS = new Set(['data:', 'blob:'])
@@ -89,6 +90,31 @@ export const expectCounts = async (page, laneId, { pending, deployed }) => {
   await expect(metric(page, laneId, 'deployed')).toHaveText(String(deployed))
 }
 
+export const expectPending = (page, laneId, count) =>
+  expect(metric(page, laneId, 'pending')).toHaveText(String(count))
+
+const QUEUE_LABEL_BY_LANE = { human: 'Human', ai: 'AI' }
+export { QUEUE_STATE }
+
+export const queueBox = (page, laneId) => laneLocator(page, laneId).locator('[data-state]')
+
+// The lane shows `count` pending PRs and its queue box is in `state` (QUEUE_STATE.*).
+export const expectQueueState = async (page, laneId, count, state) => {
+  await expectPending(page, laneId, count)
+  await expect(queueBox(page, laneId)).toHaveAttribute('data-state', state)
+}
+
+// Everything a warning looks like: the state, the alert icon, the red border, the announcement.
+export const expectWarningShown = async (page, laneId) => {
+  const box = queueBox(page, laneId)
+  await expect(box).toHaveAttribute('data-state', QUEUE_STATE.warning)
+  await expect(box.locator('[data-icon="triangle-alert"]')).toBeVisible()
+  await expect(box).toHaveCSS('border-color', 'rgb(239, 68, 68)')
+  await expect(laneLocator(page, laneId).getByRole('status')).toHaveText(
+    `${QUEUE_LABEL_BY_LANE[laneId]} Pending Review over threshold`,
+  )
+}
+
 export const SECOND_MS = 1000
 export { TICK_MS }
 export const TICKS_PER_SECOND = SECOND_MS / TICK_MS
@@ -144,6 +170,9 @@ export const REFERENCE = Object.freeze({
   // humanGen 10 for 2 s gives 17 PRs / 4,400 LOC queued; PR size 500 for 1 more second adds
   // 10 x 500 LOC and reviews 300 LOC: 26 PRs / 9,100 LOC.
   humanPendingLocAtTick20WithHumanGen10: '4,400',
+  humanPendingAtTick20WithHumanGen10: 17,
+  humanDeployedAtTick20WithHumanGen10: 2,
+  aiPendingAtTick20WithHumanGen10: 36, // the AI lane does not depend on humanGen
   humanPendingAtTick30AfterSizeChangeToPrSize500: 26,
   humanPendingLocAtTick30AfterSizeChangeToPrSize500: '9,100',
   // Displayed Pending Review while the AI lane (2 PRs generated per tick, about 0.16 reviewed) and
@@ -152,15 +181,12 @@ export const REFERENCE = Object.freeze({
   aiPendingAtTick8: 14,
   aiPendingAtTick9: 16,
   aiPendingAtTick12: 22,
-  aiPendingAtTick20WithHumanGen10: 36, // the AI lane does not depend on humanGen
   humanPendingAtTick18WithHumanGen10: 15,
   humanPendingAtTick19WithHumanGen10: 16,
   // Then humanGen 1 and reviewer speed 1000: each tick adds 0.1 PR and reviews 100 LOC (0.4 PR).
   humanPendingAtTick25AfterDraining: 16,
   humanPendingAtTick26AfterDraining: 15,
   humanDefectsCaughtWhenDrained: '6%', // PR size 250 at 1000 LOC/hr: 0.8 x 0.7625 x 0.1
-  humanPendingAtTick20WithHumanGen10: 17,
-  humanDeployedAtTick20WithHumanGen10: 2,
   aiDeployedAtTick11WithFasterReview: 2, // reviewer speed 1000, skim 3 -> 3000 LOC/hr
   // aiGen 40, prSize 300 (AI size 453, 60 LOC reviewed per tick), after 3 s:
   aiPendingAtTick30WithAiGen40AndPrSize300: 116,
@@ -236,6 +262,13 @@ export const tabTo = async (page, target) => {
   throw new Error('Tab never reached the control')
 }
 
+// Runs the fake clock for `seconds`, then waits until the elapsed readout shows `totalSeconds`
+// (the run's total so far), so the render for those ticks has happened before any assertion.
+export const advanceSeconds = async (page, seconds, totalSeconds) => {
+  await page.clock.runFor(seconds * SECOND_MS)
+  await expectElapsedAtTick(page, Math.round(totalSeconds * TICKS_PER_SECOND))
+}
+
 // From a fresh or just-reset page: starts the simulation, runs the fake clock, and waits until the
 // elapsed readout shows the run has rendered. The readout shares one React state with the lanes,
 // so the lanes are current too.
@@ -247,6 +280,8 @@ export const startAndRunFor = async (page, seconds) => {
 
 // Resolves after any render React has already queued. React schedules renders on a
 // MessageChannel, which page.clock does not fake, and ours is queued after React's.
+// It covers renders only: it does not guarantee that an effect cleanup (such as clearing the
+// interval) has run. After a visibility-driven pause, wait for a positive DOM result first.
 export const flushPendingRenders = (page) =>
   page.evaluate(
     () =>

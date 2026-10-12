@@ -103,7 +103,7 @@ export const displayedDeployed = (lane) => floorShow(lane.deployedPrs)
 export const displayedIncidents = (lane) => floorShow(lane.escapedDefects)
 
 // The only place the warning comparison is made: the displayed count must exceed the threshold.
-export const isOverThreshold = (displayedPending, threshold) => displayedPending > threshold
+export const isOverThreshold = (lane, threshold) => displayedPending(lane) > threshold
 
 const hasDeployedWholePr = (lane) => displayedDeployed(lane) >= 1
 

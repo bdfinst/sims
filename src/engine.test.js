@@ -185,8 +185,11 @@ describe('escape accrual at the default settings (10 seconds)', () => {
 })
 
 describe('formatIncidentsPerPr', () => {
-  it('divides by internal Deployed, not the floored count (107.84 / 15.87, not 107 / 15)', () => {
+  it('divides AI incidents by internal Deployed: 107.84 / 15.87 gives 6.79', () => {
     expect(formatIncidentsPerPr(afterDefaultRun(LANE_IDS.ai))).toBe('6.79')
+  })
+
+  it('divides escaped defects by deployed PRs: 107 over 15 gives 7.13', () => {
     expect(formatIncidentsPerPr(laneWithTotals(15, 107))).toBe('7.13')
   })
 
@@ -231,13 +234,13 @@ describe('formatHeadlineRatio', () => {
     ).toBe(NO_VALUE)
   })
 
-  it('is blank when the Human lane has no incidents yet (no division by zero)', () => {
+  it('is blank when the Human lane has no incidents yet (the ratio would be Infinity)', () => {
     expect(
       formatHeadlineRatio(lanesOf({ ai: laneWithTotals(5, 30), human: laneWithTotals(5, 0) })),
     ).toBe(NO_VALUE)
   })
 
-  it('is blank when neither lane has incidents (0 / 0 is not a number)', () => {
+  it('is blank when neither lane has incidents (the ratio would be NaN)', () => {
     expect(
       formatHeadlineRatio(lanesOf({ ai: laneWithTotals(5, 0), human: laneWithTotals(5, 0) })),
     ).toBe(NO_VALUE)
@@ -422,15 +425,27 @@ describe('formatLoc', () => {
 
 describe('isOverThreshold', () => {
   const THRESHOLD = 15
+  const laneWithPending = (pendingPrs) => ({ ...emptyLane(), pendingPrs })
 
   it.each([
-    { displayed: THRESHOLD - 1, isOver: false },
-    { displayed: THRESHOLD, isOver: false },
-    { displayed: THRESHOLD + 1, isOver: true },
+    { threshold: THRESHOLD, displayed: THRESHOLD - 1, isOver: false },
+    { threshold: THRESHOLD, displayed: THRESHOLD, isOver: false },
+    { threshold: THRESHOLD, displayed: THRESHOLD + 1, isOver: true },
   ])(
-    'is $isOver when $displayed PRs are pending against a threshold of 15',
-    ({ displayed, isOver }) => {
-      expect(isOverThreshold(displayed, THRESHOLD)).toBe(isOver)
+    'is $isOver when $displayed PRs are pending against a threshold of $threshold',
+    ({ threshold, displayed, isOver }) => {
+      expect(isOverThreshold(laneWithPending(displayed), threshold)).toBe(isOver)
+    },
+  )
+
+  it.each([
+    { threshold: THRESHOLD, internal: 15.84, shown: 15, isOver: false },
+    { threshold: THRESHOLD, internal: 16.72, shown: 16, isOver: true },
+  ])(
+    'judges the displayed count: $internal PRs (shown as $shown) against $threshold is $isOver',
+    ({ threshold, internal, shown, isOver }) => {
+      expect(displayedPending(laneWithPending(internal))).toBe(shown)
+      expect(isOverThreshold(laneWithPending(internal), threshold)).toBe(isOver)
     },
   )
 })

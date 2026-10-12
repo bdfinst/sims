@@ -83,6 +83,8 @@ const BOUNDS = [
   { control: AI_SKIM_LABEL, key: 'End', bound: 3 },
 ]
 
+test.describe.configure({ mode: 'parallel' })
+
 test.describe('Adjust the model live', () => {
   for (const { control, defaultValue, min, max, step, shown, spoken } of DEFAULT_CONTROLS) {
     test(`Controls start at their defaults with units: ${control}`, async ({ page }) => {

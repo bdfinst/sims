@@ -1,35 +1,40 @@
 import { displayedPending, formatLoc, isOverThreshold } from '../engine.js'
+import { QUEUE_STATE, QUEUE_STATE_CLASS } from '../laneConfig.js'
 import { Icon } from './Icon.jsx'
 import { MetricValue } from './MetricValue.jsx'
 
-// Class strings stay complete literals so Tailwind's scanner finds them.
-const WARNING_BOX_CLASS = 'border-warning bg-warning/10'
-const NORMAL_BOX_CLASS = 'border-gray-600'
+// Everything that varies with the warning comes from the one comparison in isOverThreshold.
+const queueAppearance = (laneLabel, lane, threshold) => {
+  const isWarning = isOverThreshold(lane, threshold)
+  const state = isWarning ? QUEUE_STATE.warning : QUEUE_STATE.normal
+  return {
+    isWarning,
+    state,
+    boxClass: QUEUE_STATE_CLASS[state],
+    statusText: isWarning ? `${laneLabel} Pending Review over threshold` : '',
+  }
+}
 
 export function QueueBox({ laneLabel, lane, threshold }) {
-  const pending = displayedPending(lane)
-  const isOver = isOverThreshold(pending, threshold)
+  const { isWarning, state, boxClass, statusText } = queueAppearance(laneLabel, lane, threshold)
   return (
-    <div
-      data-state={isOver ? 'warning' : 'normal'}
-      className={`rounded border p-4 ${isOver ? WARNING_BOX_CLASS : NORMAL_BOX_CLASS}`}
-    >
+    <div data-state={state} className={`rounded border p-4 ${boxClass}`}>
       <div className="flex items-start justify-between gap-2">
         <dl>
           <dt className="text-base">Pending Review</dt>
           <dd className="text-4xl font-bold">
-            <MetricValue name="pending" value={pending} />
+            <MetricValue name="pending" value={displayedPending(lane)} />
           </dd>
           <dt className="text-base">Pending LOC</dt>
           <dd className="text-xl font-semibold">
             <MetricValue name="pendingLoc" value={formatLoc(lane.pendingLoc)} />
           </dd>
         </dl>
-        {isOver && <Icon name="triangle-alert" className="text-warning" />}
+        {isWarning && <Icon name="triangle-alert" className="text-warning" />}
       </div>
       {/* Always mounted, so a screen reader announces the text when it changes. */}
       <p role="status" className="sr-only">
-        {isOver ? `${laneLabel} Pending Review over threshold` : ''}
+        {statusText}
       </p>
     </div>
   )

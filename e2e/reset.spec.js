@@ -34,6 +34,8 @@ const expectDefaultShortRunCounts = (page) =>
     deployed: REFERENCE.aiDeployedAtTick10,
   })
 
+test.describe.configure({ mode: 'parallel' })
+
 test.describe('Reset the simulation', () => {
   test('Reset while running clears lanes and elapsed time, pauses, and keeps settings', async ({
     page,
