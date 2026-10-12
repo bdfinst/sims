@@ -2,7 +2,7 @@
 
 **Created**: 2026-10-12 (rewritten after the research amendment; revised after plan review; revised for Vite build)
 **Branch**: `feat/ai-review-sim`
-**Status**: approved
+**Status**: implemented
 **Gherkin persistence**: features
 **Spec**: `docs/specs/ai-vs-human-code-review-simulator.md` (amended 2026-10-12)
 
