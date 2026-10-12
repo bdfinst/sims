@@ -131,9 +131,12 @@ export const pauseSimulation = async (page) => {
 export const expectPending = (page, laneId, count) =>
   expect(metric(page, laneId, 'pending')).toHaveText(String(count))
 
+export const expectDeployed = (page, laneId, count) =>
+  expect(metric(page, laneId, 'deployed')).toHaveText(String(count))
+
 export const expectCounts = async (page, laneId, { pending, deployed }) => {
   await expectPending(page, laneId, pending)
-  await expect(metric(page, laneId, 'deployed')).toHaveText(String(deployed))
+  await expectDeployed(page, laneId, deployed)
 }
 
 const QUEUE_LABEL_BY_LANE = { human: 'Human', ai: 'AI' }
@@ -232,28 +235,36 @@ export const HUMAN_BACKLOG_PRESET = Object.freeze({
 // Expected values from the plan's reference model (plan, "Default arithmetic" under "Slices").
 // Per tick (0.1 h): a lane gains gen x 0.1 PRs of `size` LOC each, then reviews
 // min(pending LOC, effective speed x 0.1) LOC, taking PRs off the queue in proportion.
-// Pre-cutover oracles: the 378 and 302 LOC AI sizes and the figures below come from the removed PR
-// size slider (AI size = round(PR size x 1.51)), so only test.fixme bodies use them until Steps
-// 8.4 to 8.6 replace them with Default arithmetic values. AI effective speed = reviewer speed x skim.
-// Ticks are 0.1 s each, so tick 10 is 1 s. Counts are the displayed (floored) values.
+// AI effective speed = reviewer speed x skim. Ticks are 0.1 s each, so tick 10 is 1 s. Counts are
+// the displayed (floored) values. The pre-cutover oracles below the generation-model ones come from
+// the removed generation and PR size sliders, so only test.fixme bodies use them until Steps 8.5
+// and 8.6 replace them with Default arithmetic values.
 export const REFERENCE = Object.freeze({
-  aiPrSizeAtDefaults: 378, // round(250 x 1.51)
-  aiPrSizeAtPrSize200: 302, // round(200 x 1.51)
+  // Generation model (plan, "Default arithmetic"). Internal values in brackets.
+  // Defaults: both queues stay empty; a human PR is 240 LOC, reviewed at 3 LOC per tick.
+  defaultHumanDeployedAtTick79: 0, // (0.9875)
+  defaultHumanDeployedAtTick80: 1,
+  defaultHumanPendingAtTick100: 0,
+  defaultHumanDeployedAtTick100: 1, // (1.25)
+  defaultAiPendingAtTick100: 0,
+  defaultAiDeployedAtTick100: 1, // (1.4625)
+  // Busy-AI preset (AI code written 2000): 0.55188 PR generated and 0.16556 PR reviewed per tick,
+  // so +0.38631 pending PR per tick; the Human lane runs at its defaults.
+  busyAiPendingAtTick10: 3, // (3.863)
+  busyAiDeployedAtTick10: 1, // (1.656)
+  busyAiPendingAtTick20: 7, // (7.726)
+  busyAiPendingAtTick30: 11, // (11.589)
+  busyAiDeployedAtTick30: 4, // (4.967)
+  busyAiPendingAtTick40: 15, // between 3.9 s (15.066) and 4.2 s (16.225)
+  busyAiDeployedAtTick40: 6, // 40 x 0.16556 (6.622)
+  busyAiDeployedAtTick100: 16, // 100 x 0.16556 (16.556)
+  // Plan, Slice 2 check: from the busy-AI state at 1 s, one more tick with reviewer speed 1000 and
+  // skim 3 reviews 300 LOC (AI deployed 2.483); with reviewer speed 100, pending reaches 4.360.
+  busyAiDeployedAtTick11WithFasterReview: 2,
+  busyAiPendingAtTick11WithSlowReview: 4,
+  // Pre-cutover oracles (see above).
   aiPendingAtTick10: 18,
-  // Busy-AI preset (AI code written 2000) after 1 s: +0.38631 PR per tick generated net of review.
-  busyAiPendingAtTick10: 3,
-  busyAiDeployedAtTick10: 1,
-  aiDeployedAtTick10: 1,
-  aiPendingAtTick11WithAiGen50: 23,
-  aiPendingAtTick10WithAiGen40: 38,
-  aiDeployedAtTick10WithAiGen40: 1,
-  aiPendingAtTick30: 55,
-  aiDeployedAtTick30: 4,
-  aiPendingAtTick40: 73,
-  aiDeployedAtTick40: 6,
   aiPendingAtTick100: 184,
-  aiDeployedAtTick100: 15,
-  humanDeployedAtTick100: 10,
   // Incidents = reviewed LOC x 0.02 x (1 - detection). Internal values at 10 s: Human 19.5 escaped
   // over 10 deployed PRs (1.95 per PR); AI 107.8378 over 15.8730 deployed PRs (6.79 per PR, from the
   // unrounded values, and not 107 / 15). The displayed Incidents are those escapes floored.
@@ -279,7 +290,6 @@ export const REFERENCE = Object.freeze({
   // 10 x 500 LOC and reviews 300 LOC: 26 PRs / 9,100 LOC.
   humanPendingLocAtTick20WithHumanGen10: '4,400',
   humanPendingAtTick20WithHumanGen10: 17,
-  humanDeployedAtTick20WithHumanGen10: 2,
   aiPendingAtTick20WithHumanGen10: 36, // the AI lane does not depend on human generation
   humanPendingAtTick30AfterSizeChangeToPrSize500: 26,
   humanPendingLocAtTick30AfterSizeChangeToPrSize500: '9,100',
@@ -296,10 +306,6 @@ export const REFERENCE = Object.freeze({
   humanPendingAtTick25AfterDraining: 16,
   humanPendingAtTick26AfterDraining: 15,
   humanDefectsCaughtWhenDrained: '6%', // PR size 240 at 1000 LOC/hr: 0.8 x 0.81 x 0.1 = 0.0648
-  aiDeployedAtTick11WithFasterReview: 2, // reviewer speed 1000, skim 3 -> 3000 LOC/hr
-  // AI generation of 40 PRs per hour, PR size 300 (AI size 453, 60 LOC reviewed per tick), after 3 s:
-  aiPendingAtTick30WithAiGen40AndPrSize300: 116,
-  aiDeployedAtTick30WithAiGen40AndPrSize300: 3,
 })
 
 export const headline = (page) => page.locator('[data-metric="headlineRatio"]')

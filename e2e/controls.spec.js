@@ -1,29 +1,30 @@
 import {
   AI_CODE_WRITTEN_LABEL,
   AI_SKIM_LABEL,
+  BUSY_AI_PRESET,
   HUMAN_CODE_WRITTEN_LABEL,
   HUMAN_PRS_PER_DAY_LABEL,
   REVIEWER_SPEED_LABEL,
   REFERENCE,
-  SECOND_MS,
+  THRESHOLD_LABEL,
   TICKS_PER_SECOND,
-  TICK_MS,
   expect,
-  expectCounts,
+  expectDeployed,
+  expectPending,
+  flushPendingRenders,
   laneLocator,
-  metric,
   metricValues,
   openSimulator,
   pauseSimulation,
+  runFor,
   sampleEachTick,
-  setSlider,
+  setSliders,
   slider,
-  startSimulation,
+  startAndRunFor,
   tabTo,
   test,
   buttonNamed,
   visibleValue,
-  DRAIN_SECONDS,
 } from './fixtures.js'
 
 const DRAIN_START_SECONDS = 2
@@ -74,14 +75,43 @@ const DEFAULT_CONTROLS = [
     shown: '2×',
     spoken: '2 times',
   },
+  {
+    control: THRESHOLD_LABEL,
+    defaultValue: 15,
+    min: 5,
+    max: 50,
+    step: 1,
+    shown: '15 PRs',
+    spoken: '15 PRs',
+  },
 ]
 
 const BOUNDS = [
-  { control: REVIEWER_SPEED_LABEL, key: 'ArrowLeft', bound: 100 },
-  { control: AI_SKIM_LABEL, key: 'ArrowRight', bound: 3 },
+  { control: HUMAN_CODE_WRITTEN_LABEL, key: 'ArrowRight', presses: 40, bound: 200 },
+  { control: HUMAN_CODE_WRITTEN_LABEL, key: 'ArrowLeft', presses: 10, bound: 5 },
+  { control: HUMAN_PRS_PER_DAY_LABEL, key: 'ArrowLeft', presses: 10, bound: 0.25 },
+  { control: HUMAN_PRS_PER_DAY_LABEL, key: 'ArrowRight', presses: 20, bound: 4 },
+  { control: REVIEWER_SPEED_LABEL, key: 'ArrowLeft', presses: 200, bound: 100 },
+  { control: REVIEWER_SPEED_LABEL, key: 'ArrowRight', presses: 200, bound: 1000 },
+  { control: AI_SKIM_LABEL, key: 'ArrowRight', presses: 200, bound: 3 },
+  { control: AI_SKIM_LABEL, key: 'ArrowLeft', presses: 200, bound: 1 },
+  { control: THRESHOLD_LABEL, key: 'ArrowLeft', presses: 50, bound: 5 },
+  { control: THRESHOLD_LABEL, key: 'ArrowRight', presses: 50, bound: 50 },
 ]
-// The feature: "When I press <key> 200 times" (more than any slider's range in steps).
-const KEY_PRESSES = 200
+
+const AI_CODE_WRITTEN_JUMPS = [
+  { key: 'End', bound: 2000 },
+  { key: 'Home', bound: 5 },
+]
+
+// Inputs the scenarios set (expected counts come from REFERENCE in fixtures.js).
+const FAST_REVIEWER_SPEED = 1000
+const MAX_SKIM = 3
+const SLOW_REVIEWER_SPEED = 100
+const DRAIN_AI_CODE_WRITTEN = 5
+const DRAIN_RUN_SECONDS = 2
+const BUSY_RUN_SECONDS = 1
+const NEXT_TICK_SECONDS = 0.1
 
 test.describe.configure({ mode: 'parallel' })
 
@@ -108,32 +138,6 @@ test.describe('Adjust the model live', () => {
     })
   }
 
-  // @wip: Step 8.4
-  test.fixme('Controls start at their defaults with units: the removed generation sliders', async ({
-    page,
-  }) => {
-    const removedControls = [
-      { control: 'Human generation (PRs/hr)', defaultValue: 1, shown: '1 PRs/hr' },
-      { control: 'AI generation (PRs/hr)', defaultValue: 20, shown: '20 PRs/hr' },
-      { control: 'PR size (LOC, both lanes)', defaultValue: 250, shown: '250 LOC' },
-    ]
-    await openSimulator(page)
-    for (const { control, defaultValue, shown } of removedControls) {
-      await expect(slider(page, control)).toHaveValue(String(defaultValue))
-      await expect(await visibleValue(slider(page, control))).toHaveText(shown)
-    }
-  })
-
-  // @wip: Step 8.4
-  test.fixme('Sliders stop at their bounds: the removed AI generation slider', async ({ page }) => {
-    const removedControl = 'AI generation (PRs/hr)'
-    const sliderLocator = slider(page, removedControl)
-    await openSimulator(page)
-    await sliderLocator.focus()
-    for (let press = 0; press < KEY_PRESSES; press += 1) await sliderLocator.press('ArrowRight')
-    await expect(sliderLocator).toHaveValue('50')
-  })
-
   // AC23: the derived values are plain read-only text, not sliders. The revised wording and the
   // changes under it belong to the scenario below, which Step 8.4 reworks.
   test('Derived PR sizes and AI PRs per day show at the defaults', async ({ page }) => {
@@ -147,45 +151,54 @@ test.describe('Adjust the model live', () => {
     await expect(aiLane.getByRole('slider')).toHaveCount(2)
   })
 
-  // @wip: Step 8.4
-  test.fixme('AI PR size and effective speed are derived and read-only', async ({ page }) => {
-    const AI_GEN_LABEL = 'AI generation (PRs/hr)'
-    const PR_SIZE_LABEL = 'PR size (LOC, both lanes)'
+  test('Derived PR sizes, AI PRs per day, and effective speed are read-only', async ({ page }) => {
+    const humanLane = laneLocator(page, 'human')
     const aiLane = laneLocator(page, 'ai')
+    const derivedTexts = [
+      [humanLane, 'PR size 240 LOC (derived)'],
+      [aiLane, 'PR size 362 LOC (1.51× human)'],
+      [aiLane, '1.17 PRs/day (derived)'],
+      [aiLane, 'Effective speed 600 LOC/hr'],
+    ]
 
     await test.step('Given I open the simulator', async () => {
       await openSimulator(page)
     })
 
-    await test.step('Then the AI lane shows "PR size 378 LOC" and "Effective speed 600 LOC/hr", each marked "derived"', async () => {
-      const derivedSize = aiLane.locator('p', {
-        hasText: `PR size ${REFERENCE.aiPrSizeAtDefaults} LOC`,
-      })
-      const derivedSpeed = aiLane.locator('p', { hasText: 'Effective speed 600 LOC/hr' })
-      await expect(derivedSize).toContainText('derived')
-      await expect(derivedSpeed).toContainText('derived')
+    await test.step('Then the Human lane shows "PR size 240 LOC (derived)"', async () => {
+      await expect(humanLane.getByText('PR size 240 LOC (derived)')).toBeVisible()
     })
 
-    await test.step('And neither derived value is a slider', async () => {
-      await expect(aiLane.getByRole('slider')).toHaveCount(2)
-      await expect(aiLane.getByRole('slider', { name: AI_GEN_LABEL })).toBeVisible()
-      await expect(aiLane.getByRole('slider', { name: AI_SKIM_LABEL })).toBeVisible()
+    await test.step('And the AI lane shows "PR size 362 LOC (1.51× human)", "1.17 PRs/day (derived)", and "Effective speed 600 LOC/hr"', async () => {
+      await expect(aiLane.getByText('PR size 362 LOC (1.51× human)')).toBeVisible()
+      await expect(aiLane.getByText('1.17 PRs/day (derived)')).toBeVisible()
+      await expect(aiLane.getByText('Effective speed 600 LOC/hr')).toBeVisible()
     })
 
-    await test.step('When I set "PR size (LOC, both lanes)" to 200 and "AI skim multiplier" to 3', async () => {
-      await setSlider(page, PR_SIZE_LABEL, 200)
-      await setSlider(page, AI_SKIM_LABEL, 3)
+    await test.step('And none of the derived values is a slider', async () => {
+      // The only sliders on the page are the six controls of "Controls start at their defaults".
+      await expect(page.getByRole('slider')).toHaveCount(DEFAULT_CONTROLS.length)
+      for (const [lane, text] of derivedTexts) {
+        await expect(lane.getByText(text).getByRole('slider')).toHaveCount(0)
+      }
     })
 
-    await test.step('Then the AI lane shows "PR size 302 LOC" and "Effective speed 900 LOC/hr"', async () => {
-      await expect(
-        aiLane.locator('p', { hasText: `PR size ${REFERENCE.aiPrSizeAtPrSize200} LOC` }),
-      ).toBeVisible()
-      await expect(aiLane.locator('p', { hasText: 'Effective speed 900 LOC/hr' })).toBeVisible()
+    await test.step('When I set "Human PRs per day" to 2 and "AI skim multiplier" to 3', async () => {
+      await setSliders(page, { [HUMAN_PRS_PER_DAY_LABEL]: 2, [AI_SKIM_LABEL]: MAX_SKIM })
+    })
+
+    await test.step('Then the Human lane shows "PR size 120 LOC (derived)"', async () => {
+      await expect(humanLane.getByText('PR size 120 LOC (derived)')).toBeVisible()
+    })
+
+    await test.step('And the AI lane shows "PR size 181 LOC (1.51× human)", "2.34 PRs/day (derived)", and "Effective speed 900 LOC/hr"', async () => {
+      await expect(aiLane.getByText('PR size 181 LOC (1.51× human)')).toBeVisible()
+      await expect(aiLane.getByText('2.34 PRs/day (derived)')).toBeVisible()
+      await expect(aiLane.getByText('Effective speed 900 LOC/hr')).toBeVisible()
     })
   })
 
-  for (const { control, key, bound } of BOUNDS) {
+  for (const { control, key, presses, bound } of BOUNDS) {
     test(`Sliders stop at their bounds: ${key} on ${control}`, async ({ page }) => {
       const sliderLocator = slider(page, control)
 
@@ -193,9 +206,9 @@ test.describe('Adjust the model live', () => {
         await openSimulator(page)
       })
 
-      await test.step(`When I press ${key} ${KEY_PRESSES} times on "${control}"`, async () => {
+      await test.step(`When I press ${key} ${presses} times on "${control}"`, async () => {
         await sliderLocator.focus()
-        for (let press = 0; press < KEY_PRESSES; press += 1) await sliderLocator.press(key)
+        for (let press = 0; press < presses; press += 1) await sliderLocator.press(key)
       })
 
       await test.step(`Then the "${control}" slider has value ${bound}`, async () => {
@@ -204,31 +217,48 @@ test.describe('Adjust the model live', () => {
     })
   }
 
-  // @wip: Step 8.4
-  test.fixme('A review-side change applies on the next tick', async ({ page }) => {
-    await test.step('Given the simulation has run for 1 second with defaults', async () => {
+  for (const { key, bound } of AI_CODE_WRITTEN_JUMPS) {
+    test(`The AI code-written slider jumps to its bounds: ${key}`, async ({ page }) => {
+      const sliderLocator = slider(page, AI_CODE_WRITTEN_LABEL)
+
+      await test.step('Given I open the simulator', async () => {
+        await openSimulator(page)
+      })
+
+      await test.step(`When I press ${key} on "AI code written (LOC/hr)"`, async () => {
+        await sliderLocator.press(key)
+      })
+
+      await test.step(`Then the "AI code written (LOC/hr)" slider has value ${bound}`, async () => {
+        await expect(sliderLocator).toHaveValue(String(bound))
+      })
+    })
+  }
+
+  test('A review-side change applies on the next tick', async ({ page }) => {
+    await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 1 second', async () => {
       await openSimulator(page)
-      await startSimulation(page)
-      await page.clock.runFor(1 * SECOND_MS)
+      await setSliders(page, BUSY_AI_PRESET)
+      await startAndRunFor(page, BUSY_RUN_SECONDS)
     })
 
     await test.step('And the AI lane shows Deployed 1', async () => {
-      await expect(metric(page, 'ai', 'deployed')).toHaveText(String(REFERENCE.aiDeployedAtTick10))
+      await expectDeployed(page, 'ai', REFERENCE.busyAiDeployedAtTick10)
     })
 
     await test.step('When I set "Reviewer speed (LOC/hr, both lanes)" to 1000 and "AI skim multiplier" to 3', async () => {
-      await setSlider(page, REVIEWER_SPEED_LABEL, 1000)
-      await setSlider(page, AI_SKIM_LABEL, 3)
+      await setSliders(page, {
+        [REVIEWER_SPEED_LABEL]: FAST_REVIEWER_SPEED,
+        [AI_SKIM_LABEL]: MAX_SKIM,
+      })
     })
 
     await test.step('And 0.1 seconds pass', async () => {
-      await page.clock.runFor(TICK_MS)
+      await runFor(page, NEXT_TICK_SECONDS)
     })
 
     await test.step('Then the AI lane shows Deployed 2', async () => {
-      await expect(metric(page, 'ai', 'deployed')).toHaveText(
-        String(REFERENCE.aiDeployedAtTick11WithFasterReview),
-      )
+      await expectDeployed(page, 'ai', REFERENCE.busyAiDeployedAtTick11WithFasterReview)
     })
 
     await test.step('And the Start/Pause button still reads "Pause"', async () => {
@@ -236,78 +266,69 @@ test.describe('Adjust the model live', () => {
     })
   })
 
-  // @wip: Step 8.4
-  test.fixme('A change while paused takes effect only after Start', async ({ page }) => {
-    const AI_GEN_LABEL = 'AI generation (PRs/hr)'
-
-    await test.step('Given the simulation ran for 1 second and was paused', async () => {
+  test('A change while paused takes effect only after Start', async ({ page }) => {
+    await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation ran for 1 second and was paused', async () => {
       await openSimulator(page)
-      await startSimulation(page)
-      await page.clock.runFor(1 * SECOND_MS)
+      await setSliders(page, BUSY_AI_PRESET)
+      await startAndRunFor(page, BUSY_RUN_SECONDS)
       await pauseSimulation(page)
     })
 
-    await test.step('And the AI lane shows Pending Review 18', async () => {
-      await expect(metric(page, 'ai', 'pending')).toHaveText(String(REFERENCE.aiPendingAtTick10))
+    await test.step('And the AI lane shows Pending Review 3', async () => {
+      await expectPending(page, 'ai', REFERENCE.busyAiPendingAtTick10)
     })
 
-    await test.step('When I set "AI generation (PRs/hr)" to 50', async () => {
-      await setSlider(page, AI_GEN_LABEL, 50)
+    await test.step('When I set "Reviewer speed (LOC/hr, both lanes)" to 100', async () => {
+      await setSliders(page, { [REVIEWER_SPEED_LABEL]: SLOW_REVIEWER_SPEED })
     })
 
-    await test.step('Then the AI lane still shows Pending Review 18', async () => {
-      await expect(metric(page, 'ai', 'pending')).toHaveText(String(REFERENCE.aiPendingAtTick10))
+    await test.step('Then the AI lane still shows Pending Review 3', async () => {
+      await flushPendingRenders(page)
+      await expectPending(page, 'ai', REFERENCE.busyAiPendingAtTick10)
     })
 
     await test.step('When I press Start and 0.1 seconds pass', async () => {
-      await startSimulation(page)
-      await page.clock.runFor(TICK_MS)
+      await startAndRunFor(page, NEXT_TICK_SECONDS)
     })
 
-    await test.step('Then the AI lane shows Pending Review 23', async () => {
-      await expect(metric(page, 'ai', 'pending')).toHaveText(
-        String(REFERENCE.aiPendingAtTick11WithAiGen50),
-      )
+    await test.step('Then the AI lane shows Pending Review 4', async () => {
+      await expectPending(page, 'ai', REFERENCE.busyAiPendingAtTick11WithSlowReview)
     })
   })
 
-  // @wip: Step 8.4
-  test.fixme('A backlog drains to zero and never below', async ({ page }) => {
-    const HUMAN_GEN_LABEL = 'Human generation (PRs/hr)'
+  test('A backlog drains to zero and never below', async ({ page }) => {
     let sampledPending
 
-    await test.step('Given I set "Human generation (PRs/hr)" to 10 and the simulation has run for 2 seconds', async () => {
+    await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 2 seconds', async () => {
       await openSimulator(page)
-      await setSlider(page, HUMAN_GEN_LABEL, 10)
-      await startSimulation(page)
-      await page.clock.runFor(DRAIN_START_SECONDS * SECOND_MS)
+      await setSliders(page, BUSY_AI_PRESET)
+      await startAndRunFor(page, DRAIN_START_SECONDS)
     })
 
-    await test.step('And the Human lane shows Pending Review 17', async () => {
-      await expectCounts(page, 'human', {
-        pending: REFERENCE.humanPendingAtTick20WithHumanGen10,
-        deployed: REFERENCE.humanDeployedAtTick20WithHumanGen10,
+    await test.step('And the AI lane shows Pending Review 7', async () => {
+      await expectPending(page, 'ai', REFERENCE.busyAiPendingAtTick20)
+    })
+
+    await test.step('When I set "AI code written (LOC/hr)" to 5 and "Reviewer speed (LOC/hr, both lanes)" to 1000', async () => {
+      await setSliders(page, {
+        [AI_CODE_WRITTEN_LABEL]: DRAIN_AI_CODE_WRITTEN,
+        [REVIEWER_SPEED_LABEL]: FAST_REVIEWER_SPEED,
       })
     })
 
-    await test.step('When I set "Human generation (PRs/hr)" to 1 and "Reviewer speed (LOC/hr, both lanes)" to 1000', async () => {
-      await setSlider(page, HUMAN_GEN_LABEL, 1)
-      await setSlider(page, REVIEWER_SPEED_LABEL, 1000)
-    })
-
-    await test.step('And 6 seconds pass', async () => {
+    await test.step('And 2 seconds pass', async () => {
       sampledPending = await sampleEachTick(page, {
         startTick: DRAIN_START_SECONDS * TICKS_PER_SECOND,
-        tickCount: (DRAIN_SECONDS * SECOND_MS) / TICK_MS,
-        read: async () => (await metricValues(page, 'pending')).human,
+        tickCount: DRAIN_RUN_SECONDS * TICKS_PER_SECOND,
+        read: async () => (await metricValues(page, 'pending')).ai,
       })
     })
 
-    await test.step('Then the Human lane shows Pending Review 0', async () => {
-      await expect(metric(page, 'human', 'pending')).toHaveText('0')
+    await test.step('Then the AI lane shows Pending Review 0', async () => {
+      await expectPending(page, 'ai', 0)
     })
 
-    await test.step('And the Human Pending Review count, sampled every tick, was never below 0', async () => {
+    await test.step('And the AI Pending Review count, sampled every tick, was never below 0', async () => {
       expect(Math.min(...sampledPending)).toBeGreaterThanOrEqual(0)
     })
   })

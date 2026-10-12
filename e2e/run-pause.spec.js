@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
+  BUSY_AI_PRESET,
   INLINE_PROTOCOLS,
   NO_VALUE,
   REFERENCE,
@@ -9,17 +10,21 @@ import {
   TICKS_PER_SECOND,
   expect,
   expectCounts,
+  expectDeployed,
   expectElapsedAtTick,
   expectEmptyLanes,
   expectNeverDecreases,
   flushPendingRenders,
   headline,
   laneLocator,
-  metric,
   metricValues,
   openSimulator,
+  expectPending,
   pauseSimulation,
+  runFor,
   sampleEachTick,
+  setSliders,
+  startAndRunFor,
   startSimulation,
   test,
   buttonNamed,
@@ -32,6 +37,10 @@ const DESCRIPTION =
   'Watch AI-speed code generation swamp human reviewers and push more defects into production.'
 const HUMAN_BLUE = 'rgb(59, 130, 246)'
 const AI_PURPLE = 'rgb(168, 85, 247)'
+
+const PAUSE_AFTER_SECONDS = 3
+const LAST_TICK_BEFORE_FIRST_HUMAN_PR_SECONDS = 7.9
+const ONE_TICK_SECONDS = 0.1
 
 const iconNames = (laneRoot) =>
   laneRoot.locator('[data-icon]').evaluateAll((els) => els.map((el) => el.dataset.icon))
@@ -160,64 +169,61 @@ test.describe('Run and pause the simulation', () => {
     })
   })
 
-  // @wip: Step 8.4
-  test.fixme('Default flow after 10 seconds', async ({ page }) => {
+  test('Default flow after 10 seconds', async ({ page }) => {
     await test.step('Given I open the simulator', async () => {
       await openSimulator(page)
     })
 
     await test.step('When I press Start and 10 seconds pass', async () => {
-      await startSimulation(page)
-      await page.clock.runFor(FULL_RUN_SECONDS * SECOND_MS)
+      await startAndRunFor(page, FULL_RUN_SECONDS)
     })
 
-    await test.step('Then the Human lane shows Pending Review 0 and Deployed 10', async () => {
-      await expectCounts(page, 'human', { pending: 0, deployed: REFERENCE.humanDeployedAtTick100 })
+    await test.step('Then the Human lane shows Pending Review 0 and Deployed 1', async () => {
+      await expectCounts(page, 'human', {
+        pending: REFERENCE.defaultHumanPendingAtTick100,
+        deployed: REFERENCE.defaultHumanDeployedAtTick100,
+      })
     })
 
-    await test.step('And the AI lane shows Pending Review 184 and Deployed 15', async () => {
+    await test.step('And the AI lane shows Pending Review 0 and Deployed 1', async () => {
       await expectCounts(page, 'ai', {
-        pending: REFERENCE.aiPendingAtTick100,
-        deployed: REFERENCE.aiDeployedAtTick100,
+        pending: REFERENCE.defaultAiPendingAtTick100,
+        deployed: REFERENCE.defaultAiDeployedAtTick100,
       })
     })
 
     await test.step('And the elapsed readout shows "10.0 work hours"', async () => {
-      await expectElapsedAtTick(page, 10 * TICKS_PER_SECOND)
+      await expectElapsedAtTick(page, FULL_RUN_SECONDS * TICKS_PER_SECOND)
     })
   })
 
-  // @wip: Step 8.4
-  test.fixme('A PR is not shown as deployed until it is fully reviewed', async ({ page }) => {
+  test('A PR is not shown as deployed until it is fully reviewed', async ({ page }) => {
     await test.step('Given I open the simulator', async () => {
       await openSimulator(page)
     })
 
-    await test.step('When I press Start and 0.9 seconds pass', async () => {
-      await startSimulation(page)
-      await page.clock.runFor(0.9 * SECOND_MS)
-      await expectElapsedAtTick(page, 0.9 * TICKS_PER_SECOND)
+    await test.step('When I press Start and 7.9 seconds pass', async () => {
+      await startAndRunFor(page, LAST_TICK_BEFORE_FIRST_HUMAN_PR_SECONDS)
     })
 
     await test.step('Then the Human lane shows Deployed 0', async () => {
-      await expect(metric(page, 'human', 'deployed')).toHaveText('0')
+      await expectDeployed(page, 'human', REFERENCE.defaultHumanDeployedAtTick79)
     })
 
     await test.step('When 0.1 more seconds pass', async () => {
-      await page.clock.runFor(0.1 * SECOND_MS)
+      await runFor(page, ONE_TICK_SECONDS)
     })
 
     await test.step('Then the Human lane shows Deployed 1', async () => {
-      await expect(metric(page, 'human', 'deployed')).toHaveText('1')
+      await expectDeployed(page, 'human', REFERENCE.defaultHumanDeployedAtTick80)
     })
   })
 
-  // @wip: Step 8.4
-  test.fixme('Pause freezes the counts', async ({ page }) => {
-    await test.step('Given the simulation has run for 3 seconds', async () => {
+  test('Pause freezes the counts', async ({ page }) => {
+    await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 3 seconds', async () => {
       await openSimulator(page)
-      await startSimulation(page)
-      await page.clock.runFor(3 * SECOND_MS)
+      await setSliders(page, BUSY_AI_PRESET)
+      await startAndRunFor(page, PAUSE_AFTER_SECONDS)
     })
 
     await test.step('When I press Pause and 5 more seconds pass', async () => {
@@ -228,15 +234,15 @@ test.describe('Run and pause the simulation', () => {
       await expectLiveIntervals(page, 0)
     })
 
-    await test.step('Then the AI lane shows Pending Review 55 and Deployed 4', async () => {
+    await test.step('Then the AI lane shows Pending Review 11 and Deployed 4', async () => {
       await expectCounts(page, 'ai', {
-        pending: REFERENCE.aiPendingAtTick30,
-        deployed: REFERENCE.aiDeployedAtTick30,
+        pending: REFERENCE.busyAiPendingAtTick30,
+        deployed: REFERENCE.busyAiDeployedAtTick30,
       })
     })
 
     await test.step('And the elapsed readout shows "3.0 work hours"', async () => {
-      await expectElapsedAtTick(page, 3 * TICKS_PER_SECOND)
+      await expectElapsedAtTick(page, PAUSE_AFTER_SECONDS * TICKS_PER_SECOND)
     })
 
     await test.step('And the Start/Pause button reads "Start"', async () => {
@@ -244,34 +250,32 @@ test.describe('Run and pause the simulation', () => {
     })
   })
 
-  // @wip: Step 8.4
-  test.fixme('Resume continues from the frozen counts', async ({ page }) => {
-    await test.step('Given the simulation was paused after 3 seconds', async () => {
+  test('Resume continues from the frozen counts', async ({ page }) => {
+    await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation was paused after 3 seconds', async () => {
       await openSimulator(page)
-      await startSimulation(page)
-      await page.clock.runFor(3 * SECOND_MS)
+      await setSliders(page, BUSY_AI_PRESET)
+      await startAndRunFor(page, PAUSE_AFTER_SECONDS)
       await pauseSimulation(page)
     })
 
     await test.step('When I press Start and 1 second passes', async () => {
-      await startSimulation(page)
-      await page.clock.runFor(1 * SECOND_MS)
+      await startAndRunFor(page, 1)
     })
 
-    await test.step('Then the AI lane shows Pending Review 73 and Deployed 6', async () => {
+    await test.step('Then the AI lane shows Pending Review 15 and Deployed 6', async () => {
       await expectCounts(page, 'ai', {
-        pending: REFERENCE.aiPendingAtTick40,
-        deployed: REFERENCE.aiDeployedAtTick40,
+        pending: REFERENCE.busyAiPendingAtTick40,
+        deployed: REFERENCE.busyAiDeployedAtTick40,
       })
     })
   })
 
-  // @wip: Step 8.4
-  test.fixme('Deployed never decreases while running', async ({ page }) => {
+  test('Deployed never decreases while running', async ({ page }) => {
     const readDeployed = () => metricValues(page, 'deployed')
 
-    await test.step('Given I press Start', async () => {
+    await test.step('Given I set "AI code written (LOC/hr)" to 2000 and press Start', async () => {
       await openSimulator(page)
+      await setSliders(page, BUSY_AI_PRESET)
       await startSimulation(page)
     })
 
@@ -280,25 +284,24 @@ test.describe('Run and pause the simulation', () => {
         await readDeployed(),
         ...(await sampleEachTick(page, {
           startTick: 0,
-          tickCount: 10 * TICKS_PER_SECOND,
+          tickCount: FULL_RUN_SECONDS * TICKS_PER_SECOND,
           read: readDeployed,
         })),
       ]
 
       expectNeverDecreases(samples)
       await expect.poll(readDeployed).toEqual({
-        human: REFERENCE.humanDeployedAtTick100,
-        ai: REFERENCE.aiDeployedAtTick100,
+        human: REFERENCE.defaultHumanDeployedAtTick100,
+        ai: REFERENCE.busyAiDeployedAtTick100,
       })
     })
   })
 
-  // @wip: Step 8.4
-  test.fixme('Hiding the tab auto-pauses', async ({ page }) => {
-    await test.step('Given the simulation has run for 1 second', async () => {
+  test('Hiding the tab auto-pauses', async ({ page }) => {
+    await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 1 second', async () => {
       await openSimulator(page)
-      await startSimulation(page)
-      await page.clock.runFor(1 * SECOND_MS)
+      await setSliders(page, BUSY_AI_PRESET)
+      await startAndRunFor(page, 1)
     })
 
     await test.step('When the page becomes hidden', async () => {
@@ -311,20 +314,19 @@ test.describe('Run and pause the simulation', () => {
       await flushPendingRenders(page)
     })
 
-    await test.step('Then the status reads "Paused" and the AI lane still shows Pending Review 18', async () => {
+    await test.step('Then the status reads "Paused" and the AI lane still shows Pending Review 3', async () => {
       await expect(page.getByText('Paused', { exact: true })).toBeVisible()
-      await expect(metric(page, 'ai', 'pending')).toHaveText(String(REFERENCE.aiPendingAtTick10))
+      await expectPending(page, 'ai', REFERENCE.busyAiPendingAtTick10)
       // Plan, Step 1.2 REFACTOR: clear the interval when the tab is hidden.
       await expectLiveIntervals(page, 0)
     })
   })
 
-  // @wip: Step 8.4
-  test.fixme('Showing the tab again stays paused', async ({ page }) => {
-    await test.step('Given the simulation auto-paused when the page became hidden', async () => {
+  test('Showing the tab again stays paused', async ({ page }) => {
+    await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation auto-paused when the page became hidden after 1 second', async () => {
       await openSimulator(page)
-      await startSimulation(page)
-      await page.clock.runFor(1 * SECOND_MS)
+      await setSliders(page, BUSY_AI_PRESET)
+      await startAndRunFor(page, 1)
       await setVisibility(page, 'hidden')
       await expect(buttonNamed(page, 'Start')).toBeVisible()
     })
@@ -338,9 +340,9 @@ test.describe('Run and pause the simulation', () => {
       await flushPendingRenders(page)
     })
 
-    await test.step('Then the status reads "Paused" and the AI lane still shows Pending Review 18', async () => {
+    await test.step('Then the status reads "Paused" and the AI lane still shows Pending Review 3', async () => {
       await expect(page.getByText('Paused', { exact: true })).toBeVisible()
-      await expect(metric(page, 'ai', 'pending')).toHaveText(String(REFERENCE.aiPendingAtTick10))
+      await expectPending(page, 'ai', REFERENCE.busyAiPendingAtTick10)
     })
   })
 
@@ -359,8 +361,7 @@ test.describe('Run and pause the simulation', () => {
     })
   })
 
-  // @wip: Step 8.4
-  test.fixme('The built file runs from disk with no other requests', async ({ page }) => {
+  test('The built file runs from disk with no other requests', async ({ page }) => {
     const documentUrl = pathToFileURL(`${DIST_DIR}index.html`).href
     const requestedUrls = []
 
@@ -377,13 +378,13 @@ test.describe('Run and pause the simulation', () => {
       await expect(page.getByRole('heading', { name: TITLE })).toBeVisible()
     })
 
-    await test.step('When I press Start and 1 second passes', async () => {
-      await startSimulation(page)
-      await page.clock.runFor(1 * SECOND_MS)
+    await test.step('When I set "AI code written (LOC/hr)" to 2000, press Start, and 1 second passes', async () => {
+      await setSliders(page, BUSY_AI_PRESET)
+      await startAndRunFor(page, 1)
     })
 
-    await test.step('Then the AI lane shows Pending Review 18', async () => {
-      await expect(metric(page, 'ai', 'pending')).toHaveText(String(REFERENCE.aiPendingAtTick10))
+    await test.step('Then the AI lane shows Pending Review 3', async () => {
+      await expectPending(page, 'ai', REFERENCE.busyAiPendingAtTick10)
     })
 
     await test.step('And the only request made was for the document itself', async () => {

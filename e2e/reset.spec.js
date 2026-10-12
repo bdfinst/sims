@@ -1,5 +1,7 @@
 import {
+  AI_CODE_WRITTEN_LABEL,
   BUSY_AI_PRESET,
+  HUMAN_PRS_PER_DAY_LABEL,
   REFERENCE,
   SECOND_MS,
   buttonNamed,
@@ -10,7 +12,6 @@ import {
   flushPendingRenders,
   openSimulator,
   pauseSimulation,
-  setSlider,
   setSliders,
   slider,
   startAndRunFor,
@@ -19,8 +20,12 @@ import {
   expectLiveIntervals,
 } from './fixtures.js'
 
-const CUSTOM_AI_GEN = 40
-const CUSTOM_PR_SIZE = 300
+const KEPT_AI_CODE_WRITTEN = 400
+const KEPT_HUMAN_PRS_PER_DAY = 2
+const KEPT_SETTINGS = Object.freeze({
+  [AI_CODE_WRITTEN_LABEL]: KEPT_AI_CODE_WRITTEN,
+  [HUMAN_PRS_PER_DAY_LABEL]: KEPT_HUMAN_PRS_PER_DAY,
+})
 const LONG_RUN_SECONDS = 3
 const SHORT_RUN_SECONDS = 1
 const IDLE_AFTER_RESET_SECONDS = 5
@@ -39,25 +44,16 @@ const expectBusyAiShortRunCounts = (page) =>
 test.describe.configure({ mode: 'parallel' })
 
 test.describe('Reset the simulation', () => {
-  // @wip: Step 8.4
-  test.fixme('Reset while running clears lanes and elapsed time, pauses, and keeps settings', async ({
+  test('Reset while running clears lanes and elapsed time, pauses, and keeps settings', async ({
     page,
   }) => {
-    const AI_GEN_LABEL = 'AI generation (PRs/hr)'
-    const PR_SIZE_LABEL = 'PR size (LOC, both lanes)'
-
-    await test.step('Given I set "AI generation (PRs/hr)" to 40 and "PR size (LOC, both lanes)" to 300', async () => {
+    await test.step('Given I set "AI code written (LOC/hr)" to 400 and "Human PRs per day" to 2', async () => {
       await openSimulator(page)
-      await setSlider(page, AI_GEN_LABEL, CUSTOM_AI_GEN)
-      await setSlider(page, PR_SIZE_LABEL, CUSTOM_PR_SIZE)
+      await setSliders(page, KEPT_SETTINGS)
     })
 
     await test.step('And the simulation is running and has run for 3 seconds', async () => {
       await startAndRunFor(page, LONG_RUN_SECONDS)
-      await expectCounts(page, 'ai', {
-        pending: REFERENCE.aiPendingAtTick30WithAiGen40AndPrSize300,
-        deployed: REFERENCE.aiDeployedAtTick30WithAiGen40AndPrSize300,
-      })
     })
 
     await test.step('When I press Reset', async () => {
@@ -78,22 +74,27 @@ test.describe('Reset the simulation', () => {
       await expectLiveIntervals(page, 0)
     })
 
-    await test.step('And "AI generation (PRs/hr)" has value 40 and "PR size (LOC, both lanes)" has value 300', async () => {
-      await expect(slider(page, AI_GEN_LABEL)).toHaveValue(String(CUSTOM_AI_GEN))
-      await expect(slider(page, PR_SIZE_LABEL)).toHaveValue(String(CUSTOM_PR_SIZE))
+    await test.step('And "AI code written (LOC/hr)" has value 400 and "Human PRs per day" has value 2', async () => {
+      await expect(slider(page, AI_CODE_WRITTEN_LABEL)).toHaveValue(String(KEPT_AI_CODE_WRITTEN))
+      await expect(slider(page, HUMAN_PRS_PER_DAY_LABEL)).toHaveValue(
+        String(KEPT_HUMAN_PRS_PER_DAY),
+      )
       await expect(resetButton(page)).toBeFocused()
     })
   })
 
-  // @wip: Step 8.4
-  test.fixme('Reset while paused with non-zero counts clears them', async ({ page }) => {
-    await test.step('Given the simulation ran for 3 seconds and was paused', async () => {
+  test('Reset while paused with non-zero counts clears them', async ({ page }) => {
+    await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation ran for 3 seconds and was paused', async () => {
       await openSimulator(page)
+      await setSliders(page, BUSY_AI_PRESET)
       await startAndRunFor(page, LONG_RUN_SECONDS)
       await pauseSimulation(page)
+    })
+
+    await test.step('And the AI lane shows Pending Review 11 and Deployed 4', async () => {
       await expectCounts(page, 'ai', {
-        pending: REFERENCE.aiPendingAtTick30,
-        deployed: REFERENCE.aiDeployedAtTick30,
+        pending: REFERENCE.busyAiPendingAtTick30,
+        deployed: REFERENCE.busyAiDeployedAtTick30,
       })
     })
 
@@ -142,13 +143,10 @@ test.describe('Reset the simulation', () => {
     })
   })
 
-  // @wip: Step 8.4
-  test.fixme('Start after Reset runs from zero with the kept settings', async ({ page }) => {
-    const AI_GEN_LABEL = 'AI generation (PRs/hr)'
-
-    await test.step('Given I set "AI generation (PRs/hr)" to 40 and pressed Reset', async () => {
+  test('Start after Reset runs from zero with the kept settings', async ({ page }) => {
+    await test.step('Given I set "AI code written (LOC/hr)" to 2000 and pressed Reset', async () => {
       await openSimulator(page)
-      await setSlider(page, AI_GEN_LABEL, CUSTOM_AI_GEN)
+      await setSliders(page, BUSY_AI_PRESET)
       await resetButton(page).click()
     })
 
@@ -156,18 +154,15 @@ test.describe('Reset the simulation', () => {
       await startAndRunFor(page, SHORT_RUN_SECONDS)
     })
 
-    await test.step('Then the AI lane shows Pending Review 38 and Deployed 1', async () => {
-      await expectCounts(page, 'ai', {
-        pending: REFERENCE.aiPendingAtTick10WithAiGen40,
-        deployed: REFERENCE.aiDeployedAtTick10WithAiGen40,
-      })
+    await test.step('Then the AI lane shows Pending Review 3 and Deployed 1', async () => {
+      await expectBusyAiShortRunCounts(page)
     })
   })
 
-  // @wip: Step 8.4
-  test.fixme('Reset is keyboard operable', async ({ page }) => {
-    await test.step('Given the simulation has run for 1 second', async () => {
+  test('Reset is keyboard operable', async ({ page }) => {
+    await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 1 second', async () => {
       await openSimulator(page)
+      await setSliders(page, BUSY_AI_PRESET)
       await startAndRunFor(page, SHORT_RUN_SECONDS)
       await expectBusyAiShortRunCounts(page)
     })

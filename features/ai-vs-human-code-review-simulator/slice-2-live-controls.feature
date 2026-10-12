@@ -1,6 +1,5 @@
 Feature: Adjust the model live
 
-  @wip
   Scenario Outline: Controls start at their defaults with units
     Given I open the simulator
     Then the "<control>" slider has value <default>, min <min>, max <max>, and step <step>
@@ -15,7 +14,6 @@ Feature: Adjust the model live
       | AI skim multiplier                   | 2       | 1    | 3    | 0.5  | 2×         |
       | Warning threshold                    | 15      | 5    | 50   | 1    | 15 PRs     |
 
-  @wip
   Scenario: Derived PR sizes, AI PRs per day, and effective speed are read-only
     Given I open the simulator
     Then the Human lane shows "PR size 240 LOC (derived)"
@@ -25,7 +23,6 @@ Feature: Adjust the model live
     Then the Human lane shows "PR size 120 LOC (derived)"
     And the AI lane shows "PR size 181 LOC (1.51× human)", "2.34 PRs/day (derived)", and "Effective speed 900 LOC/hr"
 
-  @wip
   Scenario Outline: Sliders stop at their bounds
     Given I open the simulator
     When I press <key> <presses> times on "<control>"
@@ -44,7 +41,6 @@ Feature: Adjust the model live
       | Warning threshold                    | ArrowLeft  | 50      | 5     |
       | Warning threshold                    | ArrowRight | 50      | 50    |
 
-  @wip
   Scenario Outline: The AI code-written slider jumps to its bounds
     Given I open the simulator
     When I press <key> on "AI code written (LOC/hr)"
@@ -55,7 +51,6 @@ Feature: Adjust the model live
       | End  | 2000  |
       | Home | 5     |
 
-  @wip
   Scenario: A review-side change applies on the next tick
     Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 1 second
     And the AI lane shows Deployed 1
@@ -64,7 +59,6 @@ Feature: Adjust the model live
     Then the AI lane shows Deployed 2
     And the Start/Pause button still reads "Pause"
 
-  @wip
   Scenario: A change while paused takes effect only after Start
     Given I set "AI code written (LOC/hr)" to 2000 and the simulation ran for 1 second and was paused
     And the AI lane shows Pending Review 3
@@ -73,7 +67,6 @@ Feature: Adjust the model live
     When I press Start and 0.1 seconds pass
     Then the AI lane shows Pending Review 4
 
-  @wip
   Scenario: A backlog drains to zero and never below
     Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 2 seconds
     And the AI lane shows Pending Review 7

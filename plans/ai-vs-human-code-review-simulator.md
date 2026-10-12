@@ -311,7 +311,6 @@ Feature: Run and pause the simulation
     When I press Start
     Then the Start/Pause button reads "Pause" and the status reads "Running"
 
-  @wip
   Scenario: Default flow after 10 seconds
     Given I open the simulator
     When I press Start and 10 seconds pass
@@ -319,7 +318,6 @@ Feature: Run and pause the simulation
     And the AI lane shows Pending Review 0 and Deployed 1
     And the elapsed readout shows "10.0 work hours"
 
-  @wip
   Scenario: A PR is not shown as deployed until it is fully reviewed
     Given I open the simulator
     When I press Start and 7.9 seconds pass
@@ -327,7 +325,6 @@ Feature: Run and pause the simulation
     When 0.1 more seconds pass
     Then the Human lane shows Deployed 1
 
-  @wip
   Scenario: Pause freezes the counts
     Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 3 seconds
     When I press Pause and 5 more seconds pass
@@ -335,25 +332,21 @@ Feature: Run and pause the simulation
     And the elapsed readout shows "3.0 work hours"
     And the Start/Pause button reads "Start"
 
-  @wip
   Scenario: Resume continues from the frozen counts
     Given I set "AI code written (LOC/hr)" to 2000 and the simulation was paused after 3 seconds
     When I press Start and 1 second passes
     Then the AI lane shows Pending Review 15 and Deployed 6
 
-  @wip
   Scenario: Deployed never decreases while running
     Given I set "AI code written (LOC/hr)" to 2000 and press Start
     Then each lane's Deployed count, sampled every tick for 10 seconds, never decreases
 
-  @wip
   Scenario: Hiding the tab auto-pauses
     Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 1 second
     When the page becomes hidden
     And 3 seconds pass
     Then the status reads "Paused" and the AI lane still shows Pending Review 3
 
-  @wip
   Scenario: Showing the tab again stays paused
     Given I set "AI code written (LOC/hr)" to 2000 and the simulation auto-paused when the page became hidden after 1 second
     When the page becomes visible again
@@ -371,7 +364,6 @@ Feature: Run and pause the simulation
     And it has no script element with a src attribute, no stylesheet link, no modulepreload link, and no icon link to a file
     And dist contains no other JS or CSS files
 
-  @wip
   Scenario: The built file runs from disk with no other requests
     Given the project is built
     When I open dist/index.html from the file system
@@ -434,7 +426,6 @@ Feature: Run and pause the simulation
 ```gherkin
 Feature: Adjust the model live
 
-  @wip
   Scenario Outline: Controls start at their defaults with units
     Given I open the simulator
     Then the "<control>" slider has value <default>, min <min>, max <max>, and step <step>
@@ -449,7 +440,6 @@ Feature: Adjust the model live
       | AI skim multiplier                   | 2       | 1    | 3    | 0.5  | 2×         |
       | Warning threshold                    | 15      | 5    | 50   | 1    | 15 PRs     |
 
-  @wip
   Scenario: Derived PR sizes, AI PRs per day, and effective speed are read-only
     Given I open the simulator
     Then the Human lane shows "PR size 240 LOC (derived)"
@@ -459,7 +449,6 @@ Feature: Adjust the model live
     Then the Human lane shows "PR size 120 LOC (derived)"
     And the AI lane shows "PR size 181 LOC (1.51× human)", "2.34 PRs/day (derived)", and "Effective speed 900 LOC/hr"
 
-  @wip
   Scenario Outline: Sliders stop at their bounds
     Given I open the simulator
     When I press <key> <presses> times on "<control>"
@@ -478,7 +467,6 @@ Feature: Adjust the model live
       | Warning threshold                    | ArrowLeft  | 50      | 5     |
       | Warning threshold                    | ArrowRight | 50      | 50    |
 
-  @wip
   Scenario Outline: The AI code-written slider jumps to its bounds
     Given I open the simulator
     When I press <key> on "AI code written (LOC/hr)"
@@ -489,7 +477,6 @@ Feature: Adjust the model live
       | End  | 2000  |
       | Home | 5     |
 
-  @wip
   Scenario: A review-side change applies on the next tick
     Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 1 second
     And the AI lane shows Deployed 1
@@ -498,7 +485,6 @@ Feature: Adjust the model live
     Then the AI lane shows Deployed 2
     And the Start/Pause button still reads "Pause"
 
-  @wip
   Scenario: A change while paused takes effect only after Start
     Given I set "AI code written (LOC/hr)" to 2000 and the simulation ran for 1 second and was paused
     And the AI lane shows Pending Review 3
@@ -507,7 +493,6 @@ Feature: Adjust the model live
     When I press Start and 0.1 seconds pass
     Then the AI lane shows Pending Review 4
 
-  @wip
   Scenario: A backlog drains to zero and never below
     Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 2 seconds
     And the AI lane shows Pending Review 7
@@ -549,7 +534,6 @@ Feature: Adjust the model live
 ```gherkin
 Feature: Reset the simulation
 
-  @wip
   Scenario: Reset while running clears lanes and elapsed time, pauses, and keeps settings
     Given I set "AI code written (LOC/hr)" to 400 and "Human PRs per day" to 2
     And the simulation is running and has run for 3 seconds
@@ -559,7 +543,6 @@ Feature: Reset the simulation
     And the Start/Pause button reads "Start"
     And "AI code written (LOC/hr)" has value 400 and "Human PRs per day" has value 2
 
-  @wip
   Scenario: Reset while paused with non-zero counts clears them
     Given I set "AI code written (LOC/hr)" to 2000 and the simulation ran for 3 seconds and was paused
     And the AI lane shows Pending Review 11 and Deployed 4
@@ -576,13 +559,11 @@ Feature: Reset the simulation
     When I press Reset
     Then both lanes show Pending Review 0 and Deployed 0 and the Start/Pause button reads "Start"
 
-  @wip
   Scenario: Start after Reset runs from zero with the kept settings
     Given I set "AI code written (LOC/hr)" to 2000 and pressed Reset
     When I press Start and 1 second passes
     Then the AI lane shows Pending Review 3 and Deployed 1
 
-  @wip
   Scenario: Reset is keyboard operable
     Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 1 second
     When I Tab to "Reset" and press Enter
