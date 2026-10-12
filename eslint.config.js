@@ -49,7 +49,8 @@ export default [
       'no-console': 'warn',
     },
   },
-  // The engine, reducer, and tip rules are pure: no React, icons, components, or presentation config.
+  // The engine, reducer, and tip rules are pure: no React, icons, components, presentation config,
+  // DOM, browser storage, network, or timers.
   {
     files: ['src/engine.js', 'src/reducer.js', 'src/openTip.js'],
     rules: {
@@ -75,6 +76,25 @@ export default [
             },
           ],
         },
+      ],
+      'no-restricted-globals': [
+        'error',
+        ...[
+          'window',
+          'document',
+          'navigator',
+          'location',
+          'localStorage',
+          'sessionStorage',
+          'fetch',
+          'setTimeout',
+          'setInterval',
+          'requestAnimationFrame',
+        ].map((name) => ({
+          name,
+          message:
+            'engine.js, reducer.js, and openTip.js must stay pure: no DOM, browser storage, network, or timers.',
+        })),
       ],
     },
   },

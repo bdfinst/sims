@@ -31,7 +31,7 @@ On screen, top to bottom:
 
 Two lanes (human-authored vs. AI-authored code) run side by side; generation outpaces review in the AI lane, so its queue overflows and more defects escape. One simulated second is one work hour. The model math, defaults, and ranges live in the spec; expected values in tests come from the "Default arithmetic" section of `plans/ai-vs-human-code-review-simulator.md`, so don't change a test's expected number to make it pass.
 
-- `src/engine.js` — pure model, display helpers, formatters, and constants. ESLint forbids importing React, `lucide-react`, `./components/*`, or `./laneConfig*` here and in `reducer.js` and `openTip.js`. Those rules run only in `npm run lint:deep`, which the pre-push hook runs; run it yourself after touching any of the three files.
+- `src/engine.js` — pure model, display helpers, formatters, and constants. ESLint forbids importing React, `lucide-react`, `./components/*`, or `./laneConfig*` here and in `reducer.js` and `openTip.js`, and using DOM, browser-storage, network, or timer globals (`window`, `document`, `fetch`, `setTimeout`, and others). Those rules run only in `npm run lint:deep`, which the pre-push hook runs; run it yourself after touching any of the three files.
 - The Faros figures (+51% PR size, +16.2% PR merge rate, +242.7% incidents per PR) are constants in `engine.js`. The lane text, the AI code-written default, the info tips, and the research note all derive from them, so change them only there.
 - `src/reducer.js` — pure state transitions (tick, start, pause, reset, setSetting).
 - `src/laneConfig.js` — presentation only: labels, icons, colour/type class tokens, tile layout, and each slider's label and info-tip text (`SLIDER_PRESENTATION`).
