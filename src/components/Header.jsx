@@ -1,10 +1,8 @@
 import { SECONDS_PER_WORK_HOUR, formatElapsedHours } from '../engine.js'
-import { Icon } from './Icon.jsx'
 
 const TITLE = 'AI vs. Human Code Review Simulator'
 const DESCRIPTION =
   'Watch AI-speed code generation swamp human reviewers and push more defects into production.'
-const BUTTON_ICON_SIZE_PX = 20
 const ELAPSED_CAPTION = `${SECONDS_PER_WORK_HOUR} s = 1 work hour`
 
 export function Header({ isRunning, ticks, onToggleRunning, onReset }) {
@@ -26,14 +24,11 @@ export function Header({ isRunning, ticks, onToggleRunning, onReset }) {
           <button
             type="button"
             onClick={onReset}
-            className="flex items-center gap-2 rounded border border-gray-500 px-4 py-2 text-base font-semibold"
+            className="rounded border border-gray-500 px-4 py-2 text-base font-semibold"
           >
-            <Icon name="rotate-ccw" size={BUTTON_ICON_SIZE_PX} />
             Reset
           </button>
-          <span role="status" className="text-base text-gray-300">
-            {isRunning ? 'Running' : 'Paused'}
-          </span>
+          <span className="text-base text-gray-300">{isRunning ? 'Running' : 'Paused'}</span>
         </div>
         <p className="text-base">
           <span className="text-xl font-semibold">{formatElapsedHours(ticks)} work hours</span>{' '}

@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import { DEFAULT_SETTINGS, floorShow } from './engine.js'
-import { initialState, reducer } from './reducer.js'
+import { ACTION, initialState, reducer } from './reducer.js'
 import { shownCounts } from './testHelpers.js'
 
 const dispatchAll = (state, ...types) =>
   types.reduce((current, type) => reducer(current, { type }), state)
 
 const setSetting = (state, settingKey, value) =>
-  reducer(state, { type: 'setSetting', settingKey, value })
+  reducer(state, { type: ACTION.setSetting, settingKey, value })
 
 const repeat = (type, count) => Array.from({ length: count }, () => type)
 
@@ -24,26 +24,26 @@ describe('initialState', () => {
 
 describe('start and pause', () => {
   it('start sets isRunning', () => {
-    expect(dispatchAll(initialState, 'start').isRunning).toBe(true)
+    expect(dispatchAll(initialState, ACTION.start).isRunning).toBe(true)
   })
 
   it('pause clears isRunning', () => {
-    expect(dispatchAll(initialState, 'start', 'pause').isRunning).toBe(false)
+    expect(dispatchAll(initialState, ACTION.start, ACTION.pause).isRunning).toBe(false)
   })
 
   it('pausing while already paused changes nothing', () => {
-    expect(dispatchAll(initialState, 'pause')).toEqual(initialState)
+    expect(dispatchAll(initialState, ACTION.pause)).toEqual(initialState)
   })
 
   it('does not change lanes or ticks', () => {
-    const toggled = dispatchAll(initialState, 'start', 'pause')
+    const toggled = dispatchAll(initialState, ACTION.start, ACTION.pause)
     expect([toggled.lanes, toggled.ticks]).toEqual([initialState.lanes, initialState.ticks])
   })
 })
 
 describe('tick', () => {
   it('advances ticks and both lanes while running', () => {
-    const state = dispatchAll(initialState, 'start', ...repeat('tick', 100))
+    const state = dispatchAll(initialState, ACTION.start, ...repeat(ACTION.tick, 100))
     expect({
       ticks: state.ticks,
       human: shownCounts(state.lanes.human),
@@ -52,25 +52,25 @@ describe('tick', () => {
   })
 
   it('is a no-op while paused', () => {
-    expect(dispatchAll(initialState, ...repeat('tick', 5))).toBe(initialState)
+    expect(dispatchAll(initialState, ...repeat(ACTION.tick, 5))).toBe(initialState)
   })
 
   it('freezes counts after pause', () => {
-    const paused = dispatchAll(initialState, 'start', ...repeat('tick', 30), 'pause')
-    expect(dispatchAll(paused, ...repeat('tick', 50))).toBe(paused)
+    const paused = dispatchAll(initialState, ACTION.start, ...repeat(ACTION.tick, 30), ACTION.pause)
+    expect(dispatchAll(paused, ...repeat(ACTION.tick, 50))).toBe(paused)
   })
 
   it('resumes from the frozen counts', () => {
-    const paused = dispatchAll(initialState, 'start', ...repeat('tick', 30), 'pause')
-    const resumed = dispatchAll(paused, 'start', ...repeat('tick', 10))
+    const paused = dispatchAll(initialState, ACTION.start, ...repeat(ACTION.tick, 30), ACTION.pause)
+    const resumed = dispatchAll(paused, ACTION.start, ...repeat(ACTION.tick, 10))
     expect(shownCounts(resumed.lanes.ai)).toEqual([73, 6])
   })
 
   it('does not mutate the previous state', () => {
-    const running = dispatchAll(initialState, 'start', ...repeat('tick', 3))
+    const running = dispatchAll(initialState, ACTION.start, ...repeat(ACTION.tick, 3))
     const snapshot = structuredClone(running)
 
-    reducer(running, { type: 'tick' })
+    reducer(running, { type: ACTION.tick })
 
     expect(running).toEqual(snapshot)
   })
@@ -113,7 +113,7 @@ describe('setSetting', () => {
   })
 
   it('does not touch lanes, ticks, or whether it is running', () => {
-    const running = dispatchAll(initialState, 'start', ...repeat('tick', 5))
+    const running = dispatchAll(initialState, ACTION.start, ...repeat(ACTION.tick, 5))
     const next = setSetting(running, 'prSize', 400)
     expect([next.lanes, next.ticks, next.isRunning]).toEqual([
       running.lanes,
@@ -125,23 +125,23 @@ describe('setSetting', () => {
 
 describe('changing settings mid-run', () => {
   it('leaves a paused queue as it was, then applies the new rate on the next tick', () => {
-    const paused = dispatchAll(initialState, 'start', ...repeat('tick', 10), 'pause')
+    const paused = dispatchAll(initialState, ACTION.start, ...repeat(ACTION.tick, 10), ACTION.pause)
     expect(paused.lanes.ai.pendingPrs).toBeCloseTo(18.41, 2)
 
     const changed = setSetting(paused, 'aiGen', 50)
     expect(shownCounts(changed.lanes.ai)).toEqual([18, 1])
 
-    const resumed = dispatchAll(changed, 'start', 'tick')
+    const resumed = dispatchAll(changed, ACTION.start, ACTION.tick)
     expect(resumed.lanes.ai.pendingPrs).toBeCloseTo(23.25, 2)
     expect(shownCounts(resumed.lanes.ai)).toEqual([23, 1])
   })
 
   it('applies a faster review side on the very next tick (AI Deployed 1 -> 2)', () => {
-    const running = dispatchAll(initialState, 'start', ...repeat('tick', 10))
+    const running = dispatchAll(initialState, ACTION.start, ...repeat(ACTION.tick, 10))
     expect(shownCounts(running.lanes.ai)[1]).toBe(1)
 
     const faster = setSetting(setSetting(running, 'reviewerSpeed', 1000), 'skim', 3)
-    const next = reducer(faster, { type: 'tick' })
+    const next = reducer(faster, { type: ACTION.tick })
 
     expect(shownCounts(next.lanes.ai)[1]).toBe(2)
     expect(next.isRunning).toBe(true)
@@ -149,14 +149,14 @@ describe('changing settings mid-run', () => {
 
   it('drains a backlog to zero without ever going below zero', () => {
     const backlogged = setSetting(initialState, 'humanGen', 10)
-    const atTwoSeconds = dispatchAll(backlogged, 'start', ...repeat('tick', 20))
+    const atTwoSeconds = dispatchAll(backlogged, ACTION.start, ...repeat(ACTION.tick, 20))
     expect(shownCounts(atTwoSeconds.lanes.human)[0]).toBe(17)
 
     const draining = setSetting(setSetting(atTwoSeconds, 'humanGen', 1), 'reviewerSpeed', 1000)
     const pendingEachTick = []
     let state = draining
     for (let tickIndex = 0; tickIndex < 60; tickIndex += 1) {
-      state = reducer(state, { type: 'tick' })
+      state = reducer(state, { type: ACTION.tick })
       pendingEachTick.push(state.lanes.human.pendingPrs)
     }
 
@@ -166,38 +166,60 @@ describe('changing settings mid-run', () => {
 })
 
 describe('reset', () => {
+  const RUN_TICKS = 30
   const runningWithCustomSettings = () =>
-    dispatchAll(setSetting(initialState, 'aiGen', 40), 'start', ...repeat('tick', 30))
+    dispatchAll(
+      setSetting(initialState, 'aiGen', 40),
+      ACTION.start,
+      ...repeat(ACTION.tick, RUN_TICKS),
+    )
 
-  it('empties both lanes, zeroes ticks, and pauses', () => {
-    const reset = dispatchAll(runningWithCustomSettings(), 'reset')
-    expect(reset).toMatchObject({ lanes: initialState.lanes, ticks: 0, isRunning: false })
+  // Proves there is something to clear, so a reset that did nothing could not pass.
+  const expectRunHasProgressed = (state) => {
+    expect(state.ticks).toBe(RUN_TICKS)
+    expect(shownCounts(state.lanes.ai)).not.toEqual([0, 0])
+  }
+
+  it('returns the initial state, keeping only the settings', () => {
+    const before = runningWithCustomSettings()
+    expectRunHasProgressed(before)
+
+    expect(dispatchAll(before, ACTION.reset)).toEqual({
+      ...initialState,
+      settings: before.settings,
+    })
   })
 
-  it('keeps every setting as it was', () => {
+  it('keeps a customised setting', () => {
     const before = runningWithCustomSettings()
-    expect(dispatchAll(before, 'reset').settings).toEqual(before.settings)
+    expect(before.settings.aiGen).toBe(40)
+    expect(dispatchAll(before, ACTION.reset).settings.aiGen).toBe(40)
   })
 
   it('clears a paused run too', () => {
-    const paused = dispatchAll(runningWithCustomSettings(), 'pause')
-    expect(dispatchAll(paused, 'reset')).toMatchObject({ lanes: initialState.lanes, ticks: 0 })
+    const paused = dispatchAll(runningWithCustomSettings(), ACTION.pause)
+    expectRunHasProgressed(paused)
+
+    expect(dispatchAll(paused, ACTION.reset)).toEqual({
+      ...initialState,
+      settings: paused.settings,
+    })
   })
 
   it('is idempotent on the initial state', () => {
-    expect(dispatchAll(initialState, 'reset')).toEqual(initialState)
+    expect(dispatchAll(initialState, ACTION.reset)).toEqual(initialState)
   })
 
   it('does not mutate the state it was given', () => {
     const before = runningWithCustomSettings()
     const snapshot = structuredClone(before)
-    reducer(before, { type: 'reset' })
+    reducer(before, { type: ACTION.reset })
     expect(before).toEqual(snapshot)
   })
 
   it('ignores ticks after a reset until Start is pressed', () => {
-    const reset = dispatchAll(runningWithCustomSettings(), 'reset')
-    expect(dispatchAll(reset, ...repeat('tick', 5))).toBe(reset)
+    const reset = dispatchAll(runningWithCustomSettings(), ACTION.reset)
+    expect(dispatchAll(reset, ...repeat(ACTION.tick, 5))).toBe(reset)
   })
 })
 

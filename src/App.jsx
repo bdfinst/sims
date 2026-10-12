@@ -4,7 +4,7 @@ import { HeadlineBand } from './components/HeadlineBand.jsx'
 import { Lane } from './components/Lane.jsx'
 import { TICK_MS } from './engine.js'
 import { LANE_ORDER } from './laneConfig.js'
-import { initialState, reducer } from './reducer.js'
+import { ACTION, initialState, reducer } from './reducer.js'
 
 function App() {
   const [state, dispatch] = useReducer(reducer, initialState)
@@ -12,13 +12,13 @@ function App() {
 
   useEffect(() => {
     if (!isRunning) return undefined
-    const intervalId = setInterval(() => dispatch({ type: 'tick' }), TICK_MS)
+    const intervalId = setInterval(() => dispatch({ type: ACTION.tick }), TICK_MS)
     return () => clearInterval(intervalId)
   }, [isRunning])
 
   useEffect(() => {
     const pauseWhenHidden = () => {
-      if (document.visibilityState === 'hidden') dispatch({ type: 'pause' })
+      if (document.visibilityState === 'hidden') dispatch({ type: ACTION.pause })
     }
     document.addEventListener('visibilitychange', pauseWhenHidden)
     return () => document.removeEventListener('visibilitychange', pauseWhenHidden)
@@ -29,8 +29,8 @@ function App() {
       <Header
         isRunning={isRunning}
         ticks={state.ticks}
-        onToggleRunning={() => dispatch({ type: isRunning ? 'pause' : 'start' })}
-        onReset={() => dispatch({ type: 'reset' })}
+        onToggleRunning={() => dispatch({ type: isRunning ? ACTION.pause : ACTION.start })}
+        onReset={() => dispatch({ type: ACTION.reset })}
       />
       <main className="flex flex-col gap-6">
         <HeadlineBand />
@@ -41,7 +41,7 @@ function App() {
             lane={state.lanes[laneId]}
             settings={state.settings}
             onSettingChange={(settingKey, value) =>
-              dispatch({ type: 'setSetting', settingKey, value })
+              dispatch({ type: ACTION.setSetting, settingKey, value })
             }
           />
         ))}

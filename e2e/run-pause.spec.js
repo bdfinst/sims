@@ -8,6 +8,8 @@ import {
   TICKS_PER_SECOND,
   expect,
   expectCounts,
+  expectElapsedAtTick,
+  expectEmptyLanes,
   laneLocator,
   metric,
   metricValues,
@@ -16,7 +18,7 @@ import {
   sampleEachTick,
   startSimulation,
   test,
-  toggleButton,
+  buttonNamed,
 } from './fixtures.js'
 
 const DIST_DIR = fileURLToPath(new URL('../dist/', import.meta.url))
@@ -24,7 +26,6 @@ const DESCRIPTION =
   'Watch AI-speed code generation swamp human reviewers and push more defects into production.'
 const HUMAN_BLUE = 'rgb(59, 130, 246)'
 const AI_PURPLE = 'rgb(168, 85, 247)'
-const LANE_ID_LIST = ['human', 'ai']
 
 const iconNames = (laneRoot) =>
   laneRoot.locator('[data-icon]').evaluateAll((els) => els.map((el) => el.dataset.icon))
@@ -35,21 +36,14 @@ const setVisibility = (page, visibilityState) =>
     document.dispatchEvent(new Event('visibilitychange'))
   }, visibilityState)
 
-const expectEmptyLanes = async (page) => {
-  for (const laneId of LANE_ID_LIST) {
-    await expect(metric(page, laneId, 'pending')).toHaveText('0')
-    await expect(metric(page, laneId, 'deployed')).toHaveText('0')
-  }
-}
-
 test.describe('Run and pause the simulation', () => {
   test('Page loads paused with empty lanes', async ({ page }) => {
     await openSimulator(page)
 
     await expectEmptyLanes(page)
-    await expect(toggleButton(page, 'Start')).toBeVisible()
+    await expect(buttonNamed(page, 'Start')).toBeVisible()
     await expect(page.getByText('Paused', { exact: true })).toBeVisible()
-    await expect(page.getByText('0.0 work hours', { exact: true })).toBeVisible()
+    await expectElapsedAtTick(page, 0)
     await expect(page.getByText('1 s = 1 work hour', { exact: true })).toBeVisible()
   })
 
@@ -76,8 +70,8 @@ test.describe('Run and pause the simulation', () => {
   test('Start and Reset have a visible gap between them', async ({ page }) => {
     await openSimulator(page)
 
-    const startBox = await toggleButton(page, 'Start').boundingBox()
-    const resetBox = await toggleButton(page, 'Reset').boundingBox()
+    const startBox = await buttonNamed(page, 'Start').boundingBox()
+    const resetBox = await buttonNamed(page, 'Reset').boundingBox()
     const minimumGapPx = 8
     expect(resetBox.x - (startBox.x + startBox.width)).toBeGreaterThanOrEqual(minimumGapPx)
   })
@@ -97,15 +91,15 @@ test.describe('Run and pause the simulation', () => {
     await page.clock.runFor(5 * SECOND_MS)
 
     await expectEmptyLanes(page)
-    await expect(page.getByText('0.0 work hours', { exact: true })).toBeVisible()
+    await expectElapsedAtTick(page, 0)
   })
 
   test('Start switches the button to Pause', async ({ page }) => {
     await openSimulator(page)
 
-    await toggleButton(page, 'Start').click()
+    await buttonNamed(page, 'Start').click()
 
-    await expect(toggleButton(page, 'Pause')).toBeVisible()
+    await expect(buttonNamed(page, 'Pause')).toBeVisible()
     await expect(page.getByText('Running', { exact: true })).toBeVisible()
   })
 
@@ -120,7 +114,7 @@ test.describe('Run and pause the simulation', () => {
       pending: REFERENCE.aiPendingAtTick100,
       deployed: REFERENCE.aiDeployedAtTick100,
     })
-    await expect(page.getByText('10.0 work hours', { exact: true })).toBeVisible()
+    await expectElapsedAtTick(page, 10 * TICKS_PER_SECOND)
   })
 
   test('A PR is not shown as deployed until it is fully reviewed', async ({ page }) => {
@@ -146,7 +140,7 @@ test.describe('Run and pause the simulation', () => {
       pending: REFERENCE.aiPendingAtTick30,
       deployed: REFERENCE.aiDeployedAtTick30,
     })
-    await expect(page.getByText('3.0 work hours', { exact: true })).toBeVisible()
+    await expectElapsedAtTick(page, 3 * TICKS_PER_SECOND)
   })
 
   test('Resume continues from the frozen counts', async ({ page }) => {
@@ -196,7 +190,7 @@ test.describe('Run and pause the simulation', () => {
     await page.clock.runFor(1 * SECOND_MS)
 
     await setVisibility(page, 'hidden')
-    await expect(toggleButton(page, 'Start')).toBeVisible()
+    await expect(buttonNamed(page, 'Start')).toBeVisible()
     await page.clock.runFor(3 * SECOND_MS)
 
     await expect(page.getByText('Paused', { exact: true })).toBeVisible()
@@ -208,7 +202,7 @@ test.describe('Run and pause the simulation', () => {
     await startSimulation(page)
     await page.clock.runFor(1 * SECOND_MS)
     await setVisibility(page, 'hidden')
-    await expect(toggleButton(page, 'Start')).toBeVisible()
+    await expect(buttonNamed(page, 'Start')).toBeVisible()
 
     await setVisibility(page, 'visible')
     await page.clock.runFor(2 * SECOND_MS)

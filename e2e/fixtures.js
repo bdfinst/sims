@@ -60,23 +60,25 @@ export const openSimulator = async (page, url = '/') => {
   await page.clock.pauseAt(FIXED_START_MS + CLOCK_PAUSE_OFFSET_MS)
 }
 
+const LANE_ID_LIST = ['human', 'ai']
+
 export const laneLocator = (page, laneId) => page.locator(`[data-lane="${laneId}"]`)
 
 export const metric = (page, laneId, name) =>
   laneLocator(page, laneId).locator(`[data-metric="${name}"]`)
 
-export const toggleButton = (page, name) => page.getByRole('button', { name, exact: true })
+export const buttonNamed = (page, name) => page.getByRole('button', { name, exact: true })
 
 // Waiting for the toggled label means React has committed (and registered or cleared the
 // interval) before the fake clock moves.
 export const startSimulation = async (page) => {
-  await toggleButton(page, 'Start').click()
-  await expect(toggleButton(page, 'Pause')).toBeVisible()
+  await buttonNamed(page, 'Start').click()
+  await expect(buttonNamed(page, 'Pause')).toBeVisible()
 }
 
 export const pauseSimulation = async (page) => {
-  await toggleButton(page, 'Pause').click()
-  await expect(toggleButton(page, 'Start')).toBeVisible()
+  await buttonNamed(page, 'Pause').click()
+  await expect(buttonNamed(page, 'Start')).toBeVisible()
 }
 
 export const expectCounts = async (page, laneId, { pending, deployed }) => {
@@ -88,12 +90,19 @@ export const SECOND_MS = 1000
 export const TICK_MS = 100
 export const TICKS_PER_SECOND = SECOND_MS / TICK_MS
 
-// Expected values from the plan's reference implementation (scratchpad/check.py, check2.py).
-// Ticks are 0.1 s each, so tick 10 is 1 s.
+export const AI_GEN_LABEL = 'AI generation (PRs/hr)'
+export const PR_SIZE_LABEL = 'PR size (LOC, both lanes)'
+
+// Expected values from the plan's reference model (plan, "Default arithmetic" under "Slices").
+// Per tick (0.1 h): a lane gains gen x 0.1 PRs of `size` LOC each, then reviews
+// min(pending LOC, effective speed x 0.1) LOC, taking PRs off the queue in proportion.
+// AI size = round(prSize x 1.51); AI effective speed = reviewer speed x skim.
+// Ticks are 0.1 s each, so tick 10 is 1 s. Counts are the displayed (floored) values.
 export const REFERENCE = Object.freeze({
   aiPrSizeAtDefaults: 378, // round(250 x 1.51)
   aiPrSizeAtPrSize200: 302, // round(200 x 1.51)
   aiPendingAtTick10: 18,
+  aiDeployedAtTick10: 1,
   aiPendingAtTick11WithAiGen50: 23,
   aiPendingAtTick10WithAiGen40: 38,
   aiDeployedAtTick10WithAiGen40: 1,
@@ -104,7 +113,19 @@ export const REFERENCE = Object.freeze({
   aiPendingAtTick100: 184,
   aiDeployedAtTick100: 15,
   humanDeployedAtTick100: 10,
+  humanPendingAtTick20WithHumanGen10: 17,
+  humanDeployedAtTick20WithHumanGen10: 2,
+  aiDeployedAtTick11WithFasterReview: 2, // reviewer speed 1000, skim 3 -> 3000 LOC/hr
+  // aiGen 40, prSize 300 (AI size 453, 60 LOC reviewed per tick), after 3 s:
+  aiPendingAtTick30WithAiGen40AndPrSize300: 116,
+  aiDeployedAtTick30WithAiGen40AndPrSize300: 3,
 })
+
+export const expectEmptyLanes = async (page) => {
+  for (const laneId of LANE_ID_LIST) {
+    await expectCounts(page, laneId, { pending: 0, deployed: 0 })
+  }
+}
 
 export const slider = (page, name) => page.getByRole('slider', { name, exact: true })
 
@@ -130,7 +151,7 @@ export const metricValues = (page, name) =>
 
 // Lanes and the elapsed readout come from one React state, so they commit together.
 // Waiting for the readout therefore tells us the lanes are current, with no clock-dependent waits.
-const expectElapsedAtTick = (page, tick) =>
+export const expectElapsedAtTick = (page, tick) =>
   expect(
     page.getByText(`${(tick / TICKS_PER_SECOND).toFixed(1)} work hours`, { exact: true }),
   ).toBeVisible()
@@ -156,5 +177,25 @@ export const tabTo = async (page, target) => {
   }
   throw new Error('Tab never reached the control')
 }
+
+// Starts the simulation, runs the fake clock, and waits until the elapsed readout shows the run
+// has rendered. The readout shares one React state with the lanes, so the lanes are current too.
+export const startAndRunFor = async (page, seconds) => {
+  await startSimulation(page)
+  await page.clock.runFor(seconds * SECOND_MS)
+  await expectElapsedAtTick(page, seconds * TICKS_PER_SECOND)
+}
+
+// Resolves after any render React has already queued. React schedules renders on a
+// MessageChannel, which page.clock does not fake, and ours is queued after React's.
+export const flushPendingRenders = (page) =>
+  page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const channel = new MessageChannel()
+        channel.port1.onmessage = () => resolve()
+        channel.port2.postMessage(null)
+      }),
+  )
 
 export { expect }

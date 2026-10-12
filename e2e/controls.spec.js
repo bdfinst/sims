@@ -1,6 +1,9 @@
 import {
+  AI_GEN_LABEL,
+  PR_SIZE_LABEL,
   REFERENCE,
   SECOND_MS,
+  TICKS_PER_SECOND,
   TICK_MS,
   expect,
   expectCounts,
@@ -15,15 +18,15 @@ import {
   startSimulation,
   tabTo,
   test,
-  toggleButton,
+  buttonNamed,
   visibleValue,
 } from './fixtures.js'
 
 const HUMAN_GEN = 'Human generation (PRs/hr)'
-const AI_GEN = 'AI generation (PRs/hr)'
-const PR_SIZE = 'PR size (LOC, both lanes)'
 const REVIEWER_SPEED = 'Reviewer speed (LOC/hr, both lanes)'
 const AI_SKIM = 'AI skim multiplier'
+const DRAIN_START_SECONDS = 2
+const DRAIN_SECONDS = 6
 
 const DEFAULT_CONTROLS = [
   {
@@ -36,7 +39,7 @@ const DEFAULT_CONTROLS = [
     spoken: '1 PRs per hour',
   },
   {
-    control: AI_GEN,
+    control: AI_GEN_LABEL,
     defaultValue: 20,
     min: 5,
     max: 50,
@@ -45,7 +48,7 @@ const DEFAULT_CONTROLS = [
     spoken: '20 PRs per hour',
   },
   {
-    control: PR_SIZE,
+    control: PR_SIZE_LABEL,
     defaultValue: 250,
     min: 50,
     max: 1000,
@@ -66,8 +69,8 @@ const DEFAULT_CONTROLS = [
 ]
 
 const BOUNDS = [
-  { control: AI_GEN, key: 'End', bound: 50 },
-  { control: AI_GEN, key: 'Home', bound: 5 },
+  { control: AI_GEN_LABEL, key: 'End', bound: 50 },
+  { control: AI_GEN_LABEL, key: 'Home', bound: 5 },
   { control: REVIEWER_SPEED, key: 'Home', bound: 100 },
   { control: AI_SKIM, key: 'End', bound: 3 },
 ]
@@ -98,10 +101,10 @@ test.describe('Adjust the model live', () => {
     await expect(derivedSize).toContainText('derived')
     await expect(derivedSpeed).toContainText('derived')
     await expect(aiLane.getByRole('slider')).toHaveCount(2)
-    await expect(aiLane.getByRole('slider', { name: AI_GEN })).toBeVisible()
+    await expect(aiLane.getByRole('slider', { name: AI_GEN_LABEL })).toBeVisible()
     await expect(aiLane.getByRole('slider', { name: AI_SKIM })).toBeVisible()
 
-    await setSlider(page, PR_SIZE, 200)
+    await setSlider(page, PR_SIZE_LABEL, 200)
     await setSlider(page, AI_SKIM, 3)
 
     await expect(
@@ -126,14 +129,16 @@ test.describe('Adjust the model live', () => {
     await openSimulator(page)
     await startSimulation(page)
     await page.clock.runFor(1 * SECOND_MS)
-    await expect(metric(page, 'ai', 'deployed')).toHaveText('1')
+    await expect(metric(page, 'ai', 'deployed')).toHaveText(String(REFERENCE.aiDeployedAtTick10))
 
     await setSlider(page, REVIEWER_SPEED, 1000)
     await setSlider(page, AI_SKIM, 3)
     await page.clock.runFor(TICK_MS)
 
-    await expect(metric(page, 'ai', 'deployed')).toHaveText('2')
-    await expect(toggleButton(page, 'Pause')).toBeVisible()
+    await expect(metric(page, 'ai', 'deployed')).toHaveText(
+      String(REFERENCE.aiDeployedAtTick11WithFasterReview),
+    )
+    await expect(buttonNamed(page, 'Pause')).toBeVisible()
   })
 
   test('A change while paused takes effect only after Start', async ({ page }) => {
@@ -143,7 +148,7 @@ test.describe('Adjust the model live', () => {
     await pauseSimulation(page)
     await expect(metric(page, 'ai', 'pending')).toHaveText(String(REFERENCE.aiPendingAtTick10))
 
-    await setSlider(page, AI_GEN, 50)
+    await setSlider(page, AI_GEN_LABEL, 50)
     await expect(metric(page, 'ai', 'pending')).toHaveText(String(REFERENCE.aiPendingAtTick10))
 
     await startSimulation(page)
@@ -157,14 +162,17 @@ test.describe('Adjust the model live', () => {
     await openSimulator(page)
     await setSlider(page, HUMAN_GEN, 10)
     await startSimulation(page)
-    await page.clock.runFor(2 * SECOND_MS)
-    await expectCounts(page, 'human', { pending: 17, deployed: 2 })
+    await page.clock.runFor(DRAIN_START_SECONDS * SECOND_MS)
+    await expectCounts(page, 'human', {
+      pending: REFERENCE.humanPendingAtTick20WithHumanGen10,
+      deployed: REFERENCE.humanDeployedAtTick20WithHumanGen10,
+    })
 
     await setSlider(page, HUMAN_GEN, 1)
     await setSlider(page, REVIEWER_SPEED, 1000)
     const sampledPending = await sampleEachTick(page, {
-      startTick: 20,
-      tickCount: (6 * SECOND_MS) / TICK_MS,
+      startTick: DRAIN_START_SECONDS * TICKS_PER_SECOND,
+      tickCount: (DRAIN_SECONDS * SECOND_MS) / TICK_MS,
       read: async () => (await metricValues(page, 'pending')).human,
     })
 
