@@ -58,6 +58,10 @@ const TIP_PHRASES = [
 ]
 const PHRASE_BY_CONTROL = Object.fromEntries(TIP_PHRASES)
 const ALL_CONTROLS = TIP_PHRASES.map(([control]) => control)
+// The outline's rows: the lane sliders. The threshold tip has its own scenario (it covers its slider).
+const LANE_TIP_PHRASES = TIP_PHRASES.filter(([control]) => control !== THRESHOLD_LABEL)
+// Sub-pixel layout: "touches" allows less than half a pixel between the tip and its button.
+const TOUCH_DIGITS = 0
 
 const NARROW_SCREENS = [
   ...ALL_CONTROLS.map((control) => ({ viewport: NARROWEST_PHONE, control })),
@@ -129,7 +133,7 @@ test.describe('Slider info tips', () => {
     })
   }
 
-  for (const [control, phrase] of TIP_PHRASES) {
+  for (const [control, phrase] of LANE_TIP_PHRASES) {
     test(`Each tip explains its slider and is the slider's description: ${control}`, async ({
       page,
     }) => {
@@ -159,6 +163,62 @@ test.describe('Slider info tips', () => {
       })
     })
   }
+
+  test('The warning-threshold tip opens below its button, covering the slider', async ({
+    page,
+  }) => {
+    const phrase = PHRASE_BY_CONTROL[THRESHOLD_LABEL]
+    const button = infoButton(page, THRESHOLD_LABEL)
+
+    await test.step('Given I open the simulator', async () => {
+      await openSimulator(page)
+    })
+
+    await test.step(`Then the "${THRESHOLD_LABEL}" slider's accessible description contains "${phrase}"`, async () => {
+      await expect(slider(page, THRESHOLD_LABEL)).toHaveAccessibleDescription(
+        new RegExp(escapeRegExp(phrase)),
+      )
+    })
+
+    await test.step(`When I hover "About ${THRESHOLD_LABEL}"`, async () => {
+      await movePointerTo(page, button)
+    })
+
+    await test.step(`Then a tip is shown that contains "${phrase}"`, async () => {
+      await expectOneTipContaining(page, phrase)
+    })
+
+    await test.step(`And the tip's top edge touches the bottom of "About ${THRESHOLD_LABEL}"`, async () => {
+      const tip = await boxOf(shownTips(page), 'tip')
+      const buttonBox = await boxOf(button, `About ${THRESHOLD_LABEL}`)
+      expect(tip.y, 'tip top at the button bottom').toBeCloseTo(
+        buttonBox.y + buttonBox.height,
+        TOUCH_DIGITS,
+      )
+    })
+
+    await test.step(`And the tip covers the "${THRESHOLD_LABEL}" slider`, async () => {
+      const tip = await boxOf(shownTips(page), 'tip')
+      const sliderBox = await boxOf(slider(page, THRESHOLD_LABEL), `${THRESHOLD_LABEL} slider`)
+      expect(overlaps(tip, sliderBox), 'tip overlaps the slider').toBe(true)
+      // Covers: the tip, not the slider, is what the pointer finds at the slider's centre.
+      const { x, y } = await centreOf(slider(page, THRESHOLD_LABEL))
+      const topmostIsTip = await page.evaluate(
+        ([pointX, pointY]) =>
+          Boolean(document.elementFromPoint(pointX, pointY)?.closest('[role="tooltip"]')),
+        [x, y],
+      )
+      expect(topmostIsTip, 'the tip is on top of the slider').toBe(true)
+    })
+
+    await test.step('When I move the pointer onto the tip', async () => {
+      await movePointerOnto(page, button, await tipFor(page, THRESHOLD_LABEL))
+    })
+
+    await test.step('Then the tip is still shown', async () => {
+      await expectTipStillShown(page, THRESHOLD_LABEL)
+    })
+  })
 
   // AA contrast for the tip text (plan, "Info tips": light text on a dark surface, at least 4.5:1).
   test('An open tip has AA text contrast', async ({ page }) => {
@@ -563,6 +623,30 @@ test.describe('Slider info tips', () => {
 
   test.describe('on a phone, while the page scrolls', () => {
     test.use({ viewport: PHONE })
+
+    // No scenario of its own: a lane tip that flips below (its slider scrolled near the viewport's
+    // top) sits against its button, so the pointer glides from the button onto it without a gap.
+    test('A tip opened below its button can be reached by the pointer', async ({ page }) => {
+      const button = infoButton(page, REVIEWER_SPEED_LABEL)
+      const NEAR_TOP_PX = 4
+
+      await openSimulator(page)
+      await button.evaluate((element, offset) => {
+        window.scrollBy(0, element.getBoundingClientRect().top - offset)
+      }, NEAR_TOP_PX)
+      const { x, y } = await centreOf(button)
+      await page.mouse.move(x, y)
+      const tip = await tipFor(page, REVIEWER_SPEED_LABEL)
+      await expect(tip).toBeVisible()
+
+      const buttonBox = await boxOf(button, `About ${REVIEWER_SPEED_LABEL}`)
+      await expect
+        .poll(async () => (await boxOf(tip, 'tip')).y, 'tip top, flipped against the button')
+        .toBeCloseTo(buttonBox.y + buttonBox.height, TOUCH_DIGITS)
+
+      await movePointerOnto(page, button, tip)
+      await expectTipStillShown(page, REVIEWER_SPEED_LABEL)
+    })
 
     // The above-or-below choice is measured again on scroll, not only when the tip opens.
     test('A shown tip flips below and back as the page scrolls', async ({ page }) => {

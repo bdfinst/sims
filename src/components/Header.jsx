@@ -37,7 +37,12 @@ export function Header({ isRunning, ticks, threshold, onToggleRunning, onReset, 
           </p>
         </div>
         <div className="w-64">
-          <RateSlider settingKey="threshold" value={threshold} onSettingChange={onSettingChange} />
+          <RateSlider
+            settingKey="threshold"
+            value={threshold}
+            onSettingChange={onSettingChange}
+            isTipAlwaysBelow
+          />
         </div>
       </div>
     </header>

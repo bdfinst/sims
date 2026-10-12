@@ -4,6 +4,8 @@ import { FINDINGS, FINDING_KIND, assumptionsNote } from './research.js'
 
 const FORBIDDEN_PHRASES = ['near zero', 'coined', 'originated']
 const FAROS_URL = 'https://faros.ai/research/ai-acceleration-whiplash'
+const SMARTBEAR_PRACTICES_URL =
+  'https://smartbear.com/learn/code-review/best-practices-for-peer-code-review/'
 
 // Independent oracles: the spec's Research Sources "Panel wording" column, copied verbatim.
 const PANEL_WORDING = [
@@ -12,7 +14,7 @@ const PANEL_WORDING = [
     wording: '2,500 reviews of 3.2 million lines of code over 10 months',
   },
   {
-    url: 'https://smartbear.com/learn/code-review/best-practices-for-peer-code-review/',
+    url: SMARTBEAR_PRACTICES_URL,
     wording:
       'Review no more than 200–400 LOC at a time; beyond 400 LOC the ability to find defects diminishes. 200–400 LOC over 60–90 minutes yields 70–90% defect discovery. Defect discovery drops significantly faster than 500 LOC/hour.',
   },
@@ -43,15 +45,23 @@ const ASSUMPTION_SCENARIO_PHRASES = [
   'the detection floors (0.05 for large PRs and 0.1 for fast reviewing)',
   'the curve thresholds (PR size 200 to 400 LOC, reviewer speed 500 to 1,000 LOC/hr)',
   'the human-lane defaults (30 LOC/hr and 1 PR per day)',
-  "The AI lane's PR size (1.51× the human PR size) and default code written (1.162× the human PR merge rate) come from Faros",
+  "The AI lane's PR size (1.51× the human PR size) and default volume (giving 1.162× the human PRs per day) come from Faros",
   "The human defaults were chosen to land near Faros's +242.7% incidents per PR",
+]
+
+// Independent oracle: the plan's Page behavior names the note's three links and their sources.
+const NOTE_LINKS = [
+  { text: "SmartBear's 70–90%", url: SMARTBEAR_PRACTICES_URL },
+  { text: 'come from Faros', url: FAROS_URL },
+  { text: "Faros's +242.7% incidents per PR", url: FAROS_URL },
 ]
 
 const findingFor = (url) => FINDINGS.find(({ source }) => source.url === url)
 
-// The note as the panel renders it: the choices, then the calibration lead and its link text.
-const renderedNote = ({ choices, calibration }) =>
-  `${choices} ${calibration.lead} ${calibration.linkText}.`
+// The note as the panel renders it: text segments as they are, link segments by their text.
+const renderedNote = (segments) =>
+  segments.map((segment) => (typeof segment === 'string' ? segment : segment.text)).join('')
+const noteLinks = (segments) => segments.filter((segment) => typeof segment !== 'string')
 
 describe('assumptionsNote', () => {
   it.each(ASSUMPTION_SCENARIO_PHRASES)('states "%s"', (phrase) => {
@@ -59,30 +69,32 @@ describe('assumptionsNote', () => {
   })
 
   it('is built from the multipliers it is given, so it cannot drift from the model', () => {
-    const { choices } = assumptionsNote({
-      ...MODEL_ASSUMPTIONS,
-      aiSizeMultiplier: 2.25,
-      aiMergeRateMultiplier: 1.4,
-    })
-    expect(choices).toContain('PR size (2.25× the human PR size)')
-    expect(choices).toContain('default code written (1.4× the human PR merge rate)')
-    expect(choices).not.toContain('1.51')
-    expect(choices).not.toContain('1.162')
+    const note = renderedNote(
+      assumptionsNote({
+        ...MODEL_ASSUMPTIONS,
+        aiSizeMultiplier: 2.25,
+        aiMergeRateMultiplier: 1.4,
+      }),
+    )
+    expect(note).toContain('PR size (2.25× the human PR size)')
+    expect(note).toContain('default volume (giving 1.4× the human PRs per day)')
+    expect(note).not.toContain('1.51')
+    expect(note).not.toContain('1.162')
   })
 
   it('is built from the human defaults it is given, with a plural for more than one PR', () => {
-    const { choices } = assumptionsNote({
-      ...MODEL_ASSUMPTIONS,
-      humanDefaultLocPerHour: 1500,
-      humanDefaultPrsPerDay: 2,
-    })
-    expect(choices).toContain('the human-lane defaults (1,500 LOC/hr and 2 PRs per day)')
+    const note = renderedNote(
+      assumptionsNote({
+        ...MODEL_ASSUMPTIONS,
+        humanDefaultLocPerHour: 1500,
+        humanDefaultPrsPerDay: 2,
+      }),
+    )
+    expect(note).toContain('the human-lane defaults (1,500 LOC/hr and 2 PRs per day)')
   })
 
-  it('links the calibration figure to Faros', () => {
-    const { calibration } = assumptionsNote()
-    expect(calibration.linkText).toBe("Faros's +242.7% incidents per PR")
-    expect(calibration.url).toBe(FAROS_URL)
+  it('links the SmartBear range, the Faros multipliers, and the calibration figure to their sources', () => {
+    expect(noteLinks(assumptionsNote())).toEqual(NOTE_LINKS)
   })
 })
 
@@ -101,7 +113,7 @@ describe('research data', () => {
 
   it('shares one Faros figure between the finding and the calibration', () => {
     expect(findingFor(FAROS_URL).text).toContain(`(${FAROS_INCIDENTS_FIGURE})`)
-    expect(assumptionsNote().calibration.linkText).toContain(FAROS_INCIDENTS_FIGURE)
+    expect(noteLinks(assumptionsNote()).at(-1).text).toContain(FAROS_INCIDENTS_FIGURE)
   })
 
   it('marks exactly one finding as a practitioner observation, quoting the spec paraphrase', () => {
@@ -111,13 +123,7 @@ describe('research data', () => {
   })
 
   it('never uses the unsupported or misattributing wording', () => {
-    const { choices, calibration } = assumptionsNote()
-    const everyText = [
-      ...FINDINGS.map(({ text }) => text),
-      choices,
-      calibration.lead,
-      calibration.linkText,
-    ]
+    const everyText = [...FINDINGS.map(({ text }) => text), renderedNote(assumptionsNote())]
       .join(' ')
       .toLowerCase()
     for (const phrase of FORBIDDEN_PHRASES) expect(everyText).not.toContain(phrase)

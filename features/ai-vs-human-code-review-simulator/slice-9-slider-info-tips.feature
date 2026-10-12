@@ -23,12 +23,21 @@ Feature: Slider info tips
 
     Examples:
       | control                              | phrase                                                                    |
-      | Warning threshold                    | turns red when its count is above this many PRs                           |
       | Human code written (LOC/hr)          | lines of code the human lane writes, in LOC/hr                            |
       | Human PRs per day                    | Below 1, a PR spans more than one day                                     |
       | AI code written (LOC/hr)             | The AI queue grows once this exceeds the AI lane's effective review speed |
       | Reviewer speed (LOC/hr, both lanes)  | Defect discovery drops significantly faster than 500 LOC/hour             |
       | AI skim multiplier                   | AI PRs are reviewed 2× faster once picked up                              |
+
+  Scenario: The warning-threshold tip opens below its button, covering the slider
+    Given I open the simulator
+    Then the "Warning threshold" slider's accessible description contains "turns red when its count is above this many PRs"
+    When I hover "About Warning threshold"
+    Then a tip is shown that contains "turns red when its count is above this many PRs"
+    And the tip's top edge touches the bottom of "About Warning threshold"
+    And the tip covers the "Warning threshold" slider
+    When I move the pointer onto the tip
+    Then the tip is still shown
 
   Scenario: The tip stays open while the pointer moves onto it
     Given I hover "About Reviewer speed (LOC/hr, both lanes)"

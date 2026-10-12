@@ -68,12 +68,18 @@ const CALIBRATION_SENTENCE =
 // The plan's Page behavior: the calibration figure is the link "Faros's +242.7% incidents per PR".
 const CALIBRATION_LINK_TEXT = "Faros's +242.7% incidents per PR"
 const FAROS_URL = SOURCES[2].url
+const SMARTBEAR_PRACTICES_URL = SOURCES[1].url
+// The plan's Page behavior: two more phrases in the note link their sources.
+const SMARTBEAR_RANGE_LINK_TEXT = "SmartBear's 70–90%"
+const FAROS_MULTIPLIERS_LINK_TEXT = 'come from Faros'
+const NOTE_LINK_COUNT = 3
 const SECONDS_AFTER_EXPANDING = 1
 
 const assumptionsParagraph = (page) =>
   researchPanel(page).locator('p', { hasText: ASSUMPTIONS_START })
 
-const calibrationLink = (page) => assumptionsParagraph(page).locator('a')
+// A link in the assumptions note, found by its visible text.
+const noteLink = (page, text) => assumptionsParagraph(page).locator('a', { hasText: text })
 
 const expectPanelContains = (page, text) => expect(researchPanel(page)).toContainText(text)
 
@@ -166,7 +172,9 @@ test.describe('Research behind the simulation', () => {
 
     const links = [
       ...SOURCES.map(({ url }) => ({ link: sourceLink(page, url), name: url })),
-      { link: calibrationLink(page), name: 'calibration link' },
+      { link: noteLink(page, SMARTBEAR_RANGE_LINK_TEXT), name: 'SmartBear range link' },
+      { link: noteLink(page, FAROS_MULTIPLIERS_LINK_TEXT), name: 'Faros multipliers link' },
+      { link: noteLink(page, CALIBRATION_LINK_TEXT), name: 'calibration link' },
     ]
     for (const { link, name } of links) {
       const ratio = contrastRatio(await textColors(link))
@@ -207,6 +215,15 @@ test.describe('Research behind the simulation', () => {
         page,
         "the base detection rate (0.8, picked from SmartBear's 70–90% range)",
       )
+      const link = noteLink(page, SMARTBEAR_RANGE_LINK_TEXT)
+      await expect(link, 'the range links its source').toHaveAttribute(
+        'href',
+        SMARTBEAR_PRACTICES_URL,
+      )
+      await expectNewTabLink(link, {
+        name: SMARTBEAR_RANGE_LINK_TEXT,
+        url: SMARTBEAR_PRACTICES_URL,
+      })
     })
 
     await test.step('And the panel contains "the detection floors (0.05 for large PRs and 0.1 for fast reviewing)"', async () => {
@@ -227,17 +244,22 @@ test.describe('Research behind the simulation', () => {
       await expectPanelContains(page, 'the human-lane defaults (30 LOC/hr and 1 PR per day)')
     })
 
-    await test.step('And the panel contains "The AI lane\'s PR size (1.51× the human PR size) and default code written (1.162× the human PR merge rate) come from Faros"', async () => {
+    await test.step('And the panel contains "The AI lane\'s PR size (1.51× the human PR size) and default volume (giving 1.162× the human PRs per day) come from Faros"', async () => {
       await expectPanelContains(
         page,
-        "The AI lane's PR size (1.51× the human PR size) and default code written (1.162× the human PR merge rate) come from Faros",
+        "The AI lane's PR size (1.51× the human PR size) and default volume (giving 1.162× the human PRs per day) come from Faros",
       )
+      const link = noteLink(page, FAROS_MULTIPLIERS_LINK_TEXT)
+      await expect(link, 'the multipliers link their source').toHaveAttribute('href', FAROS_URL)
+      await expectNewTabLink(link, { name: FAROS_MULTIPLIERS_LINK_TEXT, url: FAROS_URL })
     })
 
     await test.step('And the panel contains "The human defaults were chosen to land near Faros\'s +242.7% incidents per PR"', async () => {
       await expectPanelContains(page, CALIBRATION_SENTENCE)
-      const link = calibrationLink(page)
-      await expect(link, 'the figure is the only link in the note').toHaveCount(1)
+      await expect(assumptionsParagraph(page).locator('a'), 'links in the note').toHaveCount(
+        NOTE_LINK_COUNT,
+      )
+      const link = noteLink(page, CALIBRATION_LINK_TEXT)
       await expect(link, 'the figure links its source').toHaveAttribute('href', FAROS_URL)
       await expectNewTabLink(link, { name: CALIBRATION_LINK_TEXT, url: FAROS_URL })
     })

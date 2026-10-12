@@ -167,7 +167,7 @@ Step 1.1 asserts that the icons `User`, `Bot`, `Eye`, `TriangleAlert`, and `Chev
 ### Info tips
 
 - `InfoTip({id, label, text})` renders a native `<button type="button">` (at least 24 × 24 px, WCAG 2.5.8) with `aria-label="About <label>"` and the `info` icon, directly after the slider's `<label>`, plus a tip element with `role="tooltip"` and `id`. The tip is always in the DOM (`hidden` when closed, so it takes no space), and the slider's `<input>` has `aria-describedby={id}`, so the tip text is the slider's accessible description even when no tip is open (AC27).
-- **Look:** `text-base`, light text on a dark surface with at least 4.5:1 contrast, and a visible border. The tip opens **above the label row**, so it never covers the slider it describes; the header's threshold tip, which sits near the top of the page, opens **below its slider** instead. The tip's edge touches its button, with no gap. If there is no room above (the tip's top would be above the viewport's top edge, measured when it opens), the tip flips below the label row; either way it lies fully inside the viewport on all four edges (AC28). It is absolutely positioned and spans the slider column's width (`left-0 right-0`), so it never extends past the viewport at 320 px and moves no other element (AC28).
+- **Look:** `text-base`, light text on a dark surface with at least 4.5:1 contrast, and a visible border. The tip opens **above the label row**, so it never covers the slider it describes; the header's threshold tip, which sits near the top of the page, opens **directly below its button, covering the slider while open** instead. The tip's edge touches its button, with no gap. If there is no room above (the tip's top would be above the viewport's top edge, measured when it opens and again on scroll and resize), the tip flips directly below its button, covering the slider while open; either way it lies fully inside the viewport on all four edges (AC28). It is absolutely positioned, stacked above the slider (`z-10`), and spans the slider column's width (`left-0 right-0`), so it never extends past the viewport at 320 px and moves no other element (AC28). A tip below its button gets a measured `top` (the button's bottom edge in the slider column), so its top edge touches the button even when the label wraps.
 - **Open/close truth table** (`openTipReducer`; one tip is shown at a time; a tip K is shown when K is the active tip, K is not dismissed, and K is hovered, keyboard-focused, or pinned):
 
 | Event on tip K | Result |
@@ -232,7 +232,7 @@ At 1280 × 720 with the panel collapsed and every tip closed, the header, the he
 - **Auto-pause:** a `visibilitychange` event with `visibilityState === 'hidden'` dispatches `pause`. Becoming visible again does nothing.
 - **Research panel:** a `<details>`/`<summary>` element, collapsed by default.
   - Its text comes verbatim from the spec's Research Sources "Panel wording" column, with links to the five URLs (`target="_blank" rel="noopener"`). The Faros finding reads "Across 22,000 developers in 4,000 teams, high AI adoption saw PR size +51%, PR merge rate +16.2%, and 3× incidents per PR (+242.7%), compared with low adoption.", with +51% and +16.2% taken from the engine constants.
-  - Its "Model assumptions" note, built from `MODEL_ASSUMPTIONS`: "Model assumptions. These are modeling choices, not research findings: the defect density (20 defects per 1,000 LOC), the base detection rate (0.8, picked from SmartBear's 70–90% range), the detection floors (0.05 for large PRs and 0.1 for fast reviewing), the curve thresholds (PR size 200 to 400 LOC, reviewer speed 500 to 1,000 LOC/hr), and the human-lane defaults (30 LOC/hr and 1 PR per day). The AI lane's PR size (1.51× the human PR size) and default code written (1.162× the human PR merge rate) come from Faros." Then: "The human defaults were chosen to land near" + the link "Faros's +242.7% incidents per PR".
+  - Its "Model assumptions" note, built from `MODEL_ASSUMPTIONS`: "Model assumptions. These are modeling choices, not research findings: the defect density (20 defects per 1,000 LOC), the base detection rate (0.8, picked from SmartBear's 70–90% range), the detection floors (0.05 for large PRs and 0.1 for fast reviewing), the curve thresholds (PR size 200 to 400 LOC, reviewer speed 500 to 1,000 LOC/hr), and the human-lane defaults (30 LOC/hr and 1 PR per day). The AI lane's PR size (1.51× the human PR size) and default volume (giving 1.162× the human PRs per day) come from Faros." Then: "The human defaults were chosen to land near" + the link "Faros's +242.7% incidents per PR". The note links two more phrases the same way: "SmartBear's 70–90%" links to the SmartBear "Best Practices for Code Review" URL, and "come from Faros" links to the Faros report URL. All three note links open in a new tab (`target="_blank" rel="noopener"`), and each one's accessible name ends " (opens in new tab)".
   - The phrases "near zero", "coined", and "originated" never appear.
 
 ## Slices
@@ -945,7 +945,7 @@ Feature: Research behind the simulation
     And the panel contains "the detection floors (0.05 for large PRs and 0.1 for fast reviewing)"
     And the panel contains "the curve thresholds (PR size 200 to 400 LOC, reviewer speed 500 to 1,000 LOC/hr)"
     And the panel contains "the human-lane defaults (30 LOC/hr and 1 PR per day)"
-    And the panel contains "The AI lane's PR size (1.51× the human PR size) and default code written (1.162× the human PR merge rate) come from Faros"
+    And the panel contains "The AI lane's PR size (1.51× the human PR size) and default volume (giving 1.162× the human PRs per day) come from Faros"
     And the panel contains "The human defaults were chosen to land near Faros's +242.7% incidents per PR"
 
   Scenario: Panel is keyboard operable and does not interrupt the simulation
@@ -1164,12 +1164,21 @@ Feature: Slider info tips
 
     Examples:
       | control                              | phrase                                                                    |
-      | Warning threshold                    | turns red when its count is above this many PRs                           |
       | Human code written (LOC/hr)          | lines of code the human lane writes, in LOC/hr                            |
       | Human PRs per day                    | Below 1, a PR spans more than one day                                     |
       | AI code written (LOC/hr)             | The AI queue grows once this exceeds the AI lane's effective review speed |
       | Reviewer speed (LOC/hr, both lanes)  | Defect discovery drops significantly faster than 500 LOC/hour             |
       | AI skim multiplier                   | AI PRs are reviewed 2× faster once picked up                              |
+
+  Scenario: The warning-threshold tip opens below its button, covering the slider
+    Given I open the simulator
+    Then the "Warning threshold" slider's accessible description contains "turns red when its count is above this many PRs"
+    When I hover "About Warning threshold"
+    Then a tip is shown that contains "turns red when its count is above this many PRs"
+    And the tip's top edge touches the bottom of "About Warning threshold"
+    And the tip covers the "Warning threshold" slider
+    When I move the pointer onto the tip
+    Then the tip is still shown
 
   Scenario: The tip stays open while the pointer moves onto it
     Given I hover "About Reviewer speed (LOC/hr, both lanes)"
@@ -1289,7 +1298,7 @@ Feature: Slider info tips
 
 - `src/openTip.js`: the pure `openTipReducer` and `isTipShown` implementing the truth table; add it to the ESLint purity guard.
 - `useOpenTip` (hook over the reducer; owns the open tip, the hover/focus bookkeeping, and the `document` Escape listener while a tip is shown) and a small context in `App` that hands its handlers to every `InfoTip`.
-- `InfoTip({id, label, text})`: a ≥ 24 × 24 px button with `aria-label="About <label>"` and the `info` icon, plus the `role="tooltip"` tip (`text-base`, AA contrast, above the label row, flipping below it when there is no room; below the slider for the header threshold).
+- `InfoTip({id, label, text})`: a ≥ 24 × 24 px button with `aria-label="About <label>"` and the `info` icon, plus the `role="tooltip"` tip (`text-base`, AA contrast, above the label row, flipping directly below its button, covering the slider while open, when there is no room; directly below its button, covering the slider while open, for the header threshold).
 - `RateSlider` renders `InfoTip` after the label and sets `aria-describedby` on the input. Add `Info` to `iconMap.js` (six icons). Add the tip text, `unitName`, and `lanes` to `SLIDER_PRESENTATION`, built from `WORK_HOURS_PER_DAY` and the Faros constants.
 - The shared slider locator in `e2e/fixtures.js` matches names exactly (`{ exact: true }`), so the "About <label>" buttons never collide with the sliders.
 - The info buttons change the Tab order, so this step marks the Slice 6 keyboard test `test.fixme` with `// @wip: Step 9.2`; Step 9.2 reworks it and removes the `fixme`.

@@ -19,6 +19,9 @@ export const RESEARCH_TITLE = 'Research behind this simulation'
 // The calibration target is quoted twice (the Faros finding and the assumptions note), so it is
 // defined once.
 const FAROS_URL = 'https://faros.ai/research/ai-acceleration-whiplash'
+// The source of the 70–90% detection range, linked from its finding and from the assumptions note.
+const SMARTBEAR_PRACTICES_URL =
+  'https://smartbear.com/learn/code-review/best-practices-for-peer-code-review/'
 const FAROS_INCIDENTS_INCREASE = `+${FAROS_INCIDENTS_PER_PR_INCREASE_PCT}%`
 
 // Whether a finding is published research or a practitioner observation (never attributed to a source).
@@ -40,7 +43,7 @@ export const FINDINGS = Object.freeze([
     text: 'Review no more than 200–400 LOC at a time; beyond 400 LOC the ability to find defects diminishes. 200–400 LOC over 60–90 minutes yields 70–90% defect discovery. Defect discovery drops significantly faster than 500 LOC/hour.',
     source: Object.freeze({
       label: 'SmartBear, Best Practices for Code Review',
-      url: 'https://smartbear.com/learn/code-review/best-practices-for-peer-code-review/',
+      url: SMARTBEAR_PRACTICES_URL,
     }),
   }),
   Object.freeze({
@@ -75,12 +78,14 @@ export const FINDINGS = Object.freeze([
 const formatPrsPerDayPhrase = (prsPerDay) =>
   `${formatCount(prsPerDay)} ${prsPerDay === 1 ? 'PR' : 'PRs'} per day`
 
-// The note is two parts so the calibration figure can render as a link to its source (AC18).
-export const assumptionsNote = (assumptions = MODEL_ASSUMPTIONS) => ({
-  choices: `Model assumptions. These are modeling choices, not research findings: the defect density (${assumptions.defectsPerKloc} defects per 1,000 LOC), the base detection rate (${assumptions.baseDetection}, picked from SmartBear's 70–90% range), the detection floors (${assumptions.sizeFloor} for large PRs and ${assumptions.speedFloor} for fast reviewing), the curve thresholds (PR size ${assumptions.sizeKnee} to ${assumptions.sizeWall} LOC, reviewer speed ${formatCount(assumptions.speedKnee)} to ${formatCount(assumptions.speedWall)} LOC/hr), and the human-lane defaults (${formatLocPerHour(assumptions.humanDefaultLocPerHour)} and ${formatPrsPerDayPhrase(assumptions.humanDefaultPrsPerDay)}). The AI lane's PR size (${formatMultiplier(assumptions.aiSizeMultiplier)} the human PR size) and default code written (${formatMultiplier(assumptions.aiMergeRateMultiplier)} the human PR merge rate) come from Faros.`,
-  calibration: {
-    lead: 'The human defaults were chosen to land near',
-    linkText: `Faros's ${FAROS_INCIDENTS_INCREASE} incidents per PR`,
-    url: FAROS_URL,
-  },
-})
+// The note as text and link segments ({ text, url }), so each sourced figure renders as a link to
+// its source (AC18).
+export const assumptionsNote = (assumptions = MODEL_ASSUMPTIONS) => [
+  `Model assumptions. These are modeling choices, not research findings: the defect density (${assumptions.defectsPerKloc} defects per 1,000 LOC), the base detection rate (${assumptions.baseDetection}, picked from `,
+  { text: "SmartBear's 70–90%", url: SMARTBEAR_PRACTICES_URL },
+  ` range), the detection floors (${assumptions.sizeFloor} for large PRs and ${assumptions.speedFloor} for fast reviewing), the curve thresholds (PR size ${assumptions.sizeKnee} to ${assumptions.sizeWall} LOC, reviewer speed ${formatCount(assumptions.speedKnee)} to ${formatCount(assumptions.speedWall)} LOC/hr), and the human-lane defaults (${formatLocPerHour(assumptions.humanDefaultLocPerHour)} and ${formatPrsPerDayPhrase(assumptions.humanDefaultPrsPerDay)}). The AI lane's PR size (${formatMultiplier(assumptions.aiSizeMultiplier)} the human PR size) and default volume (giving ${formatMultiplier(assumptions.aiMergeRateMultiplier)} the human PRs per day) `,
+  { text: 'come from Faros', url: FAROS_URL },
+  '. The human defaults were chosen to land near ',
+  { text: `Faros's ${FAROS_INCIDENTS_INCREASE} incidents per PR`, url: FAROS_URL },
+  '.',
+]
