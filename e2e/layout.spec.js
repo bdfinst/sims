@@ -12,12 +12,13 @@ import {
   PHONE,
   RESEARCH_TITLE,
   REVIEWER_SPEED_LABEL,
-  THRESHOLD_LABEL,
+  SLIDER_LABELS,
   buttonNamed,
   contrastRatio,
   expect,
   expectSimulatorOpen,
   expectViewport,
+  infoButton,
   expectNoHorizontalScroll,
   expectStrictlyIncreasing,
   headline,
@@ -346,20 +347,19 @@ test.describe('Pending Review layout', () => {
     })
   })
 
-  // @wip: Step 9.2
-  test.fixme('Every control is keyboard reachable with a visible focus ring', async ({ page }) => {
+  test('Every control is keyboard reachable with a visible focus ring', async ({ page }) => {
     const inTabOrder = [
       ['Start', buttonNamed(page, 'Start')],
       ['Reset', buttonNamed(page, 'Reset')],
-      [THRESHOLD_LABEL, slider(page, THRESHOLD_LABEL)],
-      [HUMAN_CODE_WRITTEN_LABEL, slider(page, HUMAN_CODE_WRITTEN_LABEL)],
-      [HUMAN_PRS_PER_DAY_LABEL, slider(page, HUMAN_PRS_PER_DAY_LABEL)],
-      [REVIEWER_SPEED_LABEL, slider(page, REVIEWER_SPEED_LABEL)],
-      [AI_CODE_WRITTEN_LABEL, slider(page, AI_CODE_WRITTEN_LABEL)],
-      [AI_SKIM_LABEL, slider(page, AI_SKIM_LABEL)],
+      ...SLIDER_LABELS.flatMap((label) => [
+        [`About ${label}`, infoButton(page, label)],
+        [label, slider(page, label)],
+      ]),
       [RESEARCH_TITLE, researchToggle(page)],
     ]
-    const tookFocus = {}
+    // One entry per Tab press: whether that press focused the expected control, and its focus ring.
+    const stops = []
+    let leftThePage = false
 
     await test.step('Given the queue tile capacity C is read from the queue box', async () => {
       await openAndReadCapacity(page)
@@ -372,34 +372,38 @@ test.describe('Pending Review layout', () => {
     await test.step('When I Tab through the page', async () => {
       for (const [name, control] of inTabOrder) {
         await page.keyboard.press('Tab')
-        tookFocus[name] = await control.evaluate((element) => element === document.activeElement)
-      }
-    })
-
-    await test.step('Then focus visits Start, Reset, the threshold slider, and all five model sliders', async () => {
-      const expected = Object.fromEntries(inTabOrder.map(([name]) => [name, true]))
-      expect(tookFocus, 'each control took focus, in Tab order').toEqual(expected)
-    })
-
-    await test.step('And each has an accessible name and a non-none outline when focused', async () => {
-      // Focus is on the last control after the Tab pass; Shift+Tab walks back through each one.
-      for (let index = inTabOrder.length - 1; index >= 0; index -= 1) {
-        const [name, control] = inTabOrder[index]
-        await expect(control, `${name} holds focus`).toBeFocused()
-        await expect(control).toHaveAccessibleName(name)
-        await expect(control, `${name} focus ring colour`).toHaveCSS(
-          'outline-color',
-          FOCUS_RING_COLOR,
-        )
-        const focusRing = await control.evaluate((element) => ({
+        const focus = await control.evaluate((element) => ({
+          isFocused: element === document.activeElement,
           isFocusVisible: element.matches(':focus-visible'),
           outlineStyle: getComputedStyle(element).outlineStyle,
           outlineWidth: Number.parseFloat(getComputedStyle(element).outlineWidth),
+          outlineColor: getComputedStyle(element).outlineColor,
         }))
+        stops.push({ name, ...focus })
+      }
+      // One more press: with no further tab stop, focus leaves the page.
+      await page.keyboard.press('Tab')
+      leftThePage = await page.evaluate(
+        () => document.activeElement === null || document.activeElement === document.body,
+      )
+    })
+
+    await test.step('Then focus visits, in order: Start, Reset, "About Warning threshold", "Warning threshold", "About Human code written (LOC/hr)", "Human code written (LOC/hr)", "About Human PRs per day", "Human PRs per day", "About Reviewer speed (LOC/hr, both lanes)", "Reviewer speed (LOC/hr, both lanes)", "About AI code written (LOC/hr)", "AI code written (LOC/hr)", "About AI skim multiplier", "AI skim multiplier", and "Research behind this simulation"', async () => {
+      expect(
+        stops.map(({ name, isFocused }) => [name, isFocused]),
+        'each Tab press focused the next control in order',
+      ).toEqual(inTabOrder.map(([name]) => [name, true]))
+      expect(leftThePage, 'no tab stop follows the research toggle').toBe(true)
+    })
+
+    await test.step('And each has an accessible name and a non-none outline when focused', async () => {
+      for (const [index, [name, control]] of inTabOrder.entries()) {
+        const focusRing = stops[index]
+        await expect(control).toHaveAccessibleName(name)
         expect(focusRing.isFocusVisible, `${name} matches :focus-visible`).toBe(true)
         expect(focusRing.outlineStyle, `${name} outline style`).not.toBe('none')
         expect(focusRing.outlineWidth, `${name} outline width`).toBeGreaterThan(0)
-        if (index > 0) await page.keyboard.press('Shift+Tab')
+        expect(focusRing.outlineColor, `${name} focus ring colour`).toBe(FOCUS_RING_COLOR)
       }
     })
   })

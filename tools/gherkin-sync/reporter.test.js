@@ -55,10 +55,9 @@ describe('the exported features', () => {
       .flatMap(([, block]) => block.split('\n'))
       .filter((line) => line.trim() === '@wip').length
 
-  it('carry @wip on the scenarios the plan tags', () => {
+  it('exported features carry exactly the @wip tags the plan has', () => {
     const exportedWip = loadScenarios(featuresDir).filter(({ wip }) => wip).length
 
-    expect(exportedWip).toBeGreaterThan(0)
     expect(exportedWip).toBe(planWipLines())
   })
 })

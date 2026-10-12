@@ -203,6 +203,16 @@ export const AI_CODE_WRITTEN_LABEL = 'AI code written (LOC/hr)'
 export const REVIEWER_SPEED_LABEL = 'Reviewer speed (LOC/hr, both lanes)'
 export const AI_SKIM_LABEL = 'AI skim multiplier'
 export const THRESHOLD_LABEL = 'Warning threshold'
+// Every slider, in page order: the header threshold, then the Human lane, then the AI lane. From
+// the plan's Slice 6 keyboard scenario, independent of src.
+export const SLIDER_LABELS = Object.freeze([
+  THRESHOLD_LABEL,
+  HUMAN_CODE_WRITTEN_LABEL,
+  HUMAN_PRS_PER_DAY_LABEL,
+  REVIEWER_SPEED_LABEL,
+  AI_CODE_WRITTEN_LABEL,
+  AI_SKIM_LABEL,
+])
 
 // Slider presets for the generation model, as { slider label: value } for setSliders. The values
 // come from the plan's "Default arithmetic" and are independent of src. Everything not listed

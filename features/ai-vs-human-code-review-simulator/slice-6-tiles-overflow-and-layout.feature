@@ -52,7 +52,6 @@ Feature: Pending Review tiles and layout
     Given I open the simulator
     Then the page background color is rgb(11, 13, 18)
 
-  @wip
   Scenario: Every control is keyboard reachable with a visible focus ring
     Given I open the simulator
     When I Tab through the page

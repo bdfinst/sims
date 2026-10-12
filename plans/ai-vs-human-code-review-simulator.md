@@ -877,7 +877,6 @@ Feature: Pending Review tiles and layout
     Given I open the simulator
     Then the page background color is rgb(11, 13, 18)
 
-  @wip
   Scenario: Every control is keyboard reachable with a visible focus ring
     Given I open the simulator
     When I Tab through the page
@@ -1512,6 +1511,6 @@ Your decisions (recorded in the spec's Ambiguity Log):
 #### Wave 10
 
 - [ ] Slice 9: Slider info tips
-  - [ ] Step 9.1: Info buttons and tips for every slider
+  - [x] Step 9.1: Info buttons and tips for every slider
   - [ ] Step 9.2: Tab order through info buttons
   - [ ] Step 9.3: Document the generation model, info tips, and @wip in CLAUDE.md
