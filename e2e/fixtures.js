@@ -309,4 +309,62 @@ export const flushPendingRenders = (page) =>
       }),
   )
 
+export const expectNoHorizontalScroll = async (page) => {
+  const scroll = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }))
+  expect(scroll.scrollWidth, 'page scroll width').toBeLessThanOrEqual(scroll.clientWidth)
+}
+
+// Text and background colours as sRGB bytes. A canvas converts any CSS colour (including the
+// oklch greys Tailwind uses); a transparent background falls back to the nearest opaque ancestor.
+export const textColors = (locator) =>
+  locator.evaluate((element) => {
+    const toRgba = (cssColor) => {
+      const canvas = document.createElement('canvas')
+      canvas.width = canvas.height = 1
+      const context = canvas.getContext('2d')
+      context.fillStyle = cssColor
+      context.fillRect(0, 0, 1, 1)
+      return [...context.getImageData(0, 0, 1, 1).data]
+    }
+    const OPAQUE = 255
+    const layers = []
+    for (let holder = element; holder; holder = holder.parentElement) {
+      const layer = toRgba(getComputedStyle(holder).backgroundColor)
+      if (layer[3] > 0) layers.push(layer)
+      if (layer[3] === OPAQUE) break
+    }
+    // Composite translucent backgrounds (e.g. bg-white/5) over what lies beneath them.
+    const background = layers.reduceRight(
+      (beneath, [red, green, blue, alpha]) =>
+        [red, green, blue].map(
+          (channel, index) => (channel * alpha + beneath[index] * (OPAQUE - alpha)) / OPAQUE,
+        ),
+      [0, 0, 0],
+    )
+    return {
+      foreground: toRgba(getComputedStyle(element).color).slice(0, 3),
+      background,
+    }
+  })
+
+// WCAG 2 relative luminance and contrast ratio.
+const luminance = (rgb) => {
+  const [red, green, blue] = rgb.map((byte) => {
+    const channel = byte / 255
+    return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+  })
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+}
+export const contrastRatio = ({ foreground, background }) => {
+  const [lighter, darker] = [luminance(foreground), luminance(background)].sort((a, b) => b - a)
+  return (lighter + 0.05) / (darker + 0.05)
+}
+
+export const RESEARCH_TITLE = 'Research behind this simulation'
+export const researchToggle = (page) => page.locator('summary', { hasText: RESEARCH_TITLE })
+export const researchPanel = (page) => page.locator('details')
+
 export { expect }

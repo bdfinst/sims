@@ -6,19 +6,25 @@ import {
   HUMAN_GEN_LABEL,
   PAGE_BACKGROUND,
   PR_SIZE_LABEL,
+  RESEARCH_TITLE,
   REVIEWER_SPEED_LABEL,
   THRESHOLD_LABEL,
   buttonNamed,
+  contrastRatio,
   expect,
+  expectNoHorizontalScroll,
   headline,
   laneLocator,
   metric,
   openSimulator,
   overflowIn,
   queueBox,
+  researchPanel,
+  researchToggle,
   slider,
   startAndRunFor,
   test,
+  textColors,
 } from './fixtures.js'
 
 test.describe.configure({ mode: 'parallel' })
@@ -67,14 +73,6 @@ const expectStackedBelow = (upper, lower, label) =>
 const expectLeftOf = (left, right, label) =>
   expect(left.x + left.width, label).toBeLessThanOrEqual(right.x)
 
-const expectNoHorizontalScroll = async (page) => {
-  const scroll = await page.evaluate(() => ({
-    scrollWidth: document.documentElement.scrollWidth,
-    clientWidth: document.documentElement.clientWidth,
-  }))
-  expect(scroll.scrollWidth, 'page scroll width').toBeLessThanOrEqual(scroll.clientWidth)
-}
-
 // The positions of a lane's groups: inputs (every generation slider), Pending Review box, review
 // controls, and metrics grid.
 const laneGroups = async (page, laneId) => {
@@ -90,41 +88,6 @@ const laneGroups = async (page, laneId) => {
   }
 }
 
-// Text and background colours as sRGB bytes. A canvas converts any CSS colour (including the
-// oklch greys Tailwind uses); a transparent background falls back to the nearest opaque ancestor.
-const textColors = (locator) =>
-  locator.evaluate((element) => {
-    const toRgba = (cssColor) => {
-      const canvas = document.createElement('canvas')
-      canvas.width = canvas.height = 1
-      const context = canvas.getContext('2d')
-      context.fillStyle = cssColor
-      context.fillRect(0, 0, 1, 1)
-      return [...context.getImageData(0, 0, 1, 1).data]
-    }
-    let backgroundHolder = element
-    while (toRgba(getComputedStyle(backgroundHolder).backgroundColor)[3] === 0) {
-      backgroundHolder = backgroundHolder.parentElement
-    }
-    return {
-      foreground: toRgba(getComputedStyle(element).color).slice(0, 3),
-      background: toRgba(getComputedStyle(backgroundHolder).backgroundColor).slice(0, 3),
-    }
-  })
-
-// WCAG 2 relative luminance and contrast ratio.
-const luminance = (rgb) => {
-  const [red, green, blue] = rgb.map((byte) => {
-    const channel = byte / 255
-    return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
-  })
-  return 0.2126 * red + 0.7152 * green + 0.0722 * blue
-}
-const contrastRatio = ({ foreground, background }) => {
-  const [lighter, darker] = [luminance(foreground), luminance(background)].sort((a, b) => b - a)
-  return (lighter + 0.05) / (darker + 0.05)
-}
-
 test.describe('Pending Review layout', () => {
   test.describe('on a projector', () => {
     test.use({ viewport: PROJECTOR })
@@ -133,6 +96,7 @@ test.describe('Pending Review layout', () => {
       await openSimulator(page)
       await startAndRunFor(page, FULL_RUN_SECONDS)
 
+      await expect(researchPanel(page), 'research panel is collapsed').not.toHaveAttribute('open')
       await expectInsideViewport(page.getByRole('banner'), PROJECTOR, 'header')
       await expectInsideViewport(headline(page), PROJECTOR, 'headline ratio')
       for (const laneId of ALL_LANE_IDS) {
@@ -291,6 +255,7 @@ test.describe('Pending Review layout', () => {
       [REVIEWER_SPEED_LABEL, slider(page, REVIEWER_SPEED_LABEL)],
       [AI_GEN_LABEL, slider(page, AI_GEN_LABEL)],
       [AI_SKIM_LABEL, slider(page, AI_SKIM_LABEL)],
+      [RESEARCH_TITLE, researchToggle(page)],
     ]
 
     for (const [name, control] of inTabOrder) {

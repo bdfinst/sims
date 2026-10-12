@@ -55,6 +55,20 @@ const SPEED_KNEE = 500
 const SPEED_WALL = 1000
 const SPEED_FLOOR = 0.1
 const EMPTY_QUEUE_EPSILON = 1e-9
+const DEFECTS_PER_KLOC = DEFECTS_PER_LOC * 1000
+
+// The modeling choices the research panel discloses, read from the model's own constants so the
+// note can never drift from what the simulation does.
+export const MODEL_ASSUMPTIONS = Object.freeze({
+  defectsPerKloc: DEFECTS_PER_KLOC,
+  sizeFloor: SIZE_FLOOR,
+  speedFloor: SPEED_FLOOR,
+  sizeKnee: SIZE_KNEE,
+  sizeWall: SIZE_WALL,
+  speedKnee: SPEED_KNEE,
+  speedWall: SPEED_WALL,
+  aiSizeMultiplier: LANE_MODELS[LANE_IDS.ai].sizeMultiplier,
+})
 const DISPLAY_EPSILON = 1e-9
 
 // escapedDefects is the model's term; the UI calls it "Incidents".

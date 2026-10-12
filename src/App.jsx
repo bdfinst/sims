@@ -2,6 +2,7 @@ import { useEffect, useReducer } from 'react'
 import { Header } from './components/Header.jsx'
 import { HeadlineBand } from './components/HeadlineBand.jsx'
 import { Lane } from './components/Lane.jsx'
+import { ResearchPanel } from './components/ResearchPanel.jsx'
 import { TICK_MS } from './engine.js'
 import { LANE_ORDER } from './laneConfig.js'
 import { ACTION, initialState, reducer } from './reducer.js'
@@ -47,6 +48,7 @@ function App() {
             onSettingChange={changeSetting}
           />
         ))}
+        <ResearchPanel />
       </main>
     </div>
   )

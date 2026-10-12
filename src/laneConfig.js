@@ -87,6 +87,7 @@ export const COLOR_CLASS = Object.freeze({
   faintText: 'text-gray-400',
   lanePanel: 'bg-white/5',
   tag: 'bg-white/10',
+  link: 'text-sky-300 underline',
   idleBoxBorder: 'border-gray-600',
 })
 
