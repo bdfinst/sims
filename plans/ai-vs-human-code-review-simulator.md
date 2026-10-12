@@ -991,8 +991,8 @@ At the build's project-init gate, you chose a build step instead of the single-H
 
 #### Wave 3
 
-- [ ] Slice 3: Reset
-  - [ ] Step 3.1: Reset button
+- [x] Slice 3: Reset
+  - [x] Step 3.1: Reset button
 
 #### Wave 4
 
