@@ -2,6 +2,16 @@
 
 export const LANE_IDS = Object.freeze({ human: 'human', ai: 'ai' })
 
+// Generation model constants. Faros figures are the research findings the AI lane's PR size and
+// merge rate are derived from; every displayed "+51%", "1.51×", "+16.2%" and "1.162×" comes from
+// these, so the model and the text cannot drift.
+export const WORK_HOURS_PER_DAY = 8
+export const FAROS_PR_SIZE_INCREASE_PCT = 51
+export const FAROS_MERGE_RATE_INCREASE_PCT = 16.2
+const PERCENT = 100
+export const FAROS_PR_SIZE_MULTIPLIER = 1 + FAROS_PR_SIZE_INCREASE_PCT / PERCENT
+export const FAROS_MERGE_RATE_MULTIPLIER = 1 + FAROS_MERGE_RATE_INCREASE_PCT / PERCENT
+
 // Numeric lane model. Presentation (labels, icons, classes) lives in laneConfig.js.
 export const LANE_MODELS = Object.freeze({
   [LANE_IDS.human]: Object.freeze({
@@ -13,7 +23,7 @@ export const LANE_MODELS = Object.freeze({
   [LANE_IDS.ai]: Object.freeze({
     genSetting: 'aiGen',
     sizeApplies: true,
-    sizeMultiplier: 1.51,
+    sizeMultiplier: FAROS_PR_SIZE_MULTIPLIER,
     skimApplies: true,
   }),
 })
@@ -38,6 +48,11 @@ export const snapToSlider = (settingKey, rawValue) => {
 export const DEFAULT_SETTINGS = Object.freeze(
   Object.fromEntries(Object.entries(SLIDERS).map(([key, slider]) => [key, slider.defaultValue])),
 )
+
+// The Human lane's PR size, in LOC: a day's code written divided by the PRs it is split into.
+// Unrounded; displays round it (formatPrSize).
+export const humanPrSize = ({ humanLocPerHour, humanPrsPerDay }) =>
+  (humanLocPerHour * WORK_HOURS_PER_DAY) / humanPrsPerDay
 
 // The only place derived lane values come from.
 export const laneParams = (settings, laneModel) => ({
@@ -117,6 +132,11 @@ export const formatDefectsCaught = ({ size, effSpeed }) => formatPct(detection(s
 export const formatCount = (count) => count.toLocaleString('en-US')
 
 export const formatLoc = (loc) => formatCount(floorShow(loc))
+
+// A derived PR size shows rounded to whole LOC, not floored like a count.
+export const formatPrSize = (loc) => `${formatCount(Math.round(loc))} LOC`
+
+export const formatPrsPerDay = (prsPerDay) => `${prsPerDay.toFixed(2)} PRs/day`
 
 export const NO_VALUE = '—'
 

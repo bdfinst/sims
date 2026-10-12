@@ -1,11 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import {
   DEFAULT_SETTINGS,
+  FAROS_MERGE_RATE_INCREASE_PCT,
+  FAROS_MERGE_RATE_MULTIPLIER,
+  FAROS_PR_SIZE_INCREASE_PCT,
+  FAROS_PR_SIZE_MULTIPLIER,
   LANE_IDS,
   LANE_MODELS,
   MODEL_ASSUMPTIONS,
   NO_VALUE,
   SLIDERS,
+  WORK_HOURS_PER_DAY,
   detection,
   displayedDeployed,
   displayedIncidents,
@@ -20,6 +25,9 @@ import {
   formatLoc,
   formatPct,
   formatPickupWaitHours,
+  formatPrSize,
+  formatPrsPerDay,
+  humanPrSize,
   isOverThreshold,
   laneParams,
   sizeFactor,
@@ -490,5 +498,65 @@ describe('MODEL_ASSUMPTIONS', () => {
       speedWall: 1000,
       aiSizeMultiplier: 1.51,
     })
+  })
+})
+
+// Oracles here are literals on purpose: they must not move if a src constant is edited by mistake.
+describe('generation constants', () => {
+  it('works an 8-hour day and takes the Faros increases as 51% and 16.2%', () => {
+    expect(WORK_HOURS_PER_DAY).toBe(8)
+    expect(FAROS_PR_SIZE_INCREASE_PCT).toBe(51)
+    expect(FAROS_MERGE_RATE_INCREASE_PCT).toBe(16.2)
+  })
+
+  it('derives the multipliers as exactly 1.51 and 1.162', () => {
+    expect(FAROS_PR_SIZE_MULTIPLIER).toBe(1.51)
+    expect(FAROS_MERGE_RATE_MULTIPLIER).toBe(1.162)
+  })
+
+  it('derives the AI code-written default (53 LOC/hr) from 30 LOC/hr and both multipliers', () => {
+    expect(Math.round(30 * FAROS_PR_SIZE_MULTIPLIER * FAROS_MERGE_RATE_MULTIPLIER)).toBe(53)
+  })
+})
+
+describe('humanPrSize', () => {
+  it.each([
+    { humanLocPerHour: 30, humanPrsPerDay: 1, size: 240 },
+    { humanLocPerHour: 30, humanPrsPerDay: 0.5, size: 480 },
+    { humanLocPerHour: 30, humanPrsPerDay: 0.25, size: 960 },
+    { humanLocPerHour: 35, humanPrsPerDay: 0.75, size: 373.33 },
+  ])(
+    'is $size LOC at $humanLocPerHour LOC/hr and $humanPrsPerDay PRs/day',
+    ({ humanLocPerHour, humanPrsPerDay, size }) => {
+      expect(humanPrSize({ humanLocPerHour, humanPrsPerDay })).toBeCloseTo(size, 2)
+    },
+  )
+
+  it('is unrounded, so the model keeps the fractional LOC', () => {
+    expect(humanPrSize({ humanLocPerHour: 35, humanPrsPerDay: 0.75 })).not.toBe(373)
+  })
+})
+
+describe('formatPrSize', () => {
+  it.each([
+    { loc: 240, shown: '240 LOC' },
+    { loc: 362.4, shown: '362 LOC' },
+    { loc: 373.3333, shown: '373 LOC' },
+    { loc: 563.7, shown: '564 LOC' },
+    { loc: 1449.6, shown: '1,450 LOC' },
+  ])('shows $shown for $loc', ({ loc, shown }) => {
+    expect(formatPrSize(loc)).toBe(shown)
+  })
+})
+
+describe('formatPrsPerDay', () => {
+  it.each([
+    { prsPerDay: 1, shown: '1.00 PRs/day' },
+    { prsPerDay: 1.17, shown: '1.17 PRs/day' },
+    { prsPerDay: 0.585, shown: '0.58 PRs/day' },
+    { prsPerDay: 0.2925, shown: '0.29 PRs/day' },
+    { prsPerDay: 44.15, shown: '44.15 PRs/day' },
+  ])('shows $shown for $prsPerDay', ({ prsPerDay, shown }) => {
+    expect(formatPrsPerDay(prsPerDay)).toBe(shown)
   })
 })
