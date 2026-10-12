@@ -3,7 +3,7 @@
 **Created**: 2026-10-12 (rewritten after the research amendment; revised after plan review; revised for Vite build)
 **Amended**: 2026-10-12, the generation amendment (revised after plan review round 1). This revises an implemented plan: Slices 1–7 are built; Slices 8, 10, and 9 (in that order) implement the amendment and update the tests for the revised Slice 1–7 scenarios.
 **Branch**: `feat/ai-review-sim`
-**Status**: approved
+**Status**: implemented
 **Gherkin persistence**: features
 **Spec**: `docs/specs/ai-vs-human-code-review-simulator.md` (amended 2026-10-12, including the generation amendment)
 
