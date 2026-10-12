@@ -3,38 +3,45 @@ Feature: Pending Review tiles and layout
   Background:
     Given the queue tile capacity C is read from the queue box
 
+  @wip
   Scenario: One tile per pending PR
-    Given I open the simulator
-    When I press Start and 1.2 seconds pass
+    Given I set "AI code written (LOC/hr)" to 2000
+    When I press Start and 5.7 seconds pass
     Then the AI lane shows Pending Review 22, 22 tiles, and no overflow indicator
 
   Scenario: Empty queue shows no tiles
     Given I open the simulator
     Then neither Pending Review box shows any tiles
 
+  @wip
   Scenario: Exactly at capacity has no overflow indicator
-    Given I set "Human generation (PRs/hr)" to 10, "PR size (LOC, both lanes)" to 1000, and "Reviewer speed (LOC/hr, both lanes)" to 100
-    When I press Start and C + 1 ticks pass
-    Then the Human lane shows Pending Review C, C tiles, and no overflow indicator
+    Given I set "Human code written (LOC/hr)" to 5, "Reviewer speed (LOC/hr, both lanes)" to 100, "AI skim multiplier" to 1, and "AI code written (LOC/hr)" to 704
+    When I press Start and C ticks pass
+    Then the AI lane shows Pending Review C, C tiles, and no overflow indicator
     When 0.1 more seconds pass
-    Then the Human lane shows Pending Review C + 1, C tiles, and the text "+1 more"
+    Then the AI lane shows Pending Review C + 1, C tiles, and the text "+1 more"
 
+  @wip
   Scenario: Overflow beyond capacity
-    Given I open the simulator
-    When I press Start and 10 seconds pass
-    Then the AI lane shows C tiles and the text "+N more", where N is 184 minus C
+    Given I set "AI code written (LOC/hr)" to 2000
+    When I press Start and 30 seconds pass
+    Then the AI lane shows C tiles and the text "+N more", where N is 115 minus C
 
+  @wip
   Scenario: Projector fit at 1280 × 720
-    Given the viewport is 1280 × 720 and the simulation has run for 10 seconds
+    Given the viewport is 1280 × 720
+    And I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 30 seconds
     Then the header, the headline ratio, and both lanes' Pending Review counts and metric grids are fully visible without scrolling
 
   Scenario: Metric rows line up across lanes
     Given the viewport is 1280 × 800
     Then each metric row in the Human lane has the same left edge as the matching row in the AI lane
 
+  @wip
   Scenario: No horizontal scroll on a phone, even when overflowing
     Given the viewport is 375 × 667
-    When I press Start and 10 seconds pass
+    And I set "AI code written (LOC/hr)" to 2000
+    When I press Start and 30 seconds pass
     Then the AI lane shows a "+N more" indicator
     And the page does not scroll horizontally
     And the two lanes are stacked one above the other
@@ -50,8 +57,9 @@ Feature: Pending Review tiles and layout
     Given I open the simulator
     Then the page background color is rgb(11, 13, 18)
 
+  @wip
   Scenario: Every control is keyboard reachable with a visible focus ring
     Given I open the simulator
     When I Tab through the page
-    Then focus visits Start, Reset, the threshold slider, and all five model sliders
+    Then focus visits, in order: Start, Reset, "About Warning threshold", "Warning threshold", "About Human code written (LOC/hr)", "Human code written (LOC/hr)", "About Human PRs per day", "Human PRs per day", "About Reviewer speed (LOC/hr, both lanes)", "Reviewer speed (LOC/hr, both lanes)", "About AI code written (LOC/hr)", "AI code written (LOC/hr)", "About AI skim multiplier", "AI skim multiplier", and "Research behind this simulation"
     And each has an accessible name and a non-none outline when focused

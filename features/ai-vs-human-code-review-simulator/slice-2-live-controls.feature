@@ -1,60 +1,86 @@
 Feature: Adjust the model live
 
+  @wip
   Scenario Outline: Controls start at their defaults with units
     Given I open the simulator
     Then the "<control>" slider has value <default>, min <min>, max <max>, and step <step>
     And its visible value reads "<shown>"
 
     Examples:
-      | control                              | default | min | max  | step | shown        |
-      | Human generation (PRs/hr)            | 1       | 1   | 10   | 1    | 1 PRs/hr     |
-      | AI generation (PRs/hr)               | 20      | 5   | 50   | 1    | 20 PRs/hr    |
-      | PR size (LOC, both lanes)            | 250     | 50  | 1000 | 10   | 250 LOC      |
-      | Reviewer speed (LOC/hr, both lanes)  | 300     | 100 | 1000 | 50   | 300 LOC/hr   |
-      | AI skim multiplier                   | 2       | 1   | 3    | 0.5  | 2×           |
+      | control                              | default | min  | max  | step | shown      |
+      | Human code written (LOC/hr)          | 30      | 5    | 200  | 5    | 30 LOC/hr  |
+      | Human PRs per day                    | 1       | 0.25 | 4    | 0.25 | 1 PRs/day  |
+      | AI code written (LOC/hr)             | 53      | 5    | 2000 | 1    | 53 LOC/hr  |
+      | Reviewer speed (LOC/hr, both lanes)  | 300     | 100  | 1000 | 50   | 300 LOC/hr |
+      | AI skim multiplier                   | 2       | 1    | 3    | 0.5  | 2×         |
+      | Warning threshold                    | 15      | 5    | 50   | 1    | 15 PRs     |
 
-  Scenario: AI PR size and effective speed are derived and read-only
+  @wip
+  Scenario: Derived PR sizes, AI PRs per day, and effective speed are read-only
     Given I open the simulator
-    Then the AI lane shows "PR size 378 LOC" and "Effective speed 600 LOC/hr", each marked "derived"
-    And neither derived value is a slider
-    When I set "PR size (LOC, both lanes)" to 200 and "AI skim multiplier" to 3
-    Then the AI lane shows "PR size 302 LOC" and "Effective speed 900 LOC/hr"
+    Then the Human lane shows "PR size 240 LOC (derived)"
+    And the AI lane shows "PR size 362 LOC (1.51× human)", "1.17 PRs/day (derived)", and "Effective speed 600 LOC/hr"
+    And none of the derived values is a slider
+    When I set "Human PRs per day" to 2 and "AI skim multiplier" to 3
+    Then the Human lane shows "PR size 120 LOC (derived)"
+    And the AI lane shows "PR size 181 LOC (1.51× human)", "2.34 PRs/day (derived)", and "Effective speed 900 LOC/hr"
 
+  @wip
   Scenario Outline: Sliders stop at their bounds
     Given I open the simulator
-    When I press <key> 200 times on "<control>"
+    When I press <key> <presses> times on "<control>"
     Then the "<control>" slider has value <bound>
 
     Examples:
-      | control                              | key        | bound |
-      | AI generation (PRs/hr)               | ArrowRight | 50    |
-      | AI generation (PRs/hr)               | ArrowLeft  | 5     |
-      | Reviewer speed (LOC/hr, both lanes)  | ArrowLeft  | 100   |
-      | AI skim multiplier                   | ArrowRight | 3     |
+      | control                              | key        | presses | bound |
+      | Human code written (LOC/hr)          | ArrowRight | 40      | 200   |
+      | Human code written (LOC/hr)          | ArrowLeft  | 10      | 5     |
+      | Human PRs per day                    | ArrowLeft  | 10      | 0.25  |
+      | Human PRs per day                    | ArrowRight | 20      | 4     |
+      | Reviewer speed (LOC/hr, both lanes)  | ArrowLeft  | 200     | 100   |
+      | Reviewer speed (LOC/hr, both lanes)  | ArrowRight | 200     | 1000  |
+      | AI skim multiplier                   | ArrowRight | 200     | 3     |
+      | AI skim multiplier                   | ArrowLeft  | 200     | 1     |
+      | Warning threshold                    | ArrowLeft  | 50      | 5     |
+      | Warning threshold                    | ArrowRight | 50      | 50    |
 
+  @wip
+  Scenario Outline: The AI code-written slider jumps to its bounds
+    Given I open the simulator
+    When I press <key> on "AI code written (LOC/hr)"
+    Then the "AI code written (LOC/hr)" slider has value <bound>
+
+    Examples:
+      | key  | bound |
+      | End  | 2000  |
+      | Home | 5     |
+
+  @wip
   Scenario: A review-side change applies on the next tick
-    Given the simulation has run for 1 second with defaults
+    Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 1 second
     And the AI lane shows Deployed 1
     When I set "Reviewer speed (LOC/hr, both lanes)" to 1000 and "AI skim multiplier" to 3
     And 0.1 seconds pass
     Then the AI lane shows Deployed 2
     And the Start/Pause button still reads "Pause"
 
+  @wip
   Scenario: A change while paused takes effect only after Start
-    Given the simulation ran for 1 second and was paused
-    And the AI lane shows Pending Review 18
-    When I set "AI generation (PRs/hr)" to 50
-    Then the AI lane still shows Pending Review 18
+    Given I set "AI code written (LOC/hr)" to 2000 and the simulation ran for 1 second and was paused
+    And the AI lane shows Pending Review 3
+    When I set "Reviewer speed (LOC/hr, both lanes)" to 100
+    Then the AI lane still shows Pending Review 3
     When I press Start and 0.1 seconds pass
-    Then the AI lane shows Pending Review 23
+    Then the AI lane shows Pending Review 4
 
+  @wip
   Scenario: A backlog drains to zero and never below
-    Given I set "Human generation (PRs/hr)" to 10 and the simulation has run for 2 seconds
-    And the Human lane shows Pending Review 17
-    When I set "Human generation (PRs/hr)" to 1 and "Reviewer speed (LOC/hr, both lanes)" to 1000
-    And 6 seconds pass
-    Then the Human lane shows Pending Review 0
-    And the Human Pending Review count, sampled every tick, was never below 0
+    Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 2 seconds
+    And the AI lane shows Pending Review 7
+    When I set "AI code written (LOC/hr)" to 5 and "Reviewer speed (LOC/hr, both lanes)" to 1000
+    And 2 seconds pass
+    Then the AI lane shows Pending Review 0
+    And the AI Pending Review count, sampled every tick, was never below 0
 
   Scenario: Sliders are keyboard operable
     Given I open the simulator
