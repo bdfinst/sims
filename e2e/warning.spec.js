@@ -21,6 +21,10 @@ import {
   test,
   ticksToSeconds,
   visibleValue,
+  BUSY_HUMAN_GEN,
+  QUIET_HUMAN_GEN,
+  FAST_REVIEWER_SPEED,
+  AI_PENDING_22_AT_TICK,
 } from './fixtures.js'
 
 test.describe.configure({ mode: 'parallel' })
@@ -30,10 +34,6 @@ const DEFAULT_THRESHOLD = 15
 const MIN_THRESHOLD = 5
 const MAX_THRESHOLD = 50
 const THRESHOLD_STEP = 1
-
-const BUSY_HUMAN_GEN = 10
-const QUIET_HUMAN_GEN = 1
-const FAST_REVIEWER_SPEED = 1000
 
 // Thresholds derived from the displayed queues they are meant to straddle.
 const HUMAN_PENDING = REFERENCE.humanPendingAtTick20WithHumanGen10 // 17, with the AI lane at 36
@@ -45,7 +45,6 @@ const KEPT_THRESHOLD = 30
 
 const SECONDS_TO_AI_PENDING_14 = 0.8
 const SECONDS_TO_AI_PENDING_16 = 0.9
-const AI_PENDING_22_AT_TICK = 12
 const SECONDS_TO_AI_PENDING_9 = 0.5
 const SECONDS_TO_HUMAN_PENDING_15 = 1.8
 const SECONDS_TO_HUMAN_PENDING_16 = 1.9

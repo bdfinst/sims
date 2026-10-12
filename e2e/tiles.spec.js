@@ -9,7 +9,6 @@ import {
   expectElapsedAtTick,
   expectEmptyLanes,
   expectPending,
-  metric,
   openSimulator,
   overflowIn,
   queueBox,
@@ -20,19 +19,19 @@ import {
   test,
   tilesIn,
   ticksToSeconds,
+  AI_PENDING_22_AT_TICK,
+  BUSY_HUMAN_GEN,
 } from './fixtures.js'
 
 test.describe.configure({ mode: 'parallel' })
 
-const AI_PENDING_22_AT_TICK = 12
-const BUSY_HUMAN_GEN = 10
 const HUGE_PR_SIZE = 1000
 const SLOW_REVIEWER_SPEED = 100
 const ONE_TICK = 1
 
-// Human at gen 10, PR size 1000, speed 100 shows n - 1 pending PRs after n ticks (plan, Step 6.1).
-// The capacity C is at most 98, so C is on screen by tick 99.
-const MAX_TICKS = 99
+// Human at gen 10, PR size 1000, speed 100 shows n - 1 pending PRs after n ticks (plan, Step 6.1),
+// so the queue holds exactly C PRs after C + 1 ticks.
+const ticksToFillQueue = (capacity) => capacity + 1
 
 test.describe('Pending Review tiles', () => {
   test('One tile per pending PR', async ({ page }) => {
@@ -63,25 +62,16 @@ test.describe('Pending Review tiles', () => {
     await setSlider(page, REVIEWER_SPEED_LABEL, SLOW_REVIEWER_SPEED)
     await startSimulation(page)
 
-    let tickNumber = 0
-    let reachedCapacity = false
-    while (!reachedCapacity && tickNumber < MAX_TICKS) {
-      await page.clock.runFor(TICK_MS)
-      tickNumber += 1
-      await expectElapsedAtTick(page, tickNumber)
-      const shownPending = Number(await metric(page, 'human', 'pending').textContent())
-      reachedCapacity = shownPending === capacity
-    }
-    expect(reachedCapacity, `Human lane never showed ${capacity} within ${MAX_TICKS} ticks`).toBe(
-      true,
-    )
+    const ticksAtCapacity = ticksToFillQueue(capacity)
+    await page.clock.runFor(ticksAtCapacity * TICK_MS)
+    await expectElapsedAtTick(page, ticksAtCapacity)
 
     await expectPending(page, 'human', capacity)
     await expect(tilesIn(page, 'human')).toHaveCount(capacity)
     await expect(overflowIn(page, 'human')).toHaveCount(0)
 
     await page.clock.runFor(TICK_MS)
-    await expectElapsedAtTick(page, tickNumber + ONE_TICK)
+    await expectElapsedAtTick(page, ticksAtCapacity + ONE_TICK)
     await expectPending(page, 'human', capacity + 1)
     await expect(tilesIn(page, 'human')).toHaveCount(capacity)
     await expect(overflowIn(page, 'human')).toHaveText('+1 more')

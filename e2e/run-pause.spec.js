@@ -23,6 +23,8 @@ import {
   startSimulation,
   test,
   buttonNamed,
+  FULL_RUN_SECONDS,
+  expectLiveIntervals,
 } from './fixtures.js'
 
 const DIST_DIR = fileURLToPath(new URL('../dist/', import.meta.url))
@@ -102,18 +104,21 @@ test.describe('Run and pause the simulation', () => {
 
   test('Start switches the button to Pause', async ({ page }) => {
     await openSimulator(page)
+    await expectLiveIntervals(page, 0)
 
     await buttonNamed(page, 'Start').click()
 
     await expect(buttonNamed(page, 'Pause')).toBeVisible()
     await expect(page.getByText('Running', { exact: true })).toBeVisible()
+    // Plan, Step 1.2 REFACTOR: exactly one tick interval while running.
+    await expectLiveIntervals(page, 1)
   })
 
   test('Default flow after 10 seconds', async ({ page }) => {
     await openSimulator(page)
 
     await startSimulation(page)
-    await page.clock.runFor(10 * SECOND_MS)
+    await page.clock.runFor(FULL_RUN_SECONDS * SECOND_MS)
 
     await expectCounts(page, 'human', { pending: 0, deployed: REFERENCE.humanDeployedAtTick100 })
     await expectCounts(page, 'ai', {
@@ -144,6 +149,8 @@ test.describe('Run and pause the simulation', () => {
     await page.clock.runFor(5 * SECOND_MS)
     await flushPendingRenders(page)
 
+    // Plan, Step 1.2 REFACTOR: clear the interval on pause.
+    await expectLiveIntervals(page, 0)
     await expectCounts(page, 'ai', {
       pending: REFERENCE.aiPendingAtTick30,
       deployed: REFERENCE.aiDeployedAtTick30,
@@ -199,6 +206,8 @@ test.describe('Run and pause the simulation', () => {
 
     await expect(page.getByText('Paused', { exact: true })).toBeVisible()
     await expect(metric(page, 'ai', 'pending')).toHaveText(String(REFERENCE.aiPendingAtTick10))
+    // Plan, Step 1.2 REFACTOR: clear the interval when the tab is hidden.
+    await expectLiveIntervals(page, 0)
   })
 
   test('Showing the tab again stays paused', async ({ page }) => {

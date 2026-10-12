@@ -23,10 +23,10 @@ import {
   test,
   buttonNamed,
   visibleValue,
+  DRAIN_SECONDS,
 } from './fixtures.js'
 
 const DRAIN_START_SECONDS = 2
-const DRAIN_SECONDS = 6
 
 const DEFAULT_CONTROLS = [
   {
@@ -77,11 +77,13 @@ const DEFAULT_CONTROLS = [
 ]
 
 const BOUNDS = [
-  { control: AI_GEN_LABEL, key: 'End', bound: 50 },
-  { control: AI_GEN_LABEL, key: 'Home', bound: 5 },
-  { control: REVIEWER_SPEED_LABEL, key: 'Home', bound: 100 },
-  { control: AI_SKIM_LABEL, key: 'End', bound: 3 },
+  { control: AI_GEN_LABEL, key: 'ArrowRight', bound: 50 },
+  { control: AI_GEN_LABEL, key: 'ArrowLeft', bound: 5 },
+  { control: REVIEWER_SPEED_LABEL, key: 'ArrowLeft', bound: 100 },
+  { control: AI_SKIM_LABEL, key: 'ArrowRight', bound: 3 },
 ]
+// The feature: "When I press <key> 200 times" (more than any slider's range in steps).
+const KEY_PRESSES = 200
 
 test.describe.configure({ mode: 'parallel' })
 
@@ -129,7 +131,7 @@ test.describe('Adjust the model live', () => {
       const sliderLocator = slider(page, control)
 
       await sliderLocator.focus()
-      await sliderLocator.press(key)
+      for (let press = 0; press < KEY_PRESSES; press += 1) await sliderLocator.press(key)
 
       await expect(sliderLocator).toHaveValue(String(bound))
     })

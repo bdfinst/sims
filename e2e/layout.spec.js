@@ -37,6 +37,8 @@ test.describe.configure({ mode: 'parallel' })
 const PROJECTOR = { width: 1280, height: 720 }
 const DESKTOP = { width: 1280, height: 800 }
 const TABLET = { width: 768, height: 1024 }
+// --color-deployed (#22c55e) in src/index.css
+const DEPLOYED_GREEN = 'rgb(34, 197, 94)'
 const FOCUS_RING_COLOR = 'rgb(248, 250, 252)' // --color-focus (#f8fafc) in src/index.css
 // Plan, "Layout": the metrics grid keeps one fixed row order in both lanes.
 const METRIC_ROWS_TOP_TO_BOTTOM = [
@@ -160,6 +162,15 @@ test.describe('Pending Review layout', () => {
       }
     })
 
+    // AC13: the Deployed value is green in the lanes.
+    test('Deployed values are green', async ({ page }) => {
+      await openSimulator(page)
+
+      for (const laneId of ALL_LANE_IDS) {
+        await expect(metric(page, laneId, 'deployed')).toHaveCSS('color', DEPLOYED_GREEN)
+      }
+    })
+
     test('Dark theme', async ({ page }) => {
       await openSimulator(page)
 
@@ -227,6 +238,30 @@ test.describe('Pending Review layout', () => {
 
       await expectInsideViewport(buttonNamed(page, 'Pause'), PHONE, 'Start/Pause button')
       await expectInsideViewport(buttonNamed(page, 'Reset'), PHONE, 'Reset button')
+    })
+  })
+
+  test.describe('on a phone header', () => {
+    test.use({ viewport: PHONE })
+
+    // AC14: below md, Start/Pause and Reset sit together on their own row, under the title.
+    test('Start and Reset share their own row below the title and description', async ({
+      page,
+    }) => {
+      await openSimulator(page)
+
+      const description = await boxOf(
+        page.getByText('Watch AI-speed code generation'),
+        'description',
+      )
+      const start = await boxOf(buttonNamed(page, 'Start'), 'Start')
+      const reset = await boxOf(buttonNamed(page, 'Reset'), 'Reset')
+      // Same row: their vertical extents overlap (the bordered Reset is 2 px taller, so tops differ).
+      expect(reset.y, 'Reset starts above the bottom of Start').toBeLessThan(bottomOf(start))
+      expect(start.y, 'Start starts above the bottom of Reset').toBeLessThan(bottomOf(reset))
+      expect(start.y, 'buttons are below the description').toBeGreaterThanOrEqual(
+        bottomOf(description),
+      )
     })
   })
 

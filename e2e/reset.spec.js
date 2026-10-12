@@ -16,6 +16,7 @@ import {
   startAndRunFor,
   tabTo,
   test,
+  expectLiveIntervals,
 } from './fixtures.js'
 
 const CUSTOM_AI_GEN = 40
@@ -54,6 +55,8 @@ test.describe('Reset the simulation', () => {
     await expectEmptyLanes(page)
     await expectElapsedAtTick(page, NO_ELAPSED_TICKS)
     await expect(buttonNamed(page, 'Start')).toBeVisible()
+    // Plan, Step 1.2 REFACTOR: Reset pauses, so the interval is cleared.
+    await expectLiveIntervals(page, 0)
     await expect(slider(page, AI_GEN_LABEL)).toHaveValue(String(CUSTOM_AI_GEN))
     await expect(slider(page, PR_SIZE_LABEL)).toHaveValue(String(CUSTOM_PR_SIZE))
     await expect(resetButton(page)).toBeFocused()

@@ -1,5 +1,4 @@
 import { test as base, expect } from '@playwright/test'
-import { TICK_MS } from '../src/engine.js'
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1'])
 export const INLINE_PROTOCOLS = new Set(['data:', 'blob:'])
@@ -53,9 +52,36 @@ export const SIMULATOR_TITLE = 'AI vs. Human Code Review Simulator'
 const FIXED_START_MS = Date.parse('2026-01-05T09:00:00Z')
 const CLOCK_PAUSE_OFFSET_MS = 60_000
 
+// Counts the page's live setInterval handles. It runs after page.clock.install's own init script,
+// so it wraps the clock's fake setInterval/clearInterval (the ones the app calls).
+const trackLiveIntervals = () => {
+  const liveHandles = new Set()
+  const { setInterval: clockSetInterval, clearInterval: clockClearInterval } = window
+  window.setInterval = (...args) => {
+    const handle = clockSetInterval(...args)
+    liveHandles.add(handle)
+    return handle
+  }
+  window.clearInterval = (handle) => {
+    liveHandles.delete(handle)
+    clockClearInterval(handle)
+  }
+  window.liveIntervalCount = () => liveHandles.size
+}
+
+// Retries until the count settles: an effect cleanup (clearing the interval) can run just after
+// the render that shows the paused state.
+export const expectLiveIntervals = (page, count) =>
+  expect
+    .poll(() => page.evaluate(() => window.liveIntervalCount()), {
+      message: 'live setInterval handles',
+    })
+    .toBe(count)
+
 // Opens the page under a fake clock that then stops: time only moves through page.clock.runFor.
 export const openSimulator = async (page, url = '/') => {
   await page.clock.install({ time: FIXED_START_MS })
+  await page.addInitScript(trackLiveIntervals)
   await page.goto(url)
   await expect(page.getByRole('heading', { name: SIMULATOR_TITLE })).toBeVisible()
   await page.clock.pauseAt(FIXED_START_MS + CLOCK_PAUSE_OFFSET_MS)
@@ -113,6 +139,12 @@ export const WARNING_BORDER_COLOR = 'rgb(239, 68, 68)'
 export const PAGE_BACKGROUND = 'rgb(11, 13, 18)'
 
 export const FULL_RUN_SECONDS = 10
+// Setting values and run lengths several specs share (e2e-only; the unit tests keep their own).
+export const BUSY_HUMAN_GEN = 10
+export const QUIET_HUMAN_GEN = 1
+export const FAST_REVIEWER_SPEED = 1000
+export const DRAIN_SECONDS = 6
+export const AI_PENDING_22_AT_TICK = 12
 // Declared here on purpose: data-state is a fixed hook, so a rename in the app must fail the tests.
 export const QUEUE_STATE = Object.freeze({ warning: 'warning', normal: 'normal' })
 
@@ -145,7 +177,9 @@ export const readTileCapacity = async (page) =>
   Number(await queueBox(page, 'human').getAttribute('data-capacity'))
 
 export const SECOND_MS = 1000
-export { TICK_MS }
+// Spec: the tick period is 100 ms. Declared here, not imported from src/engine.js, so a change to
+// the app's tick period fails the tests (an independent oracle, like the other constants).
+export const TICK_MS = 100
 export const TICKS_PER_SECOND = SECOND_MS / TICK_MS
 export const ticksToSeconds = (ticks) => ticks / TICKS_PER_SECOND
 
@@ -267,7 +301,7 @@ export const metricValues = (page, name) =>
 // Waiting for the readout therefore tells us the lanes are current, with no clock-dependent waits.
 export const expectElapsedAtTick = (page, tick) =>
   expect(
-    page.getByText(`${(tick / TICKS_PER_SECOND).toFixed(1)} work hours`, { exact: true }),
+    page.getByText(`${ticksToSeconds(tick).toFixed(1)} work hours`, { exact: true }),
   ).toBeVisible()
 
 // Advances the fake clock one tick at a time, reading only after that tick has rendered.

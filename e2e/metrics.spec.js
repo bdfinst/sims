@@ -25,6 +25,11 @@ import {
   startAndRunFor,
   startSimulation,
   test,
+  FULL_RUN_SECONDS,
+  BUSY_HUMAN_GEN,
+  FAST_REVIEWER_SPEED,
+  DRAIN_SECONDS,
+  QUIET_HUMAN_GEN,
 } from './fixtures.js'
 
 const SIZE_CASES = [
@@ -51,18 +56,13 @@ const MAX_SKIM = 3
 const HUMAN_PACE_SKIM = 1
 
 const NO_WAIT = '0.0 h'
-const DEFAULT_RUN_SECONDS = 10
 const SIZE_CHANGE_AT_SECONDS = 1
 const OVERSIZED_PR = 400
 const QUEUE_BUILDING_SECONDS = 2
-const BUSY_HUMAN_GEN = 10
 const RESIZED_QUEUE_PR_SIZE = 500
 const RESIZED_QUEUE_SECONDS = 1
-const FAST_REVIEWER_SPEED = 1000
-const DRAIN_SECONDS = 6
 const RESEARCH_RATIO_FLOOR = 3
 const RESEARCH_RATIO_CEILING = 4
-const QUIET_HUMAN_GEN = 1
 const NEARLY_A_PR_SECONDS = 0.9
 const LAST_TENTH_SECONDS = 0.1
 const FIRST_PR_DEPLOYED = 1
@@ -197,7 +197,7 @@ test.describe('Review quality metrics', () => {
   test('Default metrics after 10 seconds', async ({ page }) => {
     await openSimulator(page)
 
-    await startAndRunFor(page, DEFAULT_RUN_SECONDS)
+    await startAndRunFor(page, FULL_RUN_SECONDS)
 
     await expectMetric(page, 'human', 'incidents', REFERENCE.humanIncidentsAtTick100)
     await expectMetric(page, 'human', 'incidentsPerPr', REFERENCE.humanIncidentsPerPrAtTick100)
@@ -212,7 +212,7 @@ test.describe('Review quality metrics', () => {
   test('The research effect emerges at the defaults', async ({ page }) => {
     await openSimulator(page)
 
-    await startAndRunFor(page, DEFAULT_RUN_SECONDS)
+    await startAndRunFor(page, FULL_RUN_SECONDS)
 
     const ratio = Number.parseFloat(await headline(page).textContent())
     expect(ratio).toBeGreaterThan(RESEARCH_RATIO_FLOOR)
@@ -238,7 +238,7 @@ test.describe('Review quality metrics', () => {
     await openSimulator(page)
     await setSlider(page, PR_SIZE_LABEL, OVERSIZED_PR)
 
-    await startAndRunFor(page, DEFAULT_RUN_SECONDS)
+    await startAndRunFor(page, FULL_RUN_SECONDS)
 
     await expectCounts(page, 'human', {
       pending: REFERENCE.humanPendingAtTick100WithPrSize400,
@@ -265,8 +265,8 @@ test.describe('Review quality metrics', () => {
     await expectElapsedAtTick(page, TICK_AFTER_SIZE_CHANGE)
     await expectMetric(page, 'human', 'defectsCaught', REFERENCE.humanDefectsCaughtAtPrSize400)
 
-    await page.clock.runFor((DEFAULT_RUN_SECONDS - SIZE_CHANGE_AT_SECONDS) * SECOND_MS - TICK_MS)
-    await expectElapsedAtTick(page, DEFAULT_RUN_SECONDS * TICKS_PER_SECOND)
+    await page.clock.runFor((FULL_RUN_SECONDS - SIZE_CHANGE_AT_SECONDS) * SECOND_MS - TICK_MS)
+    await expectElapsedAtTick(page, FULL_RUN_SECONDS * TICKS_PER_SECOND)
     await expectMetric(
       page,
       'human',
@@ -332,7 +332,7 @@ test.describe('Review quality metrics', () => {
 
     const samples = await sampleEachTick(page, {
       startTick: 0,
-      tickCount: DEFAULT_RUN_SECONDS * TICKS_PER_SECOND,
+      tickCount: FULL_RUN_SECONDS * TICKS_PER_SECOND,
       read: () => metricValues(page, 'incidents'),
     })
 
@@ -342,7 +342,7 @@ test.describe('Review quality metrics', () => {
 
   test('Reset clears the metrics', async ({ page }) => {
     await openSimulator(page)
-    await startAndRunFor(page, DEFAULT_RUN_SECONDS)
+    await startAndRunFor(page, FULL_RUN_SECONDS)
     await expect(headline(page)).toHaveText(REFERENCE.headlineRatioAtTick100)
 
     await buttonNamed(page, 'Reset').click()
