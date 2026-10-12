@@ -1,0 +1,1 @@
+{"timestamp":"2026-10-12T11:27:02Z","plan":"plans/ai-vs-human-code-review-simulator.md","slice":"1","branch":"feat/ai-review-sim","files":["src/App.jsx","src/engine.js","src/reducer.js","src/components/Header.jsx","src/components/Lane.jsx","vite.config.js"],"outcome":"ran","reason":""}
