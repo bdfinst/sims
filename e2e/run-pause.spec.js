@@ -6,7 +6,6 @@ import {
   SECOND_MS,
   SIMULATOR_TITLE as TITLE,
   TICKS_PER_SECOND,
-  TICK_MS,
   expect,
   expectCounts,
   laneLocator,
