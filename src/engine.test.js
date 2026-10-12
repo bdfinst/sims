@@ -7,6 +7,7 @@ import {
   SLIDERS,
   detection,
   displayedDeployed,
+  displayedIncidents,
   displayedPending,
   emptyLane,
   floorShow,
@@ -92,6 +93,8 @@ const defaultParams = (laneId) => paramsFor(laneId)
 const afterDefaultRun = (laneId) =>
   runTicks(emptyLane(), defaultParams(laneId), TEN_SECONDS_IN_TICKS)
 
+const lanesOf = ({ ai, human }) => ({ [LANE_IDS.ai]: ai, [LANE_IDS.human]: human })
+
 const laneWithTotals = (deployedPrs, escapedDefects) => ({
   ...emptyLane(),
   deployedPrs,
@@ -112,10 +115,29 @@ describe('tick at the default settings', () => {
   })
 })
 
+describe('deployed LOC', () => {
+  it.each([
+    { laneId: LANE_IDS.human, reviewedLoc: 2500 },
+    { laneId: LANE_IDS.ai, reviewedLoc: 6000 },
+  ])(
+    'the $laneId lane has reviewed $reviewedLoc LOC after 10 seconds',
+    ({ laneId, reviewedLoc }) => {
+      expect(afterDefaultRun(laneId).deployedLoc).toBeCloseTo(reviewedLoc, 6)
+    },
+  )
+})
+
 describe('displayed counts', () => {
-  it('floor the internal PR counts, absorbing float drift', () => {
-    const lane = { ...emptyLane(), pendingPrs: 17.6, deployedPrs: 9.9999999999 }
-    expect([displayedPending(lane), displayedDeployed(lane)]).toEqual([17, 10])
+  it('floor the internal counts, absorbing float drift', () => {
+    const lane = {
+      ...emptyLane(),
+      pendingPrs: 17.6,
+      deployedPrs: 9.9999999999,
+      escapedDefects: 106.84,
+    }
+    expect([displayedPending(lane), displayedDeployed(lane), displayedIncidents(lane)]).toEqual([
+      17, 10, 106,
+    ])
   })
 })
 
@@ -134,7 +156,7 @@ describe('escape accrual at the default settings (10 seconds)', () => {
   it('shows Incidents 19 and 107 once floored', () => {
     const human = afterDefaultRun(LANE_IDS.human)
     const ai = afterDefaultRun(LANE_IDS.ai)
-    expect([floorShow(human.escapedDefects), floorShow(ai.escapedDefects)]).toEqual([19, 107])
+    expect([displayedIncidents(human), displayedIncidents(ai)]).toEqual([19, 107])
   })
 
   it('shows Human Incidents per PR 1.95', () => {
@@ -147,7 +169,7 @@ describe('escape accrual at the default settings (10 seconds)', () => {
       paramsFor(LANE_IDS.human, { prSize: OVERSIZED_PR }),
       TEN_SECONDS_IN_TICKS,
     )
-    expect([floorShow(human.escapedDefects), formatIncidentsPerPr(human)]).toEqual([57, '7.68'])
+    expect([displayedIncidents(human), formatIncidentsPerPr(human)]).toEqual([57, '7.68'])
   })
 
   it('shows Human Incidents 53 and 6.94 per PR when PR size becomes 400 after 1 second', () => {
@@ -157,7 +179,7 @@ describe('escape accrual at the default settings (10 seconds)', () => {
       paramsFor(LANE_IDS.human, { prSize: OVERSIZED_PR }),
       TEN_SECONDS_IN_TICKS - ONE_SECOND_IN_TICKS,
     )
-    expect([floorShow(human.escapedDefects), formatIncidentsPerPr(human)]).toEqual([53, '6.94'])
+    expect([displayedIncidents(human), formatIncidentsPerPr(human)]).toEqual([53, '6.94'])
   })
 })
 
@@ -186,25 +208,38 @@ describe('formatIncidentsPerPr', () => {
 
 describe('formatHeadlineRatio', () => {
   it('is the AI over Human incidents per PR: 3.48x at the defaults', () => {
-    expect(formatHeadlineRatio(afterDefaultRun(LANE_IDS.ai), afterDefaultRun(LANE_IDS.human))).toBe(
-      '3.48×',
-    )
+    expect(
+      formatHeadlineRatio(
+        lanesOf({
+          ai: afterDefaultRun(LANE_IDS.ai),
+          human: afterDefaultRun(LANE_IDS.human),
+        }),
+      ),
+    ).toBe('3.48×')
   })
 
   it('is blank until the Human lane displays Deployed 1', () => {
-    expect(formatHeadlineRatio(laneWithTotals(5, 30), laneWithTotals(0.9, 1.7))).toBe(NO_VALUE)
+    expect(
+      formatHeadlineRatio(lanesOf({ ai: laneWithTotals(5, 30), human: laneWithTotals(0.9, 1.7) })),
+    ).toBe(NO_VALUE)
   })
 
   it('is blank until the AI lane displays Deployed 1', () => {
-    expect(formatHeadlineRatio(laneWithTotals(0.9, 6), laneWithTotals(5, 10))).toBe(NO_VALUE)
+    expect(
+      formatHeadlineRatio(lanesOf({ ai: laneWithTotals(0.9, 6), human: laneWithTotals(5, 10) })),
+    ).toBe(NO_VALUE)
   })
 
   it('is blank when the Human lane has no incidents yet (no division by zero)', () => {
-    expect(formatHeadlineRatio(laneWithTotals(5, 30), laneWithTotals(5, 0))).toBe(NO_VALUE)
+    expect(
+      formatHeadlineRatio(lanesOf({ ai: laneWithTotals(5, 30), human: laneWithTotals(5, 0) })),
+    ).toBe(NO_VALUE)
   })
 
   it('is blank when neither lane has incidents (0 / 0 is not a number)', () => {
-    expect(formatHeadlineRatio(laneWithTotals(5, 0), laneWithTotals(5, 0))).toBe(NO_VALUE)
+    expect(
+      formatHeadlineRatio(lanesOf({ ai: laneWithTotals(5, 0), human: laneWithTotals(5, 0) })),
+    ).toBe(NO_VALUE)
   })
 })
 

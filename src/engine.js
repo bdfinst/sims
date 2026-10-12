@@ -62,6 +62,7 @@ export const emptyLane = () => ({
   pendingPrs: 0,
   pendingLoc: 0,
   deployedPrs: 0,
+  deployedLoc: 0,
   escapedDefects: 0,
 })
 
@@ -99,6 +100,7 @@ export const NO_VALUE = '—'
 // The one rule for the PR counts a lane shows; the warning check and the "—" rules use it too.
 export const displayedPending = (lane) => floorShow(lane.pendingPrs)
 export const displayedDeployed = (lane) => floorShow(lane.deployedPrs)
+export const displayedIncidents = (lane) => floorShow(lane.escapedDefects)
 
 const hasDeployedWholePr = (lane) => displayedDeployed(lane) >= 1
 
@@ -111,8 +113,11 @@ export const formatIncidentsPerPr = (lane) =>
 // Hours until the queue is cleared at the lane's effective speed (the unit is added by the view).
 export const formatPickupWaitHours = (lane, { effSpeed }) => (lane.pendingLoc / effSpeed).toFixed(1)
 
-// How many times more incidents per PR the AI lane has; blank until both lanes have shipped a PR.
-export const formatHeadlineRatio = (aiLane, humanLane) => {
+// How many times more incidents per PR the AI lane has than the Human lane; blank until both
+// lanes have shipped a PR. Takes the lanes by id so no caller can swap numerator and denominator.
+export const formatHeadlineRatio = (lanes) => {
+  const aiLane = lanes[LANE_IDS.ai]
+  const humanLane = lanes[LANE_IDS.human]
   if (!hasDeployedWholePr(aiLane) || !hasDeployedWholePr(humanLane)) return NO_VALUE
   const ratio = incidentsPerPr(aiLane) / incidentsPerPr(humanLane)
   return Number.isFinite(ratio) ? `${ratio.toFixed(2)}×` : NO_VALUE
@@ -137,6 +142,7 @@ export const tick = (lane, { gen, size, effSpeed }) => {
     pendingPrs: Math.max(0, queuedPrs - reviewedPrs),
     pendingLoc: Math.max(0, queuedLoc - reviewedLoc),
     deployedPrs: lane.deployedPrs + reviewedPrs,
+    deployedLoc: lane.deployedLoc + reviewedLoc,
     escapedDefects: lane.escapedDefects + reviewedLoc * DEFECTS_PER_LOC * (1 - detectionRate),
   }
 }

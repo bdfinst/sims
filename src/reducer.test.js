@@ -3,6 +3,7 @@ import {
   DEFAULT_SETTINGS,
   LANE_MODELS,
   NO_VALUE,
+  displayedIncidents,
   displayedPending,
   floorShow,
   formatHeadlineRatio,
@@ -193,14 +194,13 @@ describe('changing settings mid-run', () => {
 describe('incidents across a run', () => {
   const runningState = reducer(initialState, { type: ACTION.start })
   const afterTicks = (state, count) => dispatchAll(state, ...repeat(ACTION.tick, count))
-  const incidents = (lane) => floorShow(lane.escapedDefects)
   const afterTenDefaultSeconds = afterTicks(runningState, TEN_SECONDS_IN_TICKS)
 
   it('Larger PRs accrue more incidents: PR size 400 gives Human 2 / 7 / 57 / 7.68', () => {
     const oversized = setSetting(runningState, 'prSize', OVERSIZED_PR)
     const human = afterTicks(oversized, TEN_SECONDS_IN_TICKS).lanes.human
     expect(shownCounts(human)).toEqual([2, 7])
-    expect([incidents(human), formatIncidentsPerPr(human)]).toEqual([57, '7.68'])
+    expect([displayedIncidents(human), formatIncidentsPerPr(human)]).toEqual([57, '7.68'])
   })
 
   it('a size change while running changes accrual from the next tick: 53 incidents, 6.94 per PR', () => {
@@ -209,7 +209,7 @@ describe('incidents across a run', () => {
 
     const human = afterTicks(resized, TEN_SECONDS_IN_TICKS - ONE_SECOND_IN_TICKS).lanes.human
 
-    expect([incidents(human), formatIncidentsPerPr(human)]).toEqual([53, '6.94'])
+    expect([displayedIncidents(human), formatIncidentsPerPr(human)]).toEqual([53, '6.94'])
   })
 
   it('queued PRs keep their size when PR size changes: Pending 17 / 4,400 LOC becomes 26 / 9,100', () => {
@@ -263,13 +263,12 @@ describe('incidents across a run', () => {
   })
 
   it('shows the headline ratio 3.48x after 10 default seconds', () => {
-    const { ai, human } = afterTenDefaultSeconds.lanes
-    expect(formatHeadlineRatio(ai, human)).toBe('3.48×')
+    expect(formatHeadlineRatio(afterTenDefaultSeconds.lanes)).toBe('3.48×')
   })
 
   it('shows a blank headline ratio before the Human lane has deployed a whole PR (9 ticks)', () => {
-    const { ai, human } = afterTicks(runningState, ONE_SECOND_IN_TICKS - 1).lanes
-    expect(formatHeadlineRatio(ai, human)).toBe(NO_VALUE)
+    const { lanes } = afterTicks(runningState, ONE_SECOND_IN_TICKS - 1)
+    expect(formatHeadlineRatio(lanes)).toBe(NO_VALUE)
   })
 })
 

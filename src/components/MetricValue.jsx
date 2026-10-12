@@ -2,7 +2,7 @@ import { NO_VALUE } from '../engine.js'
 
 // The data-metric hook sits on a span whose text is exactly the shown value (and unit). A blank
 // value is hidden from screen readers and replaced by words, so "—" is never read as a dash.
-export function MetricValue({ name, value, unit }) {
+export function MetricValue({ name, value, unit, unitTitle }) {
   const isUnavailable = value === NO_VALUE
   return (
     <>
@@ -11,7 +11,7 @@ export function MetricValue({ name, value, unit }) {
         {unit && (
           <>
             {' '}
-            <abbr title="hours">{unit}</abbr>
+            <abbr title={unitTitle}>{unit}</abbr>
           </>
         )}
       </span>
