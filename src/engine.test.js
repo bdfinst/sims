@@ -6,10 +6,15 @@ import {
   SLIDERS,
   MS_PER_WORK_HOUR,
   TICK_MS,
+  detection,
   emptyLane,
   floorShow,
   formatElapsedHours,
+  formatLoc,
+  formatPct,
   laneParams,
+  sizeFactor,
+  speedFactor,
   tick,
 } from './engine.js'
 import { shownCounts } from './testHelpers.js'
@@ -163,5 +168,111 @@ describe('formatElapsedHours', () => {
     { ticks: 100, shown: '10.0' },
   ])('shows $shown for $ticks ticks', ({ ticks, shown }) => {
     expect(formatElapsedHours(ticks)).toBe(shown)
+  })
+})
+
+describe('sizeFactor', () => {
+  it.each([
+    { size: 50, factor: 1 },
+    { size: 200, factor: 1 },
+    { size: 300, factor: 0.525 },
+    { size: 400, factor: 0.05 },
+    { size: 1000, factor: 0.05 },
+  ])('is $factor for a $size LOC PR', ({ size, factor }) => {
+    expect(sizeFactor(size)).toBeCloseTo(factor, 10)
+  })
+
+  it('starts falling just past the knee and stops just before the wall', () => {
+    expect(sizeFactor(201)).toBeLessThan(1)
+    expect(sizeFactor(399)).toBeGreaterThan(0.05)
+  })
+})
+
+describe('speedFactor', () => {
+  it.each([
+    { speed: 100, factor: 1 },
+    { speed: 500, factor: 1 },
+    { speed: 750, factor: 0.55 },
+    { speed: 1000, factor: 0.1 },
+    { speed: 5000, factor: 0.1 },
+  ])('is $factor at $speed LOC/hr', ({ speed, factor }) => {
+    expect(speedFactor(speed)).toBeCloseTo(factor, 10)
+  })
+
+  it('starts falling just past the knee and stops just before the wall', () => {
+    expect(speedFactor(501)).toBeLessThan(1)
+    expect(speedFactor(999)).toBeGreaterThan(0.1)
+  })
+})
+
+describe('Defects caught for a lane (detection x 100, rounded)', () => {
+  const caughtPct = (overrides, laneId = LANE_IDS.human) => {
+    const { size, effSpeed } = laneParams(
+      { ...DEFAULT_SETTINGS, ...overrides },
+      LANE_MODELS[laneId],
+    )
+    return Math.round(detection(size, effSpeed) * 100)
+  }
+
+  it.each([
+    { prSize: 50, caught: 80 },
+    { prSize: 200, caught: 80 },
+    { prSize: 300, caught: 42 },
+    { prSize: 400, caught: 4 },
+    { prSize: 1000, caught: 4 },
+  ])('Human at PR size $prSize catches $caught%', ({ prSize, caught }) => {
+    expect(caughtPct({ prSize })).toBe(caught)
+  })
+
+  it.each([
+    { reviewerSpeed: 500, caught: 80 },
+    { reviewerSpeed: 750, caught: 44 },
+    { reviewerSpeed: 900, caught: 22 },
+    { reviewerSpeed: 1000, caught: 8 },
+  ])(
+    'Human at PR size 200 and $reviewerSpeed LOC/hr catches $caught%',
+    ({ reviewerSpeed, caught }) => {
+      expect(caughtPct({ prSize: 200, reviewerSpeed })).toBe(caught)
+    },
+  )
+
+  it.each([
+    { laneId: LANE_IDS.human, expected: 61 },
+    { laneId: LANE_IDS.ai, expected: 10 },
+  ])('catches $expected% in the $laneId lane at the defaults', ({ laneId, expected }) => {
+    expect(caughtPct({}, laneId)).toBe(expected)
+  })
+
+  it.each([
+    { skim: 3, caught: 3 },
+    { skim: 1, caught: 12 },
+  ])('AI at skim $skim catches $caught%', ({ skim, caught }) => {
+    expect(caughtPct({ skim }, LANE_IDS.ai)).toBe(caught)
+  })
+
+  it('shows 6% for a drained queue (PR size 250 at 1000 LOC/hr)', () => {
+    expect(caughtPct({ reviewerSpeed: 1000 })).toBe(6)
+  })
+})
+
+describe('formatPct', () => {
+  it.each([
+    { share: 0.61, shown: '61%' },
+    { share: 0.0346, shown: '3%' },
+    { share: 0.125, shown: '13%' },
+    { share: 0, shown: '0%' },
+  ])('shows $shown for $share', ({ share, shown }) => {
+    expect(formatPct(share)).toBe(shown)
+  })
+})
+
+describe('formatLoc', () => {
+  it.each([
+    { loc: 0, shown: '0' },
+    { loc: 999.9999999999, shown: '1,000' },
+    { loc: 69600, shown: '69,600' },
+    { loc: 4400.4, shown: '4,400' },
+  ])('shows $shown for $loc', ({ loc, shown }) => {
+    expect(formatLoc(loc)).toBe(shown)
   })
 })

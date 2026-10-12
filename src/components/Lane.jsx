@@ -1,6 +1,7 @@
 import { LANE_MODELS, floorShow, laneParams } from '../engine.js'
 import { LANE_PRESENTATION } from '../laneConfig.js'
 import { Icon } from './Icon.jsx'
+import { LaneMetrics } from './LaneMetrics.jsx'
 import { RateSlider } from './RateSlider.jsx'
 
 function DerivedValue({ children }) {
@@ -64,6 +65,7 @@ export function Lane({ laneId, lane, settings, onSettingChange }) {
             {floorShow(lane.deployedPrs)}
           </dd>
         </dl>
+        <LaneMetrics lane={lane} params={params} />
       </div>
     </section>
   )

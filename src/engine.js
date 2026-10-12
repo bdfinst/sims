@@ -47,6 +47,13 @@ export const SECONDS_PER_WORK_HOUR = 1
 export const MS_PER_WORK_HOUR = SECONDS_PER_WORK_HOUR * 1000
 export const TICK_MS = TICK_HOURS * MS_PER_WORK_HOUR
 const DEFECTS_PER_LOC = 0.02
+const BASE_DETECTION = 0.8
+const SIZE_KNEE = 200
+const SIZE_WALL = 400
+const SIZE_FLOOR = 0.05
+const SPEED_KNEE = 500
+const SPEED_WALL = 1000
+const SPEED_FLOOR = 0.1
 const EMPTY_QUEUE_EPSILON = 1e-9
 const DISPLAY_EPSILON = 1e-9
 
@@ -63,8 +70,29 @@ export const floorShow = (value) => Math.floor(value + DISPLAY_EPSILON)
 
 export const formatElapsedHours = (ticks) => (ticks * TICK_HOURS).toFixed(1)
 
-// Placeholder: reviewers catch nothing until the size/speed detection curves exist.
-const detection = (_avgSize, _effSpeed) => 0
+// Full strength up to the knee, then a straight line down to the floor at the wall.
+const fallOff = (value, { knee, wall, floor }) => {
+  if (value <= knee) return 1
+  if (value >= wall) return floor
+  return 1 - (1 - floor) * ((value - knee) / (wall - knee))
+}
+
+export const sizeFactor = (prSizeLoc) =>
+  fallOff(prSizeLoc, { knee: SIZE_KNEE, wall: SIZE_WALL, floor: SIZE_FLOOR })
+
+export const speedFactor = (locPerHour) =>
+  fallOff(locPerHour, { knee: SPEED_KNEE, wall: SPEED_WALL, floor: SPEED_FLOOR })
+
+// Share of a PR's defects that a review catches, from its size and the reviewer's speed.
+export const detection = (prSizeLoc, locPerHour) =>
+  BASE_DETECTION * sizeFactor(prSizeLoc) * speedFactor(locPerHour)
+
+// Escapes do not use detection yet: accrual deliberately assumes reviewers catch nothing.
+const accrualDetection = (_avgSize, _effSpeed) => 0
+
+export const formatPct = (share) => `${Math.round(share * 100)}%`
+
+export const formatLoc = (loc) => floorShow(loc).toLocaleString('en-US')
 
 export const tick = (lane, { gen, size, effSpeed }) => {
   const generatedPrs = gen * TICK_HOURS
@@ -72,7 +100,7 @@ export const tick = (lane, { gen, size, effSpeed }) => {
   const queuedLoc = lane.pendingLoc + generatedPrs * size
 
   const avgSize = queuedPrs > EMPTY_QUEUE_EPSILON ? queuedLoc / queuedPrs : size
-  const detectionRate = detection(avgSize, effSpeed)
+  const detectionRate = accrualDetection(avgSize, effSpeed)
 
   const reviewedLoc = Math.min(queuedLoc, effSpeed * TICK_HOURS)
   const hasQueuedWork = queuedLoc > EMPTY_QUEUE_EPSILON
