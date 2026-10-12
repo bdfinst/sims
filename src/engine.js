@@ -22,6 +22,13 @@ export const SLIDERS = Object.freeze({
   threshold: Object.freeze({ min: 5, max: 50, step: 1, defaultValue: 15 }),
 })
 
+// Clamps to the slider's range and snaps to its step, so no caller can store an illegal setting.
+export const snapToSlider = (settingKey, rawValue) => {
+  const { min, max, step } = SLIDERS[settingKey]
+  const snapped = min + Math.round((rawValue - min) / step) * step
+  return Math.min(max, Math.max(min, snapped))
+}
+
 export const DEFAULT_SETTINGS = Object.freeze(
   Object.fromEntries(Object.entries(SLIDERS).map(([key, slider]) => [key, slider.defaultValue])),
 )

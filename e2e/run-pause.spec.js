@@ -1,6 +1,17 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { SIMULATOR_TITLE as TITLE, expect, openSimulator, test } from './fixtures.js'
+import {
+  SIMULATOR_TITLE as TITLE,
+  expect,
+  expectCounts,
+  laneLocator,
+  metric,
+  openSimulator,
+  pauseSimulation,
+  startSimulation,
+  test,
+  toggleButton,
+} from './fixtures.js'
 
 const DIST_DIR = fileURLToPath(new URL('../dist/', import.meta.url))
 const SECOND_MS = 1000
@@ -12,35 +23,14 @@ const HUMAN_BLUE = 'rgb(59, 130, 246)'
 const AI_PURPLE = 'rgb(168, 85, 247)'
 const LANE_ID_LIST = ['human', 'ai']
 
-const laneLocator = (page, laneId) => page.locator(`[data-lane="${laneId}"]`)
-const metric = (page, laneId, name) => laneLocator(page, laneId).locator(`[data-metric="${name}"]`)
 const iconNames = (laneRoot) =>
   laneRoot.locator('[data-icon]').evaluateAll((els) => els.map((el) => el.dataset.icon))
-
-const toggleButton = (page, name) => page.getByRole('button', { name, exact: true })
-
-// Waiting for the toggled label means React has committed (and registered or cleared the
-// interval) before the fake clock moves.
-const startSimulation = async (page) => {
-  await toggleButton(page, 'Start').click()
-  await expect(toggleButton(page, 'Pause')).toBeVisible()
-}
-
-const pauseSimulation = async (page) => {
-  await toggleButton(page, 'Pause').click()
-  await expect(toggleButton(page, 'Start')).toBeVisible()
-}
 
 const setVisibility = (page, visibilityState) =>
   page.evaluate((state) => {
     Object.defineProperty(document, 'visibilityState', { value: state, configurable: true })
     document.dispatchEvent(new Event('visibilitychange'))
   }, visibilityState)
-
-const expectCounts = async (page, laneId, { pending, deployed }) => {
-  await expect(metric(page, laneId, 'pending')).toHaveText(String(pending))
-  await expect(metric(page, laneId, 'deployed')).toHaveText(String(deployed))
-}
 
 const expectEmptyLanes = async (page) => {
   for (const laneId of LANE_ID_LIST) {

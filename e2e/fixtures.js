@@ -58,4 +58,28 @@ export const openSimulator = async (page, url = '/') => {
   await page.clock.pauseAt(FIXED_START_MS + CLOCK_PAUSE_OFFSET_MS)
 }
 
+export const laneLocator = (page, laneId) => page.locator(`[data-lane="${laneId}"]`)
+
+export const metric = (page, laneId, name) =>
+  laneLocator(page, laneId).locator(`[data-metric="${name}"]`)
+
+export const toggleButton = (page, name) => page.getByRole('button', { name, exact: true })
+
+// Waiting for the toggled label means React has committed (and registered or cleared the
+// interval) before the fake clock moves.
+export const startSimulation = async (page) => {
+  await toggleButton(page, 'Start').click()
+  await expect(toggleButton(page, 'Pause')).toBeVisible()
+}
+
+export const pauseSimulation = async (page) => {
+  await toggleButton(page, 'Pause').click()
+  await expect(toggleButton(page, 'Start')).toBeVisible()
+}
+
+export const expectCounts = async (page, laneId, { pending, deployed }) => {
+  await expect(metric(page, laneId, 'pending')).toHaveText(String(pending))
+  await expect(metric(page, laneId, 'deployed')).toHaveText(String(deployed))
+}
+
 export { expect }

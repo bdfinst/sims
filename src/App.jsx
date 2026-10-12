@@ -34,7 +34,13 @@ function App() {
       <main className="flex flex-col gap-6">
         <HeadlineBand />
         {LANE_ORDER.map((laneId) => (
-          <Lane key={laneId} laneId={laneId} lane={state.lanes[laneId]} />
+          <Lane
+            key={laneId}
+            laneId={laneId}
+            lane={state.lanes[laneId]}
+            settings={state.settings}
+            onSettingChange={(key, value) => dispatch({ type: 'setSetting', key, value })}
+          />
         ))}
       </main>
     </div>
