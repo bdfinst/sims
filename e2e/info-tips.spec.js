@@ -1,0 +1,593 @@
+import {
+  AI_CODE_WRITTEN_LABEL,
+  AI_SKIM_LABEL,
+  HUMAN_CODE_WRITTEN_LABEL,
+  HUMAN_PRS_PER_DAY_LABEL,
+  MIN_TEXT_CONTRAST,
+  NARROWEST_PHONE,
+  PHONE,
+  REVIEWER_SPEED_LABEL,
+  THRESHOLD_LABEL,
+  centreOf,
+  contrastRatio,
+  expect,
+  expectNoHorizontalScroll,
+  expectViewport,
+  flushPendingRenders,
+  infoButton,
+  movePointerTo,
+  openSimulator,
+  pageTitle,
+  runFor,
+  shownTips,
+  slider,
+  startSimulation,
+  tabTo,
+  test,
+  textColors,
+} from './fixtures.js'
+
+test.describe.configure({ mode: 'parallel' })
+
+const PROJECTOR = { width: 1280, height: 720 }
+// WCAG 2.5.8: a target is at least 24 × 24 CSS px.
+const MIN_TARGET_PX = 24
+// "Directly follows": the button sits on the label's row, at most this far to its right.
+const MAX_LABEL_TO_BUTTON_GAP_PX = 8
+const INFO_ICON = 'info'
+const UNSUPPORTED_WORDING = ['near zero', 'coined', 'originated']
+
+// Slice 9 Examples: each slider, in page order, and a phrase its tip must contain. Copied from the
+// plan, never imported from src/laneConfig.js, so a change to a tip fails these tests.
+const TIP_PHRASES = [
+  [THRESHOLD_LABEL, 'turns red when its count is above this many PRs'],
+  [HUMAN_CODE_WRITTEN_LABEL, 'lines of code the human lane writes, in LOC/hr'],
+  [HUMAN_PRS_PER_DAY_LABEL, 'Below 1, a PR spans more than one day'],
+  [
+    AI_CODE_WRITTEN_LABEL,
+    "The AI queue grows once this exceeds the AI lane's effective review speed",
+  ],
+  [REVIEWER_SPEED_LABEL, 'Defect discovery drops significantly faster than 500 LOC/hour'],
+  [AI_SKIM_LABEL, 'AI PRs are reviewed 2× faster once picked up'],
+]
+const PHRASE_BY_CONTROL = Object.fromEntries(TIP_PHRASES)
+const ALL_CONTROLS = TIP_PHRASES.map(([control]) => control)
+
+const NARROW_SCREENS = [
+  ...ALL_CONTROLS.map((control) => ({ viewport: NARROWEST_PHONE, control })),
+  { viewport: PHONE, control: AI_CODE_WRITTEN_LABEL },
+]
+
+const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+// The tip a slider names as its accessible description (aria-describedby).
+const tipFor = async (page, control) => {
+  const tipId = await slider(page, control).getAttribute('aria-describedby')
+  expect(tipId, `${control} slider names its tip`).toBeTruthy()
+  return page.locator(`[role="tooltip"][id="${tipId}"]`)
+}
+
+const expectOneTipContaining = async (page, phrase) => {
+  await expect(shownTips(page)).toHaveCount(1)
+  await expect(shownTips(page)).toContainText(phrase)
+}
+
+// "Still" and "no" checks are made after any render the last action queued has committed.
+const expectNoTipShown = async (page) => {
+  await flushPendingRenders(page)
+  await expect(shownTips(page)).toHaveCount(0)
+}
+
+const expectTipStillShown = async (page, control) => {
+  await flushPendingRenders(page)
+  await expect(await tipFor(page, control)).toBeVisible()
+}
+
+// Glides the mouse from the button's centre straight to the tip's nearest edge, one pixel per
+// move event, then into the tip. Any gap between button and tip is crossed, as a real pointer would.
+const movePointerOnto = async (page, button, tip) => {
+  const start = await centreOf(button)
+  const tipBox = await boxOf(tip, 'tip')
+  const isTipAbove = tipBox.y < start.y
+  const edgeY = isTipAbove ? tipBox.y + tipBox.height - 1 : tipBox.y + 1
+  await page.mouse.move(start.x, start.y)
+  await page.mouse.move(start.x, edgeY, { steps: Math.ceil(Math.abs(edgeY - start.y)) })
+  await movePointerTo(page, tip)
+}
+
+const boxOf = async (locator, label) => {
+  const box = await locator.boundingBox()
+  expect(box, `${label} has a layout box`).not.toBeNull()
+  return box
+}
+
+const overlaps = (first, second) =>
+  first.x < second.x + second.width &&
+  second.x < first.x + first.width &&
+  first.y < second.y + second.height &&
+  second.y < first.y + first.height
+
+// The first button or input after the slider's label, in document order.
+const controlAfterLabel = (page, control) =>
+  slider(page, control).evaluate((input) => {
+    const label = document.querySelector(`label[for="${input.id}"]`)
+    const following = [...document.querySelectorAll('button, input')].find(
+      (element) => label.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING,
+    )
+    return following?.getAttribute('aria-label') ?? following?.id
+  })
+
+const labelOf = async (page, control) => {
+  const inputId = await slider(page, control).getAttribute('id')
+  return page.locator(`label[for="${inputId}"]`)
+}
+
+// Where every element in both lanes sits, except the tips (which appear when opened).
+const laneElementBoxes = (page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('[data-lane] *')]
+      .filter((element) => !element.closest('[role="tooltip"]'))
+      .map((element) => {
+        const { x, y, width, height } = element.getBoundingClientRect()
+        return { x, y, width, height }
+      }),
+  )
+
+test.describe('Slider info tips', () => {
+  for (const control of ALL_CONTROLS) {
+    test(`Every slider has an info button after its label: ${control}`, async ({ page }) => {
+      const button = infoButton(page, control)
+
+      await test.step('Given I open the simulator', async () => {
+        await openSimulator(page)
+      })
+
+      await test.step(`Then an "About ${control}" button with an "info" icon directly follows the "${control}" label`, async () => {
+        await expect(button).toBeVisible()
+        await expect(button.locator(`[data-icon="${INFO_ICON}"]`)).toHaveCount(1)
+        expect(await controlAfterLabel(page, control), 'first control after the label').toBe(
+          `About ${control}`,
+        )
+        const label = await boxOf(await labelOf(page, control), `${control} label`)
+        const buttonBox = await boxOf(button, `About ${control}`)
+        expect(buttonBox.x, 'button is right of the label').toBeGreaterThanOrEqual(
+          label.x + label.width,
+        )
+        expect(buttonBox.x - (label.x + label.width), 'label-to-button gap').toBeLessThanOrEqual(
+          MAX_LABEL_TO_BUTTON_GAP_PX,
+        )
+        expect(buttonBox.y, 'button starts on the label row').toBeLessThan(label.y + label.height)
+      })
+
+      await test.step('And the button is at least 24 by 24 pixels', async () => {
+        const { width, height } = await boxOf(button, `About ${control}`)
+        expect(width, 'button width').toBeGreaterThanOrEqual(MIN_TARGET_PX)
+        expect(height, 'button height').toBeGreaterThanOrEqual(MIN_TARGET_PX)
+      })
+    })
+  }
+
+  for (const [control, phrase] of TIP_PHRASES) {
+    test(`Each tip explains its slider and is the slider's description: ${control}`, async ({
+      page,
+    }) => {
+      await test.step('Given I open the simulator', async () => {
+        await openSimulator(page)
+      })
+
+      await test.step(`Then the "${control}" slider's accessible description contains "${phrase}"`, async () => {
+        await expect(slider(page, control)).toHaveAccessibleDescription(
+          new RegExp(escapeRegExp(phrase)),
+        )
+      })
+
+      await test.step(`When I hover "About ${control}"`, async () => {
+        await movePointerTo(page, infoButton(page, control))
+      })
+
+      await test.step(`Then a tip is shown that contains "${phrase}"`, async () => {
+        await expectOneTipContaining(page, phrase)
+      })
+
+      await test.step(`And the tip does not cover the "${control}" slider`, async () => {
+        const tip = await boxOf(shownTips(page), 'tip')
+        const sliderBox = await boxOf(slider(page, control), `${control} slider`)
+        expect(overlaps(tip, sliderBox), 'tip overlaps the slider').toBe(false)
+      })
+    })
+  }
+
+  // AA contrast for the tip text (plan, "Info tips": light text on a dark surface, at least 4.5:1).
+  test('An open tip has AA text contrast', async ({ page }) => {
+    await openSimulator(page)
+    await movePointerTo(page, infoButton(page, REVIEWER_SPEED_LABEL))
+    await expectOneTipContaining(page, PHRASE_BY_CONTROL[REVIEWER_SPEED_LABEL])
+
+    const ratio = contrastRatio(await textColors(shownTips(page)))
+    expect(ratio, 'tip text contrast').toBeGreaterThanOrEqual(MIN_TEXT_CONTRAST)
+  })
+
+  test('The tip stays open while the pointer moves onto it', async ({ page }) => {
+    await test.step('Given I hover "About Reviewer speed (LOC/hr, both lanes)"', async () => {
+      await openSimulator(page)
+      await movePointerTo(page, infoButton(page, REVIEWER_SPEED_LABEL))
+      await expect(await tipFor(page, REVIEWER_SPEED_LABEL)).toBeVisible()
+    })
+
+    await test.step('When I move the pointer onto the tip', async () => {
+      await movePointerOnto(
+        page,
+        infoButton(page, REVIEWER_SPEED_LABEL),
+        await tipFor(page, REVIEWER_SPEED_LABEL),
+      )
+    })
+
+    await test.step('Then the tip is still shown', async () => {
+      await expectTipStillShown(page, REVIEWER_SPEED_LABEL)
+    })
+  })
+
+  test('Moving the pointer away closes the tip', async ({ page }) => {
+    await test.step('Given I hover "About Reviewer speed (LOC/hr, both lanes)"', async () => {
+      await openSimulator(page)
+      await movePointerTo(page, infoButton(page, REVIEWER_SPEED_LABEL))
+      await expect(await tipFor(page, REVIEWER_SPEED_LABEL)).toBeVisible()
+    })
+
+    await test.step('When I move the pointer to the page title', async () => {
+      await movePointerTo(page, pageTitle(page))
+    })
+
+    await test.step('Then no tip is shown', async () => {
+      await expectNoTipShown(page)
+    })
+  })
+
+  test('Keyboard focus opens the tip and Escape closes it', async ({ page }) => {
+    const button = infoButton(page, AI_SKIM_LABEL)
+
+    await test.step('Given I open the simulator', async () => {
+      await openSimulator(page)
+    })
+
+    await test.step('When I Tab to "About AI skim multiplier"', async () => {
+      await tabTo(page, button)
+    })
+
+    await test.step('Then a tip is shown that contains "AI PRs are reviewed 2× faster once picked up"', async () => {
+      await expectOneTipContaining(page, 'AI PRs are reviewed 2× faster once picked up')
+    })
+
+    await test.step('When I press Escape', async () => {
+      await page.keyboard.press('Escape')
+    })
+
+    await test.step('Then no tip is shown', async () => {
+      await expectNoTipShown(page)
+    })
+
+    await test.step('And focus is still on "About AI skim multiplier"', async () => {
+      await expect(button).toBeFocused()
+    })
+  })
+
+  test('Tabbing away from a focused info button closes its tip', async ({ page }) => {
+    await test.step('Given I Tab to "About Human PRs per day"', async () => {
+      await openSimulator(page)
+      await tabTo(page, infoButton(page, HUMAN_PRS_PER_DAY_LABEL))
+      await expect(await tipFor(page, HUMAN_PRS_PER_DAY_LABEL)).toBeVisible()
+    })
+
+    await test.step('When I press Tab', async () => {
+      await page.keyboard.press('Tab')
+    })
+
+    await test.step('Then no tip is shown', async () => {
+      await expectNoTipShown(page)
+    })
+  })
+
+  test('A focused tip stays open when the pointer leaves', async ({ page }) => {
+    await test.step('Given I Tab to "About Human PRs per day" and hover it', async () => {
+      await openSimulator(page)
+      await tabTo(page, infoButton(page, HUMAN_PRS_PER_DAY_LABEL))
+      await movePointerTo(page, infoButton(page, HUMAN_PRS_PER_DAY_LABEL))
+      await expect(await tipFor(page, HUMAN_PRS_PER_DAY_LABEL)).toBeVisible()
+    })
+
+    await test.step('When I move the pointer to the page title', async () => {
+      await movePointerTo(page, pageTitle(page))
+    })
+
+    await test.step('Then the tip for "About Human PRs per day" is still shown', async () => {
+      await expectTipStillShown(page, HUMAN_PRS_PER_DAY_LABEL)
+    })
+  })
+
+  test('A hovered tip stays open when focus moves away', async ({ page }) => {
+    await test.step('Given I Tab to "About Human PRs per day" and hover it', async () => {
+      await openSimulator(page)
+      await tabTo(page, infoButton(page, HUMAN_PRS_PER_DAY_LABEL))
+      await movePointerTo(page, infoButton(page, HUMAN_PRS_PER_DAY_LABEL))
+      await expect(await tipFor(page, HUMAN_PRS_PER_DAY_LABEL)).toBeVisible()
+    })
+
+    await test.step('When I press Tab', async () => {
+      await page.keyboard.press('Tab')
+      await expect(infoButton(page, HUMAN_PRS_PER_DAY_LABEL)).not.toBeFocused()
+    })
+
+    await test.step('Then the tip for "About Human PRs per day" is still shown', async () => {
+      await expectTipStillShown(page, HUMAN_PRS_PER_DAY_LABEL)
+    })
+  })
+
+  test('Escape closes a hovered tip without moving the pointer', async ({ page }) => {
+    const button = infoButton(page, HUMAN_PRS_PER_DAY_LABEL)
+
+    await test.step('Given I hover "About Human PRs per day"', async () => {
+      await openSimulator(page)
+      await movePointerTo(page, button)
+      await expect(await tipFor(page, HUMAN_PRS_PER_DAY_LABEL)).toBeVisible()
+    })
+
+    await test.step('When I press Escape', async () => {
+      await page.keyboard.press('Escape')
+    })
+
+    await test.step('Then no tip is shown', async () => {
+      await expectNoTipShown(page)
+      expect(await button.evaluate((element) => element.matches(':hover')), 'still hovered').toBe(
+        true,
+      )
+    })
+
+    await test.step('When I move the pointer to the page title and back onto "About Human PRs per day"', async () => {
+      await movePointerTo(page, pageTitle(page))
+      await movePointerTo(page, button)
+    })
+
+    await test.step('Then the tip for "About Human PRs per day" is shown', async () => {
+      await expect(await tipFor(page, HUMAN_PRS_PER_DAY_LABEL)).toBeVisible()
+    })
+  })
+
+  test('Clicking the info button toggles its tip', async ({ page }) => {
+    await test.step('Given I open the simulator', async () => {
+      await openSimulator(page)
+    })
+
+    await test.step('When I Tab to "About Warning threshold" and press Enter', async () => {
+      await tabTo(page, infoButton(page, THRESHOLD_LABEL))
+      await page.keyboard.press('Enter')
+    })
+
+    await test.step('And I press Tab', async () => {
+      await page.keyboard.press('Tab')
+      await expect(slider(page, THRESHOLD_LABEL)).toBeFocused()
+    })
+
+    await test.step('Then the tip for "About Warning threshold" is still shown', async () => {
+      await expectTipStillShown(page, THRESHOLD_LABEL)
+    })
+
+    await test.step('When I press Shift+Tab and Enter', async () => {
+      await page.keyboard.press('Shift+Tab')
+      await expect(infoButton(page, THRESHOLD_LABEL)).toBeFocused()
+      await page.keyboard.press('Enter')
+    })
+
+    await test.step('Then no tip is shown', async () => {
+      await expectNoTipShown(page)
+    })
+  })
+
+  test('A clicked tip stays open after the pointer leaves', async ({ page }) => {
+    const button = infoButton(page, REVIEWER_SPEED_LABEL)
+    const clickButton = async () => {
+      const { x, y } = await centreOf(button)
+      await page.mouse.click(x, y)
+    }
+
+    await test.step('Given I hover "About Reviewer speed (LOC/hr, both lanes)"', async () => {
+      await openSimulator(page)
+      await movePointerTo(page, button)
+      await expect(await tipFor(page, REVIEWER_SPEED_LABEL)).toBeVisible()
+    })
+
+    await test.step('When I click "About Reviewer speed (LOC/hr, both lanes)"', async () => {
+      await clickButton()
+    })
+
+    await test.step('And I move the pointer to the page title', async () => {
+      await movePointerTo(page, pageTitle(page))
+    })
+
+    await test.step('Then the tip for "About Reviewer speed (LOC/hr, both lanes)" is still shown', async () => {
+      await expectTipStillShown(page, REVIEWER_SPEED_LABEL)
+    })
+
+    await test.step('When I click "About Reviewer speed (LOC/hr, both lanes)" again', async () => {
+      await clickButton()
+    })
+
+    await test.step('Then no tip is shown', async () => {
+      await expectNoTipShown(page)
+    })
+  })
+
+  test.describe('on a touch device', () => {
+    test.use({ hasTouch: true })
+
+    test('A tap opens a tip and a tap elsewhere closes it', async ({ page }) => {
+      await test.step('Given I open the simulator on a touch device', async () => {
+        await openSimulator(page)
+        expect(await page.evaluate(() => navigator.maxTouchPoints), 'touch points').toBeGreaterThan(
+          0,
+        )
+      })
+
+      await test.step('When I tap "About AI code written (LOC/hr)"', async () => {
+        await infoButton(page, AI_CODE_WRITTEN_LABEL).tap()
+      })
+
+      await test.step('Then the tip for "About AI code written (LOC/hr)" is shown', async () => {
+        await expect(await tipFor(page, AI_CODE_WRITTEN_LABEL)).toBeVisible()
+      })
+
+      await test.step('When I tap the page title', async () => {
+        await pageTitle(page).tap()
+      })
+
+      await test.step('Then no tip is shown', async () => {
+        await expectNoTipShown(page)
+      })
+    })
+  })
+
+  test('Opening one tip closes the other', async ({ page }) => {
+    await test.step('Given I hover "About Human PRs per day"', async () => {
+      await openSimulator(page)
+      await movePointerTo(page, infoButton(page, HUMAN_PRS_PER_DAY_LABEL))
+      await expect(await tipFor(page, HUMAN_PRS_PER_DAY_LABEL)).toBeVisible()
+    })
+
+    await test.step('When I Tab to "About Warning threshold"', async () => {
+      await tabTo(page, infoButton(page, THRESHOLD_LABEL))
+    })
+
+    await test.step('Then exactly one tip is shown and it contains "turns red when its count is above this many PRs"', async () => {
+      await flushPendingRenders(page)
+      await expectOneTipContaining(page, 'turns red when its count is above this many PRs')
+    })
+  })
+
+  test('Hovering the slider itself shows no tip', async ({ page }) => {
+    await test.step('Given I open the simulator', async () => {
+      await openSimulator(page)
+    })
+
+    await test.step('When I hover the "Reviewer speed (LOC/hr, both lanes)" slider', async () => {
+      await movePointerTo(page, slider(page, REVIEWER_SPEED_LABEL))
+    })
+
+    await test.step('Then no tip is shown', async () => {
+      await expectNoTipShown(page)
+    })
+  })
+
+  test('Tips never use unsupported or misattributing wording', async ({ page }) => {
+    const tipTexts = []
+
+    await test.step('Given I open the simulator', async () => {
+      await openSimulator(page)
+    })
+
+    await test.step('When I hover each info button in turn', async () => {
+      for (const control of ALL_CONTROLS) {
+        await movePointerTo(page, infoButton(page, control))
+        await expectOneTipContaining(page, PHRASE_BY_CONTROL[control])
+        tipTexts.push(await shownTips(page).textContent())
+      }
+    })
+
+    await test.step('Then no tip contains "near zero", "coined", or "originated"', async () => {
+      expect(tipTexts, 'one tip read per slider').toHaveLength(ALL_CONTROLS.length)
+      const misworded = tipTexts.filter((text) =>
+        UNSUPPORTED_WORDING.some((phrase) => text.includes(phrase)),
+      )
+      expect(misworded).toEqual([])
+    })
+  })
+
+  test('Opening a tip does not interrupt the simulation', async ({ page }) => {
+    await test.step('Given the simulation is running', async () => {
+      await openSimulator(page)
+      await startSimulation(page)
+    })
+
+    await test.step('When I hover "About AI code written (LOC/hr)"', async () => {
+      await movePointerTo(page, infoButton(page, AI_CODE_WRITTEN_LABEL))
+      await expect(await tipFor(page, AI_CODE_WRITTEN_LABEL)).toBeVisible()
+    })
+
+    await test.step('Then the status still reads "Running"', async () => {
+      // "Still" running: time keeps advancing the elapsed readout with the tip open.
+      await runFor(page, 1)
+      await expect(page.getByText('Running', { exact: true })).toBeVisible()
+    })
+  })
+
+  test.describe('on a projector', () => {
+    test.use({ viewport: PROJECTOR })
+
+    test('Closed tips are hidden and take no space at 1280 × 720', async ({ page }) => {
+      await test.step('Given the viewport is 1280 × 720', async () => {
+        await openSimulator(page)
+        await expectViewport(page, PROJECTOR)
+      })
+
+      await test.step('Then every tip is hidden and takes no space', async () => {
+        const allTips = page.getByRole('tooltip', { includeHidden: true })
+        await expect(allTips).toHaveCount(ALL_CONTROLS.length)
+        for (const tip of await allTips.all()) {
+          await expect(tip).toBeHidden()
+          await expect(tip).toHaveCSS('display', 'none')
+          expect(await tip.boundingBox(), 'a closed tip has no layout box').toBeNull()
+        }
+      })
+    })
+
+    test('Opening a tip moves no lane element', async ({ page }) => {
+      let closedBoxes = []
+
+      await test.step('Given the viewport is 1280 × 720', async () => {
+        await openSimulator(page)
+        await expectViewport(page, PROJECTOR)
+        closedBoxes = await laneElementBoxes(page)
+      })
+
+      await test.step('When I hover "About Reviewer speed (LOC/hr, both lanes)"', async () => {
+        await movePointerTo(page, infoButton(page, REVIEWER_SPEED_LABEL))
+        await expect(await tipFor(page, REVIEWER_SPEED_LABEL)).toBeVisible()
+      })
+
+      await test.step('Then no element in either lane has moved', async () => {
+        expect(closedBoxes.length, 'lane elements measured').toBeGreaterThan(0)
+        expect(await laneElementBoxes(page)).toEqual(closedBoxes)
+      })
+    })
+  })
+
+  for (const { viewport, control } of NARROW_SCREENS) {
+    const size = `${viewport.width} × ${viewport.height}`
+
+    test.describe(`at ${size}`, () => {
+      test.use({ viewport })
+
+      test(`An open tip fits a narrow screen: ${size} ${control}`, async ({ page }) => {
+        await test.step(`Given the viewport is ${size}`, async () => {
+          await openSimulator(page)
+          await expectViewport(page, viewport)
+        })
+
+        await test.step(`When I Tab to "About ${control}"`, async () => {
+          await tabTo(page, infoButton(page, control))
+        })
+
+        await test.step('Then the tip is fully inside the viewport', async () => {
+          await expectOneTipContaining(page, PHRASE_BY_CONTROL[control])
+          const { x, y, width, height } = await boxOf(shownTips(page), 'tip')
+          expect(y, 'tip top').toBeGreaterThanOrEqual(0)
+          expect(y + height, 'tip bottom').toBeLessThanOrEqual(viewport.height)
+          expect(x, 'tip left').toBeGreaterThanOrEqual(0)
+          expect(x + width, 'tip right').toBeLessThanOrEqual(viewport.width)
+        })
+
+        await test.step('And the page does not scroll horizontally', async () => {
+          await expectNoHorizontalScroll(page)
+        })
+      })
+    })
+  }
+})

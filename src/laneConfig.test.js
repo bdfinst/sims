@@ -1,11 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { LANE_IDS, LANE_MODELS, SLIDERS } from './engine.js'
+import {
+  FAROS_MERGE_RATE_INCREASE_PCT,
+  FAROS_PR_SIZE_INCREASE_PCT,
+  FAROS_PR_SIZE_MULTIPLIER,
+  LANE_IDS,
+  LANE_MODELS,
+  SLIDERS,
+  WORK_HOURS_PER_DAY,
+} from './engine.js'
 import {
   LANE_ORDER,
   LANE_PRESENTATION,
   SLIDER_PRESENTATION,
   TILE_CAPACITY,
   derivedFieldText,
+  sliderInfoTexts,
   tileLayout,
 } from './laneConfig.js'
 
@@ -103,7 +112,117 @@ describe('slider presentation', () => {
       spokenUnit: 'lines of code per hour',
     },
   ])('words $settingKey as "$label"', ({ settingKey, ...presentation }) => {
-    expect(SLIDER_PRESENTATION[settingKey]).toEqual(presentation)
+    expect(SLIDER_PRESENTATION[settingKey]).toMatchObject(presentation)
+  })
+})
+
+// Plan, "Info tips": each slider's tip text, unit, and lanes, copied here as independent oracles.
+const TIP_ORACLES = [
+  {
+    settingKey: 'threshold',
+    unitName: 'PRs',
+    lanes: 'both lanes',
+    info: 'A Pending Review box turns red when its count is above this many PRs, in both lanes.',
+  },
+  {
+    settingKey: 'humanLocPerHour',
+    unitName: 'LOC/hr',
+    lanes: 'human lane',
+    info: 'How many lines of code the human lane writes, in LOC/hr. With Human PRs per day, it sets the human PR size. AI PRs are 1.51× that size (Faros: PR size +51%).',
+  },
+  {
+    settingKey: 'humanPrsPerDay',
+    unitName: 'PRs/day',
+    lanes: 'human lane',
+    info: 'How many PRs the human lane opens per 8-hour work day, in PRs/day. Below 1, a PR spans more than one day. Human PR size = LOC/hr × 8 ÷ PRs/day.',
+  },
+  {
+    settingKey: 'aiLocPerHour',
+    unitName: 'LOC/hr',
+    lanes: 'AI lane',
+    info: "How many lines of code the AI lane generates, in LOC/hr. The AI queue grows once this exceeds the AI lane's effective review speed. Default: the human default scaled by Faros (PR size +51%, PR merge rate +16.2%).",
+  },
+  {
+    settingKey: 'reviewerSpeed',
+    unitName: 'LOC/hr',
+    lanes: 'both lanes',
+    info: 'How many lines of code a reviewer reads, in LOC/hr, in both lanes. Defect discovery drops significantly faster than 500 LOC/hour (SmartBear).',
+  },
+  {
+    settingKey: 'skim',
+    unitName: '×',
+    lanes: 'AI lane',
+    info: 'How much faster reviewers read AI-generated code (×) in the AI lane: effective speed is reviewer speed × this value. AI PRs are reviewed 2× faster once picked up (LinearB).',
+  },
+]
+const MAX_LEAD_SENTENCE_WORDS = 25
+const UNSUPPORTED_WORDING = ['near zero', 'coined', 'originated']
+const leadSentence = (text) => text.split(/(?<=\.)\s/)[0]
+const wordCount = (sentence) => sentence.split(/\s+/).length
+
+describe('slider info tips', () => {
+  it('covers every slider', () => {
+    expect(TIP_ORACLES.map(({ settingKey }) => settingKey).sort()).toEqual(
+      Object.keys(SLIDERS).sort(),
+    )
+  })
+
+  it.each(TIP_ORACLES)(
+    "gives $settingKey the plan's tip text, unit, and lanes",
+    ({ settingKey, ...tip }) => {
+      expect(SLIDER_PRESENTATION[settingKey]).toMatchObject(tip)
+    },
+  )
+
+  it.each(Object.keys(SLIDERS))('names the unit and lanes of %s in its tip', (settingKey) => {
+    const { info, unitName, lanes } = SLIDER_PRESENTATION[settingKey]
+    expect(info).toContain(unitName)
+    expect(info).toContain(lanes)
+  })
+
+  it.each(Object.keys(SLIDERS))(
+    `leads the %s tip with a sentence of at most ${MAX_LEAD_SENTENCE_WORDS} words`,
+    (settingKey) => {
+      const lead = leadSentence(SLIDER_PRESENTATION[settingKey].info)
+      expect(lead).toMatch(/\.$/)
+      expect(wordCount(lead)).toBeLessThanOrEqual(MAX_LEAD_SENTENCE_WORDS)
+    },
+  )
+
+  it.each(Object.keys(SLIDERS))('keeps unsupported wording out of the %s tip', (settingKey) => {
+    const { info } = SLIDER_PRESENTATION[settingKey]
+    expect(UNSUPPORTED_WORDING.filter((phrase) => info.includes(phrase))).toEqual([])
+  })
+
+  it('takes every "8" from WORK_HOURS_PER_DAY, so another work day leaves no "8" in any tip', () => {
+    const texts = sliderInfoTexts({
+      workHoursPerDay: 7,
+      prSizeIncreasePct: FAROS_PR_SIZE_INCREASE_PCT,
+      prSizeMultiplier: FAROS_PR_SIZE_MULTIPLIER,
+      mergeRateIncreasePct: FAROS_MERGE_RATE_INCREASE_PCT,
+    })
+    expect(Object.values(texts).filter((text) => text.includes('8'))).toEqual([])
+    expect(texts.humanPrsPerDay).toContain('per 7-hour work day')
+    expect(texts.humanPrsPerDay).toContain('LOC/hr × 7 ÷ PRs/day')
+  })
+
+  it("quotes the engine's Faros constants in the human and AI tips", () => {
+    const { humanLocPerHour, aiLocPerHour } = SLIDER_PRESENTATION
+    expect(humanLocPerHour.info).toContain(`PR size +${FAROS_PR_SIZE_INCREASE_PCT}%`)
+    expect(humanLocPerHour.info).toContain(`${FAROS_PR_SIZE_MULTIPLIER}×`)
+    expect(aiLocPerHour.info).toContain(`PR size +${FAROS_PR_SIZE_INCREASE_PCT}%`)
+    expect(aiLocPerHour.info).toContain(`PR merge rate +${FAROS_MERGE_RATE_INCREASE_PCT}%`)
+  })
+
+  it('reflects other Faros figures when built from them', () => {
+    const texts = sliderInfoTexts({
+      workHoursPerDay: WORK_HOURS_PER_DAY,
+      prSizeIncreasePct: 60,
+      prSizeMultiplier: 1.6,
+      mergeRateIncreasePct: 20.5,
+    })
+    expect(texts.humanLocPerHour).toContain('AI PRs are 1.6× that size (Faros: PR size +60%)')
+    expect(texts.aiLocPerHour).toContain('(PR size +60%, PR merge rate +20.5%)')
   })
 })
 

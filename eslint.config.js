@@ -49,9 +49,9 @@ export default [
       'no-console': 'warn',
     },
   },
-  // The engine and reducer are pure: no React, icons, components, or presentation config.
+  // The engine, reducer, and tip rules are pure: no React, icons, components, or presentation config.
   {
-    files: ['src/engine.js', 'src/reducer.js'],
+    files: ['src/engine.js', 'src/reducer.js', 'src/openTip.js'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -71,7 +71,7 @@ export default [
                 '**/laneConfig*',
               ],
               message:
-                'engine.js and reducer.js must stay pure: no React, icons, components, or laneConfig.',
+                'engine.js, reducer.js, and openTip.js must stay pure: no React, icons, components, or laneConfig.',
             },
           ],
         },

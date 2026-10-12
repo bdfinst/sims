@@ -336,6 +336,27 @@ export const expectEmptyLanes = async (page) => {
 
 export const slider = (page, name) => page.getByRole('slider', { name, exact: true })
 
+// A slider's info button, named "About <slider label>".
+export const infoButton = (page, sliderLabel) => buttonNamed(page, `About ${sliderLabel}`)
+
+// The info tips on screen (getByRole skips hidden ones).
+export const shownTips = (page) => page.getByRole('tooltip')
+
+// The centre of an element's layout box.
+export const centreOf = async (locator) => {
+  const box = await locator.boundingBox()
+  expect(box, 'element has a layout box').not.toBeNull()
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+}
+
+// Moves the real mouse pointer to the centre of an element (a hover, with no click).
+export const movePointerTo = async (page, locator) => {
+  const { x, y } = await centreOf(locator)
+  await page.mouse.move(x, y)
+}
+
+export const pageTitle = (page) => page.getByRole('heading', { level: 1 })
+
 export const setSlider = (page, name, value) => slider(page, name).fill(String(value))
 
 // Sets several sliders in order: setSliders(page, { 'Human PRs per day': 0.5, ... }) or a preset.

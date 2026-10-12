@@ -42,8 +42,11 @@ const AI_PURPLE = 'rgb(168, 85, 247)'
 
 const PAUSE_AFTER_SECONDS = 3
 
+// The lane's identity icons: every icon except those inside a slider's info button.
 const iconNames = (laneRoot) =>
-  laneRoot.locator('[data-icon]').evaluateAll((els) => els.map((el) => el.dataset.icon))
+  laneRoot
+    .locator('[data-icon]')
+    .evaluateAll((els) => els.filter((el) => !el.closest('button')).map((el) => el.dataset.icon))
 
 const setVisibility = (page, visibilityState) =>
   page.evaluate((state) => {

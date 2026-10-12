@@ -9,9 +9,9 @@ const ICON_ENTRIES = Object.entries(ICONS)
 const lucideExports = new Set(Object.values(lucide))
 
 describe('the icon map', () => {
-  it('holds exactly the five icons the plan allows', () => {
+  it('holds exactly the six icons the plan allows, including info', () => {
     expect(Object.keys(ICONS).sort()).toEqual(
-      ['bot', 'chevron-down', 'eye', 'triangle-alert', 'user'].sort(),
+      ['bot', 'chevron-down', 'eye', 'info', 'triangle-alert', 'user'].sort(),
     )
   })
 

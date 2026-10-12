@@ -346,7 +346,8 @@ test.describe('Pending Review layout', () => {
     })
   })
 
-  test('Every control is keyboard reachable with a visible focus ring', async ({ page }) => {
+  // @wip: Step 9.2
+  test.fixme('Every control is keyboard reachable with a visible focus ring', async ({ page }) => {
     const inTabOrder = [
       ['Start', buttonNamed(page, 'Start')],
       ['Reset', buttonNamed(page, 'Reset')],

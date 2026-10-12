@@ -1,5 +1,6 @@
 import { SLIDERS } from '../engine.js'
 import { COLOR_CLASS, SLIDER_PRESENTATION, TYPE_CLASS } from '../laneConfig.js'
+import { InfoTip } from './InfoTip.jsx'
 
 export function RateSlider({
   settingKey,
@@ -8,13 +9,18 @@ export function RateSlider({
   accentClass = COLOR_CLASS.neutralSliderAccent, // the threshold slider belongs to no lane
 }) {
   const { min, max, step } = SLIDERS[settingKey]
-  const { label, unit, spokenUnit } = SLIDER_PRESENTATION[settingKey]
+  const { label, unit, spokenUnit, info } = SLIDER_PRESENTATION[settingKey]
   const inputId = `slider-${settingKey}`
+  const tipId = `info-${settingKey}`
+  // `relative` anchors the info tip to this slider's column, above the label row or below the slider.
   return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={inputId} className={TYPE_CLASS.label}>
-        {label}
-      </label>
+    <div className="relative flex flex-col gap-1">
+      <div className="flex items-start gap-1">
+        <label htmlFor={inputId} className={TYPE_CLASS.label}>
+          {label}
+        </label>
+        <InfoTip id={tipId} label={label} text={info} />
+      </div>
       <div className="flex items-center gap-3">
         <input
           id={inputId}
@@ -24,6 +30,7 @@ export function RateSlider({
           step={step}
           value={value}
           aria-valuetext={`${value} ${spokenUnit}`}
+          aria-describedby={tipId}
           onChange={(event) => onSettingChange(settingKey, event.target.valueAsNumber)}
           className={`w-full ${accentClass}`}
         />
