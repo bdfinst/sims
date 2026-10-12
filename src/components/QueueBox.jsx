@@ -1,5 +1,5 @@
-import { displayedPending, formatLoc, isOverThreshold } from '../engine.js'
-import { QUEUE_STATE, QUEUE_STATE_CLASS } from '../laneConfig.js'
+import { displayedPending, formatLoc, isOverThreshold, tileLayout } from '../engine.js'
+import { QUEUE_STATE, QUEUE_STATE_CLASS, TILE_CAPACITY } from '../laneConfig.js'
 import { Icon } from './Icon.jsx'
 import { MetricValue } from './MetricValue.jsx'
 
@@ -15,15 +15,20 @@ const queueAppearance = (laneLabel, displayed, threshold) => {
   }
 }
 
-export function QueueBox({ laneLabel, lane, threshold }) {
+export function QueueBox({ laneLabel, lane, threshold, tileClass }) {
   const displayed = displayedPending(lane)
   const { isWarning, state, boxClass, statusText } = queueAppearance(
     laneLabel,
     displayed,
     threshold,
   )
+  const { tiles, overflow } = tileLayout(displayed, TILE_CAPACITY)
   return (
-    <div data-state={state} className={`rounded border p-4 ${boxClass}`}>
+    <div
+      data-state={state}
+      data-capacity={TILE_CAPACITY}
+      className={`rounded border p-4 ${boxClass}`}
+    >
       <div className="flex items-start justify-between gap-2">
         <dl>
           <dt className="text-base">Pending Review</dt>
@@ -37,6 +42,12 @@ export function QueueBox({ laneLabel, lane, threshold }) {
         </dl>
         {isWarning && <Icon name="triangle-alert" className="text-warning" />}
       </div>
+      <div aria-hidden="true" className="mt-2 flex flex-wrap gap-1">
+        {Array.from({ length: tiles }, (_, tileIndex) => (
+          <span key={tileIndex} data-tile className={`size-3 rounded-sm ${tileClass}`} />
+        ))}
+      </div>
+      {overflow > 0 && <p className="mt-1 text-base">+{overflow} more</p>}
       {/* Always mounted, so a screen reader announces the text when it changes. */}
       <p role="status" className="sr-only">
         {statusText}

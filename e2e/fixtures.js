@@ -96,7 +96,8 @@ const QUEUE_LABEL_BY_LANE = { human: 'Human', ai: 'AI' }
 // Declared here on purpose: data-state is a fixed hook, so a rename in the app must fail the tests.
 export const QUEUE_STATE = Object.freeze({ warning: 'warning', normal: 'normal' })
 
-export const queueBox = (page, laneId) => laneLocator(page, laneId).locator('[data-state]')
+// Anchored on data-capacity (one per box), so the tiles inside the box can never match.
+export const queueBox = (page, laneId) => laneLocator(page, laneId).locator('[data-capacity]')
 
 // The lane shows `count` pending PRs and its queue box is in `state` (QUEUE_STATE.*).
 export const expectQueueState = async (page, laneId, count, state) => {
@@ -114,6 +115,14 @@ export const expectWarningShown = async (page, laneId) => {
     `${QUEUE_LABEL_BY_LANE[laneId]} Pending Review over threshold`,
   )
 }
+
+// The tiles a queue box draws and the overflow text it adds ("+N more").
+export const tilesIn = (page, laneId) => queueBox(page, laneId).locator('[data-tile]')
+export const overflowIn = (page, laneId) => queueBox(page, laneId).getByText(/^\+\d+ more$/)
+
+// The capacity C the app puts on the queue box; specs never hard-code it.
+export const readTileCapacity = async (page) =>
+  Number(await queueBox(page, 'human').getAttribute('data-capacity'))
 
 export const SECOND_MS = 1000
 export { TICK_MS }

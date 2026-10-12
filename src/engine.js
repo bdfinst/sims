@@ -100,6 +100,12 @@ export const NO_VALUE = '—'
 // The one rule for the PR counts a lane shows; the warning check and the "—" rules use it too.
 export const displayedPending = (lane) => floorShow(lane.pendingPrs)
 export const displayedDeployed = (lane) => floorShow(lane.deployedPrs)
+// How many tiles to draw for `displayed` pending PRs, and how many PRs they do not cover.
+export const tileLayout = (displayed, capacity) => ({
+  tiles: Math.min(displayed, capacity),
+  overflow: Math.max(0, displayed - capacity),
+})
+
 export const displayedIncidents = (lane) => floorShow(lane.escapedDefects)
 
 // The only place the warning comparison is made. Pass the displayed count (displayedPending), so

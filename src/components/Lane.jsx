@@ -47,7 +47,12 @@ export function Lane({ laneId, lane, settings, onSettingChange }) {
           </DerivedValue>
         )}
       </div>
-      <QueueBox laneLabel={presentation.label} lane={lane} threshold={settings.threshold} />
+      <QueueBox
+        laneLabel={presentation.label}
+        lane={lane}
+        threshold={settings.threshold}
+        tileClass={presentation.accentTileClass}
+      />
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <Icon name={presentation.reviewIcon} className={presentation.accentTextClass} />

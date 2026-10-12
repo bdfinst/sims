@@ -23,7 +23,9 @@ import {
   sizeFactor,
   speedFactor,
   tick,
+  tileLayout,
 } from './engine.js'
+import { TILE_CAPACITY } from './laneConfig.js'
 import { shownCounts } from './testHelpers.js'
 
 describe('laneParams at the default settings', () => {
@@ -448,4 +450,26 @@ describe('isOverThreshold', () => {
       expect(isOverThreshold(displayedPending(laneWithPending(internal)), threshold)).toBe(isOver)
     },
   )
+})
+
+describe('tileLayout', () => {
+  const CAPACITY = 5
+
+  it.each([
+    { displayed: 0, tiles: 0, overflow: 0 },
+    { displayed: CAPACITY - 1, tiles: CAPACITY - 1, overflow: 0 },
+    { displayed: CAPACITY, tiles: CAPACITY, overflow: 0 },
+    { displayed: CAPACITY + 1, tiles: CAPACITY, overflow: 1 },
+    { displayed: 184, tiles: CAPACITY, overflow: 184 - CAPACITY },
+  ])(
+    'draws $tiles tiles and $overflow more for $displayed pending PRs at capacity 5',
+    ({ displayed, tiles, overflow }) => {
+      expect(tileLayout(displayed, CAPACITY)).toEqual({ tiles, overflow })
+    },
+  )
+
+  it('uses a real capacity between 22 and 98', () => {
+    expect(TILE_CAPACITY).toBeGreaterThanOrEqual(22)
+    expect(TILE_CAPACITY).toBeLessThanOrEqual(98)
+  })
 })

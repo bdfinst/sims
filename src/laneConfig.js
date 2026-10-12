@@ -12,6 +12,7 @@ export const LANE_PRESENTATION = Object.freeze({
     accentBorderClass: 'border-human',
     accentTextClass: 'text-human',
     accentSliderClass: 'accent-human',
+    accentTileClass: 'bg-human',
     generationSliders: ['humanGen', 'prSize'],
     reviewSliders: ['reviewerSpeed'],
   }),
@@ -23,6 +24,7 @@ export const LANE_PRESENTATION = Object.freeze({
     accentBorderClass: 'border-ai',
     accentTextClass: 'text-ai',
     accentSliderClass: 'accent-ai',
+    accentTileClass: 'bg-ai',
     generationSliders: ['aiGen'],
     reviewSliders: ['skim'],
   }),
@@ -71,3 +73,8 @@ export const QUEUE_STATE_CLASS = Object.freeze({
   [QUEUE_STATE.warning]: 'border-warning bg-warning/10',
   [QUEUE_STATE.normal]: 'border-gray-600',
 })
+
+// Tiles drawn per queue box before "+N more". Tiles are 12px with 4px gaps, so a phone's
+// 263px of box width holds 16 per row: 48 tiles take three rows, and 1280px takes three or fewer.
+// It must be at least 22 (the AI queue after 1.2 s) and at most 98.
+export const TILE_CAPACITY = 48
