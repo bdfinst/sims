@@ -12,19 +12,18 @@ import { scenariosFromFeature } from './expectations.js'
 const MATCH_EVERYTHING = String(/.*/)
 const NARROWING_FLAGS = ['--last-failed', '--only-changed']
 
-const loadScenarios = (featuresDir) =>
-  readdirSync(featuresDir, { recursive: true })
-    .filter((file) => file.endsWith('.feature'))
+const filesWithExtension = (dir, ext) =>
+  readdirSync(dir, { recursive: true })
+    .filter((file) => file.endsWith(ext))
     .sort()
-    .flatMap((file) => {
-      const uri = path.join(featuresDir, file)
-      return scenariosFromFeature(readFileSync(uri, 'utf8'), uri)
-    })
+    .map((file) => path.join(dir, file))
 
-const specFilesIn = (testDir) =>
-  readdirSync(testDir, { recursive: true })
-    .filter((file) => file.endsWith('.spec.js'))
-    .map((file) => path.join(testDir, file))
+export const loadScenarios = (featuresDir) =>
+  filesWithExtension(featuresDir, '.feature').flatMap((uri) =>
+    scenariosFromFeature(readFileSync(uri, 'utf8'), uri),
+  )
+
+const specFilesIn = (testDir) => filesWithExtension(testDir, '.spec.js')
 
 const isUnfiltered = (grep) =>
   [grep].flat().every((pattern) => String(pattern) === MATCH_EVERYTHING)
@@ -48,6 +47,28 @@ const STRICT_ENV = 'GHERKIN_SYNC_STRICT'
 const isStrict = () => process.env[STRICT_ENV] === '1'
 
 const relative = (file) => path.relative(process.cwd(), file)
+
+// Decides the run's result: problems fail it; in strict mode, pending scenarios fail it;
+// otherwise it passes. The message is printed either way, with the pending count if any.
+export const syncOutcome = ({ problems, pending, scope }) => {
+  const pendingLine = pending.message ? `${pending.message}\n` : ''
+  if (problems.length > 0) {
+    return {
+      failed: true,
+      message: `\nGherkin sync: ${problems.length} problem(s) (${scope}):\n${problems.map((problem) => `  - ${problem}`).join('\n')}\n${pendingLine}`,
+    }
+  }
+  if (pending.failed) {
+    return {
+      failed: true,
+      message: `\nGherkin sync: ${STRICT_ENV}=1 and ${pending.message}.\n`,
+    }
+  }
+  return {
+    failed: false,
+    message: `\nGherkin sync: tests follow their scenarios (${scope}).\n${pendingLine}`,
+  }
+}
 
 export default function createGherkinSyncReporter({ featuresDir = 'features' } = {}) {
   const outcomes = new Map()
@@ -87,21 +108,13 @@ export default function createGherkinSyncReporter({ featuresDir = 'features' } =
       const problems = compareScenariosWithTests(scenarios, tests, { complete })
       const pending = pendingReport(scenarios, { strict: isStrict() })
       const scope = complete ? 'all scenarios' : 'selected tests only (partial run)'
-      const pendingLine = pending.message ? `${pending.message}\n` : ''
+      const { failed, message } = syncOutcome({ problems, pending, scope })
 
-      if (problems.length > 0) {
-        process.stderr.write(
-          `\nGherkin sync: ${problems.length} problem(s) (${scope}):\n${problems.map((problem) => `  - ${problem}`).join('\n')}\n${pendingLine}`,
-        )
+      if (failed) {
+        process.stderr.write(message)
         return { status: 'failed' }
       }
-      if (pending.failed) {
-        process.stderr.write(`\nGherkin sync: ${STRICT_ENV}=1 and ${pending.message}.\n`)
-        return { status: 'failed' }
-      }
-      process.stdout.write(
-        `\nGherkin sync: tests follow their scenarios (${scope}).\n${pendingLine}`,
-      )
+      process.stdout.write(message)
       return undefined
     },
   }

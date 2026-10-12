@@ -9,7 +9,6 @@ import {
   MIN_TEXT_CONTRAST,
   NARROWEST_PHONE,
   OVERFLOW_RUN_SECONDS,
-  PAGE_BACKGROUND,
   PHONE,
   RESEARCH_TITLE,
   REVIEWER_SPEED_LABEL,
@@ -20,18 +19,18 @@ import {
   expectSimulatorOpen,
   expectViewport,
   expectNoHorizontalScroll,
+  expectStrictlyIncreasing,
   headline,
   laneLocator,
   metric,
+  metricsGrid,
   openAndReadCapacity,
   openWithSliders,
   openSimulator,
   overflowIn,
   queueBox,
-  bottomOf,
   researchPanel,
   researchToggle,
-  rightOf,
   setSliders,
   slider,
   startAndRunFor,
@@ -47,6 +46,8 @@ const TABLET = { width: 768, height: 1024 }
 // --color-deployed (#22c55e) in src/index.css
 const DEPLOYED_GREEN = 'rgb(34, 197, 94)'
 const FOCUS_RING_COLOR = 'rgb(248, 250, 252)' // --color-focus (#f8fafc) in src/index.css
+// The dark page: --color-canvas (#0b0d12) in src/index.css.
+const PAGE_BACKGROUND = 'rgb(11, 13, 18)'
 // Plan, "Layout": the metrics grid keeps one fixed row order in both lanes.
 const METRIC_ROWS_TOP_TO_BOTTOM = [
   'deployed',
@@ -61,14 +62,15 @@ const GENERATION_LABELS = {
 }
 const REVIEW_LABELS = { human: REVIEWER_SPEED_LABEL, ai: AI_SKIM_LABEL }
 
+// The right and bottom edges of a bounding box.
+const rightOf = ({ x, width }) => x + width
+const bottomOf = ({ y, height }) => y + height
+
 const boxOf = async (locator, label) => {
   const box = await locator.boundingBox()
   expect(box, `${label} has a layout box`).not.toBeNull()
   return box
 }
-
-const metricsGrid = (page, laneId) =>
-  laneLocator(page, laneId).locator('dl', { has: page.locator('[data-metric="incidents"]') })
 
 const expectInsideViewport = async (locator, viewport, label) => {
   const { x, y, width, height } = await boxOf(locator, label)
@@ -78,7 +80,7 @@ const expectInsideViewport = async (locator, viewport, label) => {
   expect(rightOf({ x, width }), `${label} right`).toBeLessThanOrEqual(viewport.width)
 }
 
-const expectStackedBelow = (upper, lower, label) =>
+const expectAbove = (upper, lower, label) =>
   expect(bottomOf(upper), label).toBeLessThanOrEqual(lower.y)
 
 const expectLeftOf = (left, right, label) =>
@@ -166,10 +168,7 @@ test.describe('Pending Review layout', () => {
         for (const row of METRIC_ROWS_TOP_TO_BOTTOM) {
           tops.push((await boxOf(metric(page, laneId, row), `${laneId} ${row}`)).y)
         }
-        expect(
-          tops.slice(1).every((top, index) => top > tops[index]),
-          `${laneId} rows are strictly top to bottom`,
-        ).toBe(true)
+        expectStrictlyIncreasing(tops, `${laneId} rows are strictly top to bottom`)
       }
     })
 
@@ -292,15 +291,15 @@ test.describe('Pending Review layout', () => {
       await test.step('And the two lanes are stacked one above the other', async () => {
         const human = await boxOf(laneLocator(page, 'human'), 'human lane')
         const ai = await boxOf(laneLocator(page, 'ai'), 'ai lane')
-        expectStackedBelow(human, ai, 'lanes are stacked')
+        expectAbove(human, ai, 'lanes are stacked')
       })
 
       await test.step('And within each lane the inputs, the Pending Review box, and the review side appear top to bottom', async () => {
         for (const laneId of ALL_LANE_IDS) {
           const { inputs, queue, review, metrics } = await laneGroups(page, laneId)
-          expectStackedBelow(inputs.at(-1), queue, `${laneId} inputs above queue`)
-          expectStackedBelow(queue, review, `${laneId} queue above review`)
-          expectStackedBelow(review, metrics, `${laneId} review above metrics`)
+          expectAbove(inputs.at(-1), queue, `${laneId} inputs above queue`)
+          expectAbove(queue, review, `${laneId} queue above review`)
+          expectAbove(review, metrics, `${laneId} review above metrics`)
         }
       })
 

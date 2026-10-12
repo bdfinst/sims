@@ -5,8 +5,11 @@ import {
   BUSY_AI_PRESET,
   HUMAN_CODE_WRITTEN_LABEL,
   HUMAN_PRS_PER_DAY_LABEL,
+  LAST_TICK_BEFORE_FIRST_HUMAN_PR_SECONDS,
+  MAX_SKIM,
   NEXT_TICK_SECONDS,
   NO_VALUE,
+  QUARTER_PR_PER_DAY,
   REFERENCE,
   REVIEWER_SPEED_LABEL,
   TICKS_PER_SECOND,
@@ -15,12 +18,13 @@ import {
   expectCounts,
   expectDeployed,
   expectDefectsCaught,
+  expectMetric,
   expectNeverDecreases,
   expectPending,
   headline,
   laneLocator,
-  metric,
   metricValues,
+  metricsGrid,
   openWithSliders,
   openSimulator,
   pauseSimulation,
@@ -31,7 +35,6 @@ import {
   startSimulation,
   test,
   FULL_RUN_SECONDS,
-  DRAIN_SECONDS,
 } from './fixtures.js'
 
 // Plan, Slice 4 outlines: Human code written and PRs per day set the derived PR size.
@@ -56,21 +59,20 @@ const HUMAN_CAUGHT_AT_REST = '65%'
 const AI_CAUGHT_AT_REST = '15%'
 const AI_CAUGHT_AT_MAX_SKIM = '5%'
 const AI_CAUGHT_AT_HUMAN_PACE = '18%'
-const MAX_SKIM = 3
 const HUMAN_PACE_SKIM = 1
 
 const NO_WAIT = '0.0 h'
 const CHANGE_AT_SECONDS = 1
 const LARGE_PR_CODE_WRITTEN = 50
-const RARE_PRS_PER_DAY = 0.25
 const MID_RUN_REVIEWER_SPEED = 900
 const QUEUE_BUILDING_SECONDS = 2
 const HALVED_PRS_PER_DAY = 0.5
 const RESIZED_QUEUE_SECONDS = 1
 const RESEARCH_RATIO_FLOOR = 3
 const RESEARCH_RATIO_CEILING = 4
-const NEARLY_A_PR_SECONDS = 7.9
 const REST_OF_RUN_SECONDS = 8.9
+// The busy AI queue is empty well before then, so the wait and the queue have settled.
+const WELL_DRAINED_SECONDS = 6
 const UNAVAILABLE_TEXT = 'Not yet available'
 
 // AC7c: from the defaults at 1 s, one Human-side change shows in Defects caught on the next tick
@@ -93,7 +95,7 @@ const MID_RUN_CHANGES = [
     scenario:
       'A PR-frequency change while running changes defects caught and accrual on the next tick',
     control: HUMAN_PRS_PER_DAY_LABEL,
-    value: RARE_PRS_PER_DAY,
+    value: QUARTER_PR_PER_DAY,
     caughtNextTick: REFERENCE.humanDefectsCaughtAfterPrsPerDay025,
     atTenSeconds: {
       step: 'Then the Human lane shows Incidents 5, Deployed 0, and Incidents per PR "—"',
@@ -122,11 +124,6 @@ const MID_RUN_CHANGES = [
 
 const pendingReviewList = (page, laneId) =>
   laneLocator(page, laneId).locator('dl', { has: page.locator('[data-metric="pending"]') })
-const metricsList = (page, laneId) =>
-  laneLocator(page, laneId).locator('dl', { has: page.locator('[data-metric="incidents"]') })
-
-const expectMetric = (page, laneId, name, shown) =>
-  expect(metric(page, laneId, name)).toHaveText(String(shown))
 
 const expectNoLaneIncidents = async (page) => {
   for (const laneId of ALL_LANE_IDS) {
@@ -148,12 +145,12 @@ test.describe('Review quality metrics', () => {
 
     await test.step('Then the Human lane shows Defects caught 65% and Pending LOC 0', async () => {
       await expectDefectsCaught(page, 'human', HUMAN_CAUGHT_AT_REST)
-      await expect(metric(page, 'human', 'pendingLoc')).toHaveText('0')
+      await expectMetric(page, 'human', 'pendingLoc', 0)
     })
 
     await test.step('And the AI lane shows Defects caught 15% and Pending LOC 0', async () => {
       await expectDefectsCaught(page, 'ai', AI_CAUGHT_AT_REST)
-      await expect(metric(page, 'ai', 'pendingLoc')).toHaveText('0')
+      await expectMetric(page, 'ai', 'pendingLoc', 0)
     })
   })
 
@@ -223,7 +220,7 @@ test.describe('Review quality metrics', () => {
       - term: Pending LOC
       - definition: "0"
     `)
-    await expect(metricsList(page, 'human')).toMatchAriaSnapshot(`
+    await expect(metricsGrid(page, 'human')).toMatchAriaSnapshot(`
       - term: Deployed
       - definition: "0"
       - term: Defects caught
@@ -240,7 +237,7 @@ test.describe('Review quality metrics', () => {
   test('Terms pair with their definitions at rest in the AI lane', async ({ page }) => {
     await openSimulator(page)
 
-    await expect(metricsList(page, 'ai')).toMatchAriaSnapshot(`
+    await expect(metricsGrid(page, 'ai')).toMatchAriaSnapshot(`
       - term: Deployed
       - definition: "0"
       - term: Defects caught
@@ -322,7 +319,7 @@ test.describe('Review quality metrics', () => {
     })
 
     await test.step('When I press Start and 7.9 seconds pass', async () => {
-      await startAndRunFor(page, NEARLY_A_PR_SECONDS)
+      await startAndRunFor(page, LAST_TICK_BEFORE_FIRST_HUMAN_PR_SECONDS)
     })
 
     await test.step('Then the Human lane shows Deployed 0 and Incidents per PR "—"', async () => {
@@ -355,15 +352,20 @@ test.describe('Review quality metrics', () => {
 
     await test.step('Then the Human lane shows Pending Review 0, Deployed 1, Incidents 9, and Incidents per PR 7.68', async () => {
       await expectCounts(page, 'human', {
-        pending: REFERENCE.largeHumanPrPendingAtTick100,
-        deployed: REFERENCE.largeHumanPrDeployedAtTick100,
+        pending: REFERENCE.humanPendingAtTick100WithCodeWritten50,
+        deployed: REFERENCE.humanDeployedAtTick100WithCodeWritten50,
       })
-      await expectMetric(page, 'human', 'incidents', REFERENCE.largeHumanPrIncidentsAtTick100)
+      await expectMetric(
+        page,
+        'human',
+        'incidents',
+        REFERENCE.humanIncidentsAtTick100WithCodeWritten50,
+      )
       await expectMetric(
         page,
         'human',
         'incidentsPerPr',
-        REFERENCE.largeHumanPrIncidentsPerPrAtTick100,
+        REFERENCE.humanIncidentsPerPrAtTick100WithCodeWritten50,
       )
     })
   })
@@ -442,7 +444,7 @@ test.describe('Review quality metrics', () => {
     })
 
     await test.step('And 6 seconds pass', async () => {
-      await runFor(page, DRAIN_SECONDS)
+      await runFor(page, WELL_DRAINED_SECONDS)
     })
 
     await test.step('Then the AI lane shows Pending Review 0, Pickup wait 0.0 h, and Defects caught 2%', async () => {
@@ -466,6 +468,7 @@ test.describe('Review quality metrics', () => {
       })
 
       expectNeverDecreases(samples)
+      expect(samples.at(-1).human).toBeGreaterThan(0)
       expect(samples.at(-1).ai).toBeGreaterThan(0)
     })
   })

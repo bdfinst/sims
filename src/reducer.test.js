@@ -1,12 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  DEFAULT_SETTINGS,
-  NO_VALUE,
-  displayedIncidents,
-  floorShow,
-  formatHeadlineRatio,
-  formatIncidentsPerPr,
-} from './engine.js'
+import { DEFAULT_SETTINGS, displayedIncidents, floorShow, formatHeadlineRatio } from './engine.js'
 import { ACTION, initialState, reducer } from './reducer.js'
 import { shownCounts } from './testHelpers.js'
 
@@ -203,34 +196,23 @@ describe('incidents across a run', () => {
   const runningState = reducer(initialState, { type: ACTION.start })
   const afterTicks = (state, count) => dispatchAll(state, ...repeat(ACTION.tick, count))
 
-  it('a size change while running changes accrual from the next tick: 8 incidents, 7.08 per PR', () => {
-    const afterOneSecond = afterTicks(runningState, ONE_SECOND_IN_TICKS)
-    const resized = setSetting(afterOneSecond, 'humanLocPerHour', 50)
+  // Wiring only: one number per key shows the change reached the next ticks. engine.test.js pins
+  // the full figures (7.08, Deployed 0 and no Incidents per PR, 3.71).
+  it.each([
+    { settingKey: 'humanLocPerHour', value: 50, incidents: 8 },
+    { settingKey: 'humanPrsPerDay', value: 0.25, incidents: 5 },
+    { settingKey: 'reviewerSpeed', value: 900, incidents: 4 },
+  ])(
+    'a $settingKey change to $value while running shows Human Incidents $incidents at 10 seconds',
+    ({ settingKey, value, incidents }) => {
+      const afterOneSecond = afterTicks(runningState, ONE_SECOND_IN_TICKS)
+      const changed = setSetting(afterOneSecond, settingKey, value)
 
-    const human = afterTicks(resized, TEN_SECONDS_IN_TICKS - ONE_SECOND_IN_TICKS).lanes.human
+      const human = afterTicks(changed, TEN_SECONDS_IN_TICKS - ONE_SECOND_IN_TICKS).lanes.human
 
-    expect([displayedIncidents(human), formatIncidentsPerPr(human)]).toEqual([8, '7.08'])
-  })
-
-  it('a PR-frequency change while running shows Incidents 5, Deployed 0 and no Incidents per PR', () => {
-    const afterOneSecond = afterTicks(runningState, ONE_SECOND_IN_TICKS)
-    const rarer = setSetting(afterOneSecond, 'humanPrsPerDay', 0.25)
-
-    const human = afterTicks(rarer, TEN_SECONDS_IN_TICKS - ONE_SECOND_IN_TICKS).lanes.human
-
-    expect([displayedIncidents(human), shownCounts(human)[1], formatIncidentsPerPr(human)]).toEqual(
-      [5, 0, NO_VALUE],
-    )
-  })
-
-  it('a reviewer-speed change while running shows Incidents 4 and 3.71 per PR', () => {
-    const afterOneSecond = afterTicks(runningState, ONE_SECOND_IN_TICKS)
-    const faster = setSetting(afterOneSecond, 'reviewerSpeed', 900)
-
-    const human = afterTicks(faster, TEN_SECONDS_IN_TICKS - ONE_SECOND_IN_TICKS).lanes.human
-
-    expect([displayedIncidents(human), formatIncidentsPerPr(human)]).toEqual([4, '3.71'])
-  })
+      expect(displayedIncidents(human)).toBe(incidents)
+    },
+  )
 
   it('never lets an incident count decrease while running, and ends above zero', () => {
     const samples = []
@@ -280,12 +262,6 @@ describe('reset', () => {
       ...initialState,
       settings: before.settings,
     })
-  })
-
-  it('keeps a customised setting', () => {
-    const before = runningWithCustomSettings()
-    expect(before.settings.aiLocPerHour).toBe(400)
-    expect(dispatchAll(before, ACTION.reset).settings.aiLocPerHour).toBe(400)
   })
 
   it('keeps customised code-written and PRs-per-day settings', () => {

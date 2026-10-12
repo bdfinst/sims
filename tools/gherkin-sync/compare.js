@@ -22,12 +22,21 @@ const commonPrefixLength = (expected, actual) => {
   return firstDifference === -1 ? expected.length : firstDifference
 }
 
+// An outline whose Examples header has no rows has no variants; a test claiming it is then
+// compared with an empty step list.
+const NO_VARIANT = { example: null, steps: [] }
+
 const closestVariant = (variants, actual) =>
-  variants.reduce((best, variant) =>
-    commonPrefixLength(variant.steps, actual) > commonPrefixLength(best.steps, actual)
-      ? variant
-      : best,
-  )
+  variants.length === 0
+    ? NO_VARIANT
+    : variants.reduce((best, variant) =>
+        commonPrefixLength(variant.steps, actual) > commonPrefixLength(best.steps, actual)
+          ? variant
+          : best,
+      )
+
+const followsSomeVariant = (scenario, test) =>
+  scenario.variants.some(({ steps }) => sameSteps(steps, test.steps))
 
 const describeMismatch = (expected, actual) => {
   const index = commonPrefixLength(expected, actual)
@@ -55,7 +64,7 @@ const scenarioClaimedBy = (scenarios, title) =>
     )
 
 const stepProblems = (scenario, test) => {
-  if (scenario.variants.some(({ steps }) => sameSteps(steps, test.steps))) return []
+  if (followsSomeVariant(scenario, test)) return []
   const variant = closestVariant(scenario.variants, test.steps)
   const row = variant.example ? ` (closest Examples row: ${variant.example})` : ''
   return [
@@ -72,9 +81,7 @@ const coverageProblems = (scenario, claimants) => {
   // claimant passed and follows some row.
   if (!claimants.some(({ ran }) => ran)) return []
   if (!claimants.every(({ passed }) => passed)) return []
-  const followsSomeVariant = (test) =>
-    scenario.variants.some(({ steps }) => sameSteps(steps, test.steps))
-  if (!claimants.every(followsSomeVariant)) return []
+  if (!claimants.every((test) => followsSomeVariant(scenario, test))) return []
   return scenario.variants
     .filter(({ steps }) => !claimants.some((test) => sameSteps(steps, test.steps)))
     .map(({ example }) =>
@@ -86,10 +93,11 @@ const coverageProblems = (scenario, claimants) => {
 
 export const compareScenariosWithTests = (allScenarios, tests, { complete }) => {
   const scenarios = allScenarios.filter(({ wip }) => !wip)
-  const claimed = tests.map((test) => ({
-    test,
-    scenario: scenarioClaimedBy(scenarios, test.title),
-  }))
+  // Claims resolve against every scenario, so a test claiming a longer wip name is dropped
+  // rather than checked against a shorter untagged one.
+  const claimed = tests
+    .map((test) => ({ test, scenario: scenarioClaimedBy(allScenarios, test.title) }))
+    .filter(({ scenario }) => !scenario?.wip)
   const mismatches = claimed
     .filter(({ test, scenario }) => scenario && test.passed)
     .flatMap(({ test, scenario }) => stepProblems(scenario, test))

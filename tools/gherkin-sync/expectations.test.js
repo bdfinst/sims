@@ -136,6 +136,36 @@ describe('scenariosFromFeature', () => {
     expect(scenariosFromFeature(source, URI).map(({ wip }) => wip)).toEqual([true])
   })
 
+  it('marks every scenario wip when the Feature is tagged @wip', () => {
+    const source = `@wip
+Feature: Pending feature
+  Scenario: One
+    Then one outcome
+
+  Rule: Inside
+    Scenario: Ruled
+      Then ruled outcome
+`
+    expect(scenariosFromFeature(source, URI).map(({ wip }) => wip)).toEqual([true, true])
+  })
+
+  it('marks every scenario in a Rule tagged @wip as wip, and only those', () => {
+    const source = `Feature: Rules
+  Scenario: Outside
+    Then outside outcome
+
+  @wip
+  Rule: Pending rule
+    Scenario: Ruled
+      Then ruled outcome
+`
+    const wipByName = scenariosFromFeature(source, URI).map(({ name, wip }) => [name, wip])
+    expect(wipByName).toEqual([
+      ['Outside', false],
+      ['Ruled', true],
+    ])
+  })
+
   it('treats a tagged Scenario Outline as one wip scenario whose every row is pending', () => {
     const source = `Feature: Bounds
   @wip

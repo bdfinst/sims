@@ -3,6 +3,7 @@ import {
   BUSY_AI_PRESET,
   HUMAN_CODE_WRITTEN_LABEL,
   HUMAN_PRS_PER_DAY_LABEL,
+  QUARTER_PR_PER_DAY,
   QUEUE_STATE,
   REFERENCE,
   TICKS_PER_SECOND,
@@ -10,6 +11,7 @@ import {
   expectCounts,
   expectDefectsCaught,
   expectQueueState,
+  expectStrictlyIncreasing,
   laneLocator,
   metricValues,
   openWithSliders,
@@ -25,25 +27,18 @@ test.describe.configure({ mode: 'parallel' })
 
 // Inputs the scenarios set (expected values come from REFERENCE and the plan's "Derived display").
 const HALF_PR_PER_DAY = 0.5
-const QUARTER_PR_PER_DAY = 0.25
 const ROUNDING_CODE_WRITTEN = 35
 const ROUNDING_PRS_PER_DAY = 0.75
 const OVER_CAPACITY_AI_CODE_WRITTEN = 1000
 const AT_CAPACITY_AI_CODE_WRITTEN = 600
 const OVER_CAPACITY_RUN_SECONDS = 15
 const AT_CAPACITY_RUN_SECONDS = 10
-// Plan, "Default arithmetic": a 960 LOC human PR shows Defects caught 4%.
-const CAUGHT_AT_960_LOC = '4%'
 
-// Each text is visible in the lane.
+// Each text is the whole text of an element visible in the lane.
 const expectLaneShows = async (page, laneId, texts) => {
-  for (const text of texts) await expect(laneLocator(page, laneId).getByText(text)).toBeVisible()
-}
-
-// Every sample is greater than the one before it.
-const expectStrictlyIncreasing = (samples) => {
-  const notIncreasing = samples.slice(1).filter((sample, index) => !(sample > samples[index]))
-  expect(notIncreasing).toEqual([])
+  for (const text of texts) {
+    await expect(laneLocator(page, laneId).getByText(text, { exact: true })).toBeVisible()
+  }
 }
 
 test.describe('Generate code and derive PR size', () => {
@@ -93,7 +88,8 @@ test.describe('Generate code and derive PR size', () => {
 
     await test.step('Then the Human lane shows "PR size 960 LOC (derived)" and Defects caught 4%', async () => {
       await expectLaneShows(page, 'human', ['PR size 960 LOC (derived)'])
-      await expectDefectsCaught(page, 'human', CAUGHT_AT_960_LOC)
+      // Defects caught depends only on PR size (960 LOC) and speed, so the mid-run figure applies.
+      await expectDefectsCaught(page, 'human', REFERENCE.humanDefectsCaughtAfterPrsPerDay025)
     })
 
     await test.step('And the AI lane shows "PR size 1,450 LOC (1.51× human)" and "0.29 PRs/day (derived)"', async () => {
@@ -141,12 +137,17 @@ test.describe('Generate code and derive PR size', () => {
     })
 
     await test.step('Then the AI lane shows Pending Review 16 and is in the warning state', async () => {
-      await expectQueueState(page, 'ai', REFERENCE.ai1000PendingAtTick150, QUEUE_STATE.warning)
+      await expectQueueState(
+        page,
+        'ai',
+        REFERENCE.aiCodeWritten1000PendingAtTick150,
+        QUEUE_STATE.warning,
+      )
     })
 
     await test.step('And the AI Pending LOC, sampled every tick, strictly increased', async () => {
       expect(sampledPendingLoc).toHaveLength(OVER_CAPACITY_RUN_SECONDS * TICKS_PER_SECOND + 1)
-      expectStrictlyIncreasing(sampledPendingLoc)
+      expectStrictlyIncreasing(sampledPendingLoc, 'AI Pending LOC each tick')
     })
   })
 
@@ -161,8 +162,8 @@ test.describe('Generate code and derive PR size', () => {
 
     await test.step('Then the AI lane shows Pending Review 0 and Deployed 16', async () => {
       await expectCounts(page, 'ai', {
-        pending: REFERENCE.ai600PendingAtTick100,
-        deployed: REFERENCE.ai600DeployedAtTick100,
+        pending: REFERENCE.aiCodeWritten600PendingAtTick100,
+        deployed: REFERENCE.aiCodeWritten600DeployedAtTick100,
       })
     })
   })

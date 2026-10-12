@@ -1,7 +1,14 @@
 // Presentation only. Numeric behavior lives in engine.js.
 // Tailwind class strings must stay complete literals so the scanner finds them.
 
-import { LANE_IDS, LANE_MODELS, formatLocPerHour, formatPrSize, formatPrsPerDay } from './engine.js'
+import {
+  LANE_IDS,
+  LANE_MODELS,
+  formatLocPerHour,
+  formatMultiplier,
+  formatPrSize,
+  formatPrsPerDay,
+} from './engine.js'
 
 // Read-only values a lane shows under its sliders, from laneParams: `paramKey` is the laneParams
 // field, `format` renders it, `prefix` (may be empty) precedes it and `note` follows it, and `area`
@@ -61,7 +68,7 @@ export const LANE_PRESENTATION = Object.freeze({
     generationSliders: ['aiLocPerHour'],
     reviewSliders: ['skim'],
     derivedFields: [
-      derivedSize(`(${LANE_MODELS[LANE_IDS.ai].sizeMultiplier}× human)`),
+      derivedSize(`(${formatMultiplier(LANE_MODELS[LANE_IDS.ai].sizeMultiplier)} human)`),
       DERIVED_PRS_PER_DAY,
       DERIVED_EFFECTIVE_SPEED,
     ],

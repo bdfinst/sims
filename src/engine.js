@@ -2,9 +2,11 @@
 
 export const LANE_IDS = Object.freeze({ human: 'human', ai: 'ai' })
 
-// Generation model constants. Faros figures are the research findings the AI lane's PR size and
-// merge rate are derived from. Today the lane's "1.51×" and the aiLocPerHour default come from
-// these, so the model and that text cannot drift; the research panel's "+51%" joins them in Step 10.1.
+// Generation model constants. The Faros figures fix the AI lane's PR size (×1.51 the human PR
+// size) and the default AI code written, which gives about ×1.162 the human PRs per day at the
+// defaults. The AI default is fixed: it does not follow later changes to the human sliders. The
+// lane's "1.51×" text comes from these constants, and the research panel's "+51%" should derive
+// from them too, so the model and its text cannot drift.
 export const WORK_HOURS_PER_DAY = 8
 export const FAROS_PR_SIZE_INCREASE_PCT = 51
 export const FAROS_MERGE_RATE_INCREASE_PCT = 16.2
@@ -84,7 +86,8 @@ export const laneParams = (settings, laneModel) => {
 
 export const TICK_HOURS = 0.1
 export const SECONDS_PER_WORK_HOUR = 1
-export const MS_PER_WORK_HOUR = SECONDS_PER_WORK_HOUR * 1000
+const MS_PER_SECOND = 1000
+export const MS_PER_WORK_HOUR = SECONDS_PER_WORK_HOUR * MS_PER_SECOND
 export const TICK_MS = TICK_HOURS * MS_PER_WORK_HOUR
 const DEFECTS_PER_LOC = 0.02
 const BASE_DETECTION = 0.8
@@ -145,6 +148,11 @@ export const detection = (sizeLoc, locPerHour) =>
   BASE_DETECTION * sizeFactor(sizeLoc) * speedFactor(locPerHour)
 
 export const formatPct = (share) => `${Math.round(share * PERCENT)}%`
+
+// A multiplier to at most three decimals, without a float tail: 1.51 -> "1.51×".
+const MULTIPLIER_DECIMALS = 3
+export const formatMultiplier = (multiplier) =>
+  `${Number(multiplier.toFixed(MULTIPLIER_DECIMALS))}×`
 
 // Defects caught is shown from the lane's nominal size and speed, not from the queue's mix.
 export const formatDefectsCaught = ({ size, effSpeed }) => formatPct(detection(size, effSpeed))

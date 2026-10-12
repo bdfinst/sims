@@ -1,9 +1,12 @@
 import {
   AI_CODE_WRITTEN_LABEL,
+  AI_DRAIN_SETTINGS,
   AI_SKIM_LABEL,
   BUSY_AI_PRESET,
   HUMAN_CODE_WRITTEN_LABEL,
   HUMAN_PRS_PER_DAY_LABEL,
+  MAX_SKIM,
+  NEXT_TICK_SECONDS,
   REVIEWER_SPEED_LABEL,
   REFERENCE,
   THRESHOLD_LABEL,
@@ -107,12 +110,10 @@ const AI_CODE_WRITTEN_JUMPS = [
 
 // Inputs the scenarios set (expected counts come from REFERENCE in fixtures.js).
 const FAST_REVIEWER_SPEED = 1000
-const MAX_SKIM = 3
 const SLOW_REVIEWER_SPEED = 100
-const DRAIN_AI_CODE_WRITTEN = 5
-const DRAIN_RUN_SECONDS = 2
+// How long the drain is sampled tick by tick; the 7-PR queue empties well within it.
+const DRAIN_SAMPLED_SECONDS = 2
 const BUSY_RUN_SECONDS = 1
-const NEXT_TICK_SECONDS = 0.1
 
 test.describe.configure({ mode: 'parallel' })
 
@@ -139,19 +140,6 @@ test.describe('Adjust the model live', () => {
     })
   }
 
-  // AC23: the derived values are plain read-only text, not sliders. The scenario below checks
-  // the revised wording and how the values change.
-  test('Derived PR sizes and AI PRs per day show at the defaults', async ({ page }) => {
-    await openSimulator(page)
-
-    await expect(laneLocator(page, 'human').getByText('PR size 240 LOC (derived)')).toBeVisible()
-    const aiLane = laneLocator(page, 'ai')
-    await expect(aiLane.getByText('PR size 362 LOC (1.51× human)')).toBeVisible()
-    await expect(aiLane.getByText('1.17 PRs/day (derived)')).toBeVisible()
-    await expect(aiLane.getByText('Effective speed 600 LOC/hr')).toBeVisible()
-    await expect(aiLane.getByRole('slider')).toHaveCount(2)
-  })
-
   test('Derived PR sizes, AI PRs per day, and effective speed are read-only', async ({ page }) => {
     const humanLane = laneLocator(page, 'human')
     const aiLane = laneLocator(page, 'ai')
@@ -177,10 +165,13 @@ test.describe('Adjust the model live', () => {
     })
 
     await test.step('And none of the derived values is a slider', async () => {
-      // The only sliders on the page are the six controls of "Controls start at their defaults".
+      // The only sliders on the page are the six controls of "Controls start at their defaults",
+      // and the AI lane's are its code-written and skim sliders.
       await expect(page.getByRole('slider')).toHaveCount(DEFAULT_CONTROLS.length)
+      await expect(aiLane.getByRole('slider')).toHaveCount(2)
       for (const [lane, text] of derivedTexts) {
-        await expect(lane.getByText(text).getByRole('slider')).toHaveCount(0)
+        await expect(lane.getByRole('slider', { name: text })).toHaveCount(0)
+        await expect(lane.getByText(text)).not.toHaveJSProperty('tagName', 'INPUT')
       }
     })
 
@@ -308,16 +299,13 @@ test.describe('Adjust the model live', () => {
     })
 
     await test.step('When I set "AI code written (LOC/hr)" to 5 and "Reviewer speed (LOC/hr, both lanes)" to 1000', async () => {
-      await setSliders(page, {
-        [AI_CODE_WRITTEN_LABEL]: DRAIN_AI_CODE_WRITTEN,
-        [REVIEWER_SPEED_LABEL]: FAST_REVIEWER_SPEED,
-      })
+      await setSliders(page, AI_DRAIN_SETTINGS)
     })
 
     await test.step('And 2 seconds pass', async () => {
       sampledPending = await sampleEachTick(page, {
         startTick: DRAIN_START_SECONDS * TICKS_PER_SECOND,
-        tickCount: DRAIN_RUN_SECONDS * TICKS_PER_SECOND,
+        tickCount: DRAIN_SAMPLED_SECONDS * TICKS_PER_SECOND,
         read: async () => (await metricValues(page, 'pending')).ai,
       })
     })

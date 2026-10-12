@@ -1,18 +1,19 @@
 import {
   AI_DRAIN_SETTINGS,
   BUSY_AI_PRESET,
-  HUMAN_BACKLOG_PRESET,
+  FULL_RUN_SECONDS,
+  HUMAN_CODE_WRITTEN_LABEL,
+  HUMAN_PRS_PER_DAY_LABEL,
   NEXT_TICK_SECONDS,
   QUEUE_STATE,
   REFERENCE,
+  REVIEWER_SPEED_LABEL,
   THRESHOLD_LABEL,
   runFor,
   buttonNamed,
   expect,
   expectPending,
   expectQueueState,
-  expectWarningAnnounced,
-  expectWarningBox,
   laneLocator,
   openWithSliders,
   openSimulator,
@@ -45,11 +46,36 @@ const SECONDS_TO_AI_PENDING_15 = 3.9
 const SECONDS_FROM_14_TO_16 = 0.4
 const SECONDS_FROM_15_TO_16 = 0.3
 const HUMAN_BACKLOG_SECONDS = 24
-const BUSY_AI_FULL_RUN_SECONDS = 10
 const SECONDS_TO_AI_PENDING_23 = 6
 const SECONDS_TO_AI_PENDING_7 = 2
 const SECONDS_TO_AI_PENDING_19 = 5
 const SECONDS_TO_DRAIN_TO_16 = 0.6
+
+// Human backlog: 400 LOC human PRs; the human queue gains one PR every 4 s (6 pending at 24 s).
+// Values from the plan's "Default arithmetic", independent of src.
+const HUMAN_BACKLOG_PRESET = Object.freeze({
+  [HUMAN_CODE_WRITTEN_LABEL]: 200,
+  [HUMAN_PRS_PER_DAY_LABEL]: 4,
+  [REVIEWER_SPEED_LABEL]: 100,
+})
+
+// The red of the warning state: --color-warning (#ef4444) in src/index.css.
+const WARNING_BORDER_COLOR = 'rgb(239, 68, 68)'
+const QUEUE_LABEL_BY_LANE = { human: 'Human', ai: 'AI' }
+
+// What a warning box looks like: the state, the alert icon, and the red border.
+const expectWarningBox = async (page, laneId) => {
+  const box = queueBox(page, laneId)
+  await expect(box).toHaveAttribute('data-state', QUEUE_STATE.warning)
+  await expect(box.locator('[data-icon="triangle-alert"]')).toBeVisible()
+  await expect(box).toHaveCSS('border-color', WARNING_BORDER_COLOR)
+}
+
+// The lane's status element announces the warning.
+const expectWarningAnnounced = (page, laneId) =>
+  expect(laneLocator(page, laneId).getByRole('status')).toHaveText(
+    `${QUEUE_LABEL_BY_LANE[laneId]} Pending Review over threshold`,
+  )
 
 // Waits for the slider's own shown value, so later checks cannot pass on the old threshold.
 const setThreshold = async (page, value) => {
@@ -143,7 +169,7 @@ test.describe('Pending Review overload warning', () => {
     })
 
     await test.step('And the Human lane shows Pending Review 6 and the AI lane shows Pending Review 71', async () => {
-      await expectPending(page, 'human', REFERENCE.humanBacklogPendingAtTick240)
+      await expectPending(page, 'human', REFERENCE.humanBacklogHumanPendingAtTick240)
       await expectPending(page, 'ai', REFERENCE.humanBacklogAiPendingAtTick240)
     })
 
@@ -172,7 +198,7 @@ test.describe('Pending Review overload warning', () => {
     })
 
     await test.step('When I press Start and 10 seconds pass', async () => {
-      await startAndRunFor(page, BUSY_AI_FULL_RUN_SECONDS)
+      await startAndRunFor(page, FULL_RUN_SECONDS)
     })
 
     await test.step('Then the AI lane shows Pending Review 38 and is not in the warning state', async () => {
@@ -216,6 +242,7 @@ test.describe('Pending Review overload warning', () => {
 
     await test.step('Then the AI lane is in the warning state', async () => {
       await expectQueueState(page, 'ai', REFERENCE.busyAiPendingAtTick20, QUEUE_STATE.warning)
+      // Not in a step's text: the title's "while running" holds, as the simulation never paused.
       await expect(buttonNamed(page, 'Pause')).toBeVisible()
     })
   })
@@ -239,12 +266,7 @@ test.describe('Pending Review overload warning', () => {
     })
 
     await test.step('Then the AI lane shows Pending Review 16 and is in the warning state', async () => {
-      await expectQueueState(
-        page,
-        'ai',
-        REFERENCE.busyAiPendingAtTick56AfterDraining,
-        QUEUE_STATE.warning,
-      )
+      await expectQueueState(page, 'ai', REFERENCE.drainedAiPendingAtTick56, QUEUE_STATE.warning)
     })
 
     await test.step('When 0.1 more seconds pass', async () => {
@@ -252,12 +274,7 @@ test.describe('Pending Review overload warning', () => {
     })
 
     await test.step('Then the AI lane shows Pending Review 15 and is not in the warning state', async () => {
-      await expectQueueState(
-        page,
-        'ai',
-        REFERENCE.busyAiPendingAtTick57AfterDraining,
-        QUEUE_STATE.normal,
-      )
+      await expectQueueState(page, 'ai', REFERENCE.drainedAiPendingAtTick57, QUEUE_STATE.normal)
     })
   })
 

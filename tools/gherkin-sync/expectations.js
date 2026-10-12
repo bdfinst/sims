@@ -32,20 +32,21 @@ const backgroundStepsOf = (children) =>
   children.flatMap(({ background }) => (background ? background.steps.map(stepLine) : []))
 
 // A scenario tagged @wip is pending: its tests are not checked yet. A tagged Scenario Outline
-// is pending as a whole, so every Examples row is.
+// is pending as a whole, so every Examples row is. A @wip tag on the Feature or a Rule makes
+// every scenario under it pending.
 const isWip = ({ tags }) => tags.some(({ name }) => name === WIP_TAG)
 
-const scenariosOf = (children, inheritedSteps, uri) => {
+const scenariosOf = (children, inheritedSteps, inheritedWip, uri) => {
   const backgroundSteps = [...inheritedSteps, ...backgroundStepsOf(children)]
   return children.flatMap(({ rule, scenario }) => {
-    if (rule) return scenariosOf(rule.children, backgroundSteps, uri)
+    if (rule) return scenariosOf(rule.children, backgroundSteps, inheritedWip || isWip(rule), uri)
     if (!scenario) return []
     const lines = [...backgroundSteps, ...scenario.steps.map(stepLine)]
     return [
       {
         name: scenario.name,
         location: `${uri}:${scenario.location.line}`,
-        wip: isWip(scenario),
+        wip: inheritedWip || isWip(scenario),
         variants: variantsOf(scenario, lines),
       },
     ]
@@ -55,5 +56,5 @@ const scenariosOf = (children, inheritedSteps, uri) => {
 export const scenariosFromFeature = (source, uri) => {
   const parser = new Parser(new AstBuilder(IdGenerator.uuid()), new GherkinClassicTokenMatcher())
   const { feature } = parser.parse(source)
-  return feature ? scenariosOf(feature.children, [], uri) : []
+  return feature ? scenariosOf(feature.children, [], isWip(feature), uri) : []
 }

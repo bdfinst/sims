@@ -24,6 +24,7 @@ import {
   formatIncidentsPerPr,
   formatLoc,
   formatLocPerHour,
+  formatMultiplier,
   formatPct,
   formatPickupWaitHours,
   formatPrSize,
@@ -63,13 +64,17 @@ describe('laneParams at the default settings', () => {
 })
 
 describe('laneParams after settings change', () => {
-  it('halves both PR sizes and doubles the PRs per day when Human PRs per day goes to 2, and skim 3 gives 900 LOC/hr', () => {
-    const settings = { ...DEFAULT_SETTINGS, humanPrsPerDay: 2, skim: 3 }
+  it('halves both PR sizes and doubles the PRs per day when Human PRs per day goes to 2', () => {
+    const settings = { ...DEFAULT_SETTINGS, humanPrsPerDay: 2 }
     expect(laneParams(settings, LANE_MODELS[HUMAN])).toMatchObject({ size: 120, prsPerDay: 2 })
     const ai = laneParams(settings, LANE_MODELS[AI])
     expect(ai.size).toBeCloseTo(181.2, 10)
     expect(ai.prsPerDay).toBeCloseTo(2.34, 2)
-    expect(ai.effSpeed).toBe(900)
+  })
+
+  it('gives the AI lane an effective speed of 900 LOC/hr at skim 3', () => {
+    const settings = { ...DEFAULT_SETTINGS, skim: 3 }
+    expect(laneParams(settings, LANE_MODELS[AI]).effSpeed).toBe(900)
   })
 
   it('moves both PR sizes with Human code written: 50 LOC/hr gives 400 and 604', () => {
@@ -168,6 +173,11 @@ describe('slider table', () => {
 
 const ONE_SECOND_IN_TICKS = 10
 const TEN_SECONDS_IN_TICKS = 100
+const TWENTY_FOUR_SECONDS_IN_TICKS = 240
+const THIRTY_SECONDS_IN_TICKS = 300
+
+// Rounds to `places` decimals, dropping float noise before an exact comparison.
+const roundTo = (value, places) => Number(value.toFixed(places))
 
 const runTicks = (lane, params, count) =>
   Array.from({ length: count }).reduce((current) => tick(current, params), lane)
@@ -469,7 +479,7 @@ describe('mid-run changes from the defaults at 1 second (AC7c)', () => {
 })
 
 describe('the busy AI lane (AI code written 2000)', () => {
-  const busyTrace = traceTicks(emptyLane(), paramsFor(AI, BUSY_AI), 300)
+  const busyTrace = traceTicks(emptyLane(), paramsFor(AI, BUSY_AI), THIRTY_SECONDS_IN_TICKS)
   const at = (seconds) => busyTrace[seconds * ONE_SECOND_IN_TICKS - 1]
 
   it('gains 0.38631 pending PR per tick: 3.863, 7.726, and 11.589 after 1, 2, and 3 seconds', () => {
@@ -529,7 +539,7 @@ describe('AI code written against the AI lane effective review speed (AC7d)', ()
 
   it('adds exactly 40 pending LOC per tick at 1,000 LOC/hr: 40, 80, ... 6,000 at 15 seconds', () => {
     const trace = traceTicks(emptyLane(), AI_AT_1000, FIFTEEN_SECONDS_IN_TICKS)
-    const pendingLoc = trace.map((lane) => Math.round(lane.pendingLoc * 1e6) / 1e6)
+    const pendingLoc = trace.map((lane) => roundTo(lane.pendingLoc, 6))
     expect(pendingLoc).toEqual(
       Array.from({ length: FIFTEEN_SECONDS_IN_TICKS }, (_, i) => 40 * (i + 1)),
     )
@@ -553,14 +563,22 @@ describe('AI code written against the AI lane effective review speed (AC7d)', ()
   })
 
   describe('at 600 LOC/hr, equal to the effective review speed', () => {
-    const trace = traceTicks(emptyLane(), paramsFor(AI, { aiLocPerHour: 600 }), 300)
+    const trace = traceTicks(
+      emptyLane(),
+      paramsFor(AI, { aiLocPerHour: 600 }),
+      THIRTY_SECONDS_IN_TICKS,
+    )
 
     it('keeps the displayed queue at 0 for 30 seconds', () => {
-      expect(trace.map((lane) => displayedPending(lane))).toEqual(Array(300).fill(0))
+      expect(trace.map((lane) => displayedPending(lane))).toEqual(
+        Array(THIRTY_SECONDS_IN_TICKS).fill(0),
+      )
     })
 
     it('keeps the displayed Pending LOC at 0 for 30 seconds', () => {
-      expect(trace.map((lane) => formatLoc(lane.pendingLoc))).toEqual(Array(300).fill('0'))
+      expect(trace.map((lane) => formatLoc(lane.pendingLoc))).toEqual(
+        Array(THIRTY_SECONDS_IN_TICKS).fill('0'),
+      )
     })
 
     it('deploys 16 PRs (16.556) in 10 seconds', () => {
@@ -574,7 +592,7 @@ describe('AI code written against the AI lane effective review speed (AC7d)', ()
   // The change in internal pending LOC over each of `count` ticks from an empty lane, to 9 places.
   const pendingLocGrowthPerTick = (params, count) =>
     traceTicks(emptyLane(), params, count).map((lane, index, trace) =>
-      Number((lane.pendingLoc - (index === 0 ? 0 : trace[index - 1].pendingLoc)).toFixed(9)),
+      roundTo(lane.pendingLoc - (index === 0 ? 0 : trace[index - 1].pendingLoc), 9),
     )
 
   it('grows the internal pending LOC by (code written - effective speed) x 0.1 per tick at 601 LOC/hr', () => {
@@ -627,13 +645,21 @@ describe('the human backlog preset: a human queue that grows one PR every 4 seco
   })
 
   it('shows Human Pending Review 1 at 4 seconds and 6 at 24 seconds', () => {
-    const trace = traceTicks(emptyLane(), paramsFor(HUMAN, HUMAN_BACKLOG), 240)
+    const trace = traceTicks(
+      emptyLane(),
+      paramsFor(HUMAN, HUMAN_BACKLOG),
+      TWENTY_FOUR_SECONDS_IN_TICKS,
+    )
     expect(displayedPending(trace[39])).toBe(1)
     expect(displayedPending(trace[239])).toBe(6)
   })
 
   it('shows AI Pending Review 71 at 24 seconds when AI code written is 2000 (effective speed 200)', () => {
-    const ai = runTicks(emptyLane(), paramsFor(AI, { ...HUMAN_BACKLOG, ...BUSY_AI }), 240)
+    const ai = runTicks(
+      emptyLane(),
+      paramsFor(AI, { ...HUMAN_BACKLOG, ...BUSY_AI }),
+      TWENTY_FOUR_SECONDS_IN_TICKS,
+    )
     expect(displayedPending(ai)).toBe(71)
   })
 })
@@ -669,7 +695,7 @@ describe('draining a backlog', () => {
     const pending = traceTicks(afterBusyTicks(50), drainingParams, 7).map((lane) => lane.pendingPrs)
 
     it('passes through 18.77, 18.21, 17.66, 17.11, 16.56, 16.01 and 15.46', () => {
-      expect(pending.map((value) => Math.round(value * 100) / 100)).toEqual([
+      expect(pending.map((value) => roundTo(value, 2))).toEqual([
         18.77, 18.21, 17.66, 17.11, 16.56, 16.01, 15.46,
       ])
     })
@@ -950,10 +976,6 @@ describe('humanPrSize', () => {
       expect(humanPrSize({ humanLocPerHour, humanPrsPerDay })).toBeCloseTo(size, 2)
     },
   )
-
-  it('is unrounded, so the model keeps the fractional LOC', () => {
-    expect(humanPrSize({ humanLocPerHour: 35, humanPrsPerDay: 0.75 })).not.toBe(373)
-  })
 })
 
 describe('formatPrSize', () => {
@@ -983,6 +1005,16 @@ describe('formatPrsPerDay', () => {
 
   it('groups thousands and keeps two decimals for a large value: 1,059.60', () => {
     expect(formatPrsPerDay(1059.6)).toBe('1,059.60 PRs/day')
+  })
+})
+
+describe('formatMultiplier', () => {
+  it.each([
+    { multiplier: 1.51, shown: '1.51×' },
+    { multiplier: 1.162, shown: '1.162×' },
+    { multiplier: 0.30000000000000004, shown: '0.3×' },
+  ])('shows $shown for $multiplier', ({ multiplier, shown }) => {
+    expect(formatMultiplier(multiplier)).toBe(shown)
   })
 })
 

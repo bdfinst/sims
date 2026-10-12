@@ -3,9 +3,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
   BUSY_AI_PRESET,
   INLINE_PROTOCOLS,
+  LAST_TICK_BEFORE_FIRST_HUMAN_PR_SECONDS,
+  NEXT_TICK_SECONDS,
   NO_VALUE,
   REFERENCE,
-  SECOND_MS,
   SIMULATOR_TITLE as TITLE,
   TICKS_PER_SECOND,
   expect,
@@ -14,8 +15,8 @@ import {
   expectElapsedAtTick,
   expectEmptyLanes,
   expectNeverDecreases,
-  flushPendingRenders,
   headline,
+  idleFor,
   laneLocator,
   metricValues,
   openWithSliders,
@@ -40,8 +41,6 @@ const HUMAN_BLUE = 'rgb(59, 130, 246)'
 const AI_PURPLE = 'rgb(168, 85, 247)'
 
 const PAUSE_AFTER_SECONDS = 3
-const LAST_TICK_BEFORE_FIRST_HUMAN_PR_SECONDS = 7.9
-const ONE_TICK_SECONDS = 0.1
 
 const iconNames = (laneRoot) =>
   laneRoot.locator('[data-icon]').evaluateAll((els) => els.map((el) => el.dataset.icon))
@@ -140,7 +139,7 @@ test.describe('Run and pause the simulation', () => {
     })
 
     await test.step('When 5 seconds pass without pressing Start', async () => {
-      await page.clock.runFor(5 * SECOND_MS)
+      await idleFor(page, 5)
     })
 
     await test.step('Then both lanes still show Pending Review 0 and Deployed 0', async () => {
@@ -165,7 +164,7 @@ test.describe('Run and pause the simulation', () => {
     await test.step('Then the Start/Pause button reads "Pause" and the status reads "Running"', async () => {
       await expect(buttonNamed(page, 'Pause')).toBeVisible()
       await expect(page.getByText('Running', { exact: true })).toBeVisible()
-      // Plan, Step 1.2 REFACTOR: exactly one tick interval while running.
+      // Exactly one tick interval while running.
       await expectLiveIntervals(page, 1)
     })
   })
@@ -212,7 +211,7 @@ test.describe('Run and pause the simulation', () => {
     })
 
     await test.step('When 0.1 more seconds pass', async () => {
-      await runFor(page, ONE_TICK_SECONDS)
+      await runFor(page, NEXT_TICK_SECONDS)
     })
 
     await test.step('Then the Human lane shows Deployed 1', async () => {
@@ -228,9 +227,8 @@ test.describe('Run and pause the simulation', () => {
 
     await test.step('When I press Pause and 5 more seconds pass', async () => {
       await pauseSimulation(page)
-      await page.clock.runFor(5 * SECOND_MS)
-      await flushPendingRenders(page)
-      // Plan, Step 1.2 REFACTOR: clear the interval on pause.
+      await idleFor(page, 5)
+      // Pausing leaves no tick interval running.
       await expectLiveIntervals(page, 0)
     })
 
@@ -307,14 +305,13 @@ test.describe('Run and pause the simulation', () => {
     })
 
     await test.step('And 3 seconds pass', async () => {
-      await page.clock.runFor(3 * SECOND_MS)
-      await flushPendingRenders(page)
+      await idleFor(page, 3)
     })
 
     await test.step('Then the status reads "Paused" and the AI lane still shows Pending Review 3', async () => {
       await expect(page.getByText('Paused', { exact: true })).toBeVisible()
       await expectPending(page, 'ai', REFERENCE.busyAiPendingAtTick10)
-      // Plan, Step 1.2 REFACTOR: clear the interval when the tab is hidden.
+      // Hiding the tab leaves no tick interval running.
       await expectLiveIntervals(page, 0)
     })
   })
@@ -332,8 +329,7 @@ test.describe('Run and pause the simulation', () => {
     })
 
     await test.step('And 2 seconds pass', async () => {
-      await page.clock.runFor(2 * SECOND_MS)
-      await flushPendingRenders(page)
+      await idleFor(page, 2)
     })
 
     await test.step('Then the status reads "Paused" and the AI lane still shows Pending Review 3', async () => {

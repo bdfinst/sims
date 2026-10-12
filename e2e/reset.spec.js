@@ -3,13 +3,13 @@ import {
   BUSY_AI_PRESET,
   HUMAN_PRS_PER_DAY_LABEL,
   REFERENCE,
-  SECOND_MS,
   buttonNamed,
   expect,
   expectCounts,
   expectElapsedAtTick,
   expectEmptyLanes,
-  flushPendingRenders,
+  idleFor,
+  metric,
   openWithSliders,
   openSimulator,
   pauseSimulation,
@@ -53,10 +53,14 @@ test.describe('Reset the simulation', () => {
 
     await test.step('And the simulation is running and has run for 3 seconds', async () => {
       await startAndRunFor(page, LONG_RUN_SECONDS)
+      // The AI lane has deployed PRs, so a Reset that did nothing could not pass.
+      await expect(metric(page, 'ai', 'deployed')).not.toHaveText('0')
     })
 
     await test.step('When I press Reset', async () => {
       await resetButton(page).click()
+      // Not a scenario step: clicking Reset leaves focus on it, so keyboard users stay in place.
+      await expect(resetButton(page)).toBeFocused()
     })
 
     await test.step('Then both lanes show Pending Review 0 and Deployed 0', async () => {
@@ -69,7 +73,7 @@ test.describe('Reset the simulation', () => {
 
     await test.step('And the Start/Pause button reads "Start"', async () => {
       await expect(buttonNamed(page, 'Start')).toBeVisible()
-      // Plan, Step 1.2 REFACTOR: Reset pauses, so the interval is cleared.
+      // Reset pauses, so no tick interval is left running.
       await expectLiveIntervals(page, 0)
     })
 
@@ -78,7 +82,6 @@ test.describe('Reset the simulation', () => {
       await expect(slider(page, HUMAN_PRS_PER_DAY_LABEL)).toHaveValue(
         String(KEPT_HUMAN_PRS_PER_DAY),
       )
-      await expect(resetButton(page)).toBeFocused()
     })
   })
 
@@ -107,6 +110,7 @@ test.describe('Reset the simulation', () => {
 
   test('Counts stay at zero after Reset', async ({ page }) => {
     await test.step('Given I pressed Reset while running', async () => {
+      // "While running" needs a run with counts to clear: the busy-AI preset gives them in 1 s.
       await openWithSliders(page, BUSY_AI_PRESET)
       await startAndRunFor(page, SHORT_RUN_SECONDS)
       await expectBusyAiShortRunCounts(page)
@@ -115,8 +119,7 @@ test.describe('Reset the simulation', () => {
     })
 
     await test.step('When 5 seconds pass', async () => {
-      await page.clock.runFor(IDLE_AFTER_RESET_SECONDS * SECOND_MS)
-      await flushPendingRenders(page)
+      await idleFor(page, IDLE_AFTER_RESET_SECONDS)
     })
 
     await test.step('Then both lanes still show Pending Review 0 and Deployed 0', async () => {

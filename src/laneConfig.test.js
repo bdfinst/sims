@@ -75,10 +75,12 @@ describe('lane presentation agrees with the lane model', () => {
 
 describe('slider presentation', () => {
   it.each(Object.keys(SLIDERS))('has a label, unit, and spoken unit for %s', (settingKey) => {
-    const { label, unit, spokenUnit } = SLIDER_PRESENTATION[settingKey]
-    expect([label, unit, spokenUnit].every((text) => typeof text === 'string' && text !== '')).toBe(
-      true,
-    )
+    const nonEmptyText = expect.stringMatching(/./)
+    expect(SLIDER_PRESENTATION[settingKey]).toMatchObject({
+      label: nonEmptyText,
+      unit: nonEmptyText,
+      spokenUnit: nonEmptyText,
+    })
   })
 
   it.each([

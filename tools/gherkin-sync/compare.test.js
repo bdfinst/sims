@@ -27,6 +27,11 @@ const passedTest = (title, steps) => ({
   steps,
 })
 
+const DRIFT_PROBLEM =
+  'e2e/x.spec.js:10 "Start switches the button to Pause" does not follow scenario "Start switches the button to Pause" (features/run.feature:3): step 2: expected "When I press Start", got "When I press Reset"'
+const NO_TEST_PROBLEM =
+  'Scenario "Start switches the button to Pause" (features/run.feature:3) has no test with that title'
+
 const FULL = { complete: true }
 const PARTIAL = { complete: false }
 
@@ -43,9 +48,7 @@ describe('compareScenariosWithTests', () => {
   it('names the first differing step when a test performs a different action', () => {
     const tests = [passedTest(START.name, ['Given I open the simulator', 'When I press Reset'])]
 
-    expect(compareScenariosWithTests([START], tests, PARTIAL)).toEqual([
-      'e2e/x.spec.js:10 "Start switches the button to Pause" does not follow scenario "Start switches the button to Pause" (features/run.feature:3): step 2: expected "When I press Start", got "When I press Reset"',
-    ])
+    expect(compareScenariosWithTests([START], tests, PARTIAL)).toEqual([DRIFT_PROBLEM])
   })
 
   it('reports a missing step, and an extra step, at the position where they occur', () => {
@@ -80,9 +83,7 @@ describe('compareScenariosWithTests', () => {
   })
 
   it('reports a scenario with no test titled after it on a full run', () => {
-    expect(compareScenariosWithTests([START], [], FULL)).toEqual([
-      'Scenario "Start switches the button to Pause" (features/run.feature:3) has no test with that title',
-    ])
+    expect(compareScenariosWithTests([START], [], FULL)).toEqual([NO_TEST_PROBLEM])
   })
 
   it('skips missing scenarios and rows on a partial run', () => {
@@ -144,14 +145,31 @@ describe('compareScenariosWithTests', () => {
   it('still reports the same drift and the same gap for an untagged scenario', () => {
     const drifted = passedTest(START.name, ['Given I open the simulator', 'When I press Reset'])
 
-    expect(compareScenariosWithTests([START], [drifted], FULL)).toHaveLength(1)
-    expect(compareScenariosWithTests([START], [], FULL)).toHaveLength(1)
+    expect(compareScenariosWithTests([START], [drifted], FULL)).toEqual([DRIFT_PROBLEM])
+    expect(compareScenariosWithTests([START], [], FULL)).toEqual([NO_TEST_PROBLEM])
   })
 
   it('does not let a wip scenario hide a test that claims a different, untagged scenario', () => {
     const drifted = passedTest(START.name, ['Given I open the simulator', 'When I press Reset'])
 
-    expect(compareScenariosWithTests([WIP_BOUNDS, START], [drifted], FULL)).toHaveLength(1)
+    expect(compareScenariosWithTests([WIP_BOUNDS, START], [drifted], FULL)).toEqual([DRIFT_PROBLEM])
+  })
+
+  it('does not check a test against an untagged scenario when it claims a longer, wip one', () => {
+    const rowName = `${START.name}: ArrowRight`
+    const wipRow = { ...WIP_BOUNDS, name: rowName, location: 'features/run.feature:9' }
+    const rowTest = passedTest(rowName, ['When I press ArrowRight 200 times'])
+
+    expect(compareScenariosWithTests([START, wipRow], [rowTest], PARTIAL)).toEqual([])
+  })
+
+  it('reports an outline whose Examples header has no rows instead of throwing', () => {
+    const empty = { name: 'Empty outline', location: 'features/e.feature:1', variants: [] }
+    const tests = [passedTest(empty.name, ['When I press Start'])]
+
+    expect(compareScenariosWithTests([empty], tests, FULL)).toEqual([
+      'e2e/x.spec.js:10 "Empty outline" does not follow scenario "Empty outline" (features/e.feature:1): step 1: expected "(no more steps)", got "When I press Start"',
+    ])
   })
 
   it('still reports two scenarios that share a name when one of them is wip', () => {

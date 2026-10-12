@@ -1,12 +1,14 @@
 import {
+  AI_CODE_WRITTEN_LABEL,
+  AI_SKIM_LABEL,
   BUSY_AI_PRESET,
-  EXACT_AI_PRESET,
+  HUMAN_CODE_WRITTEN_LABEL,
   NEXT_TICK_SECONDS,
   OVERFLOW_RUN_SECONDS,
   REFERENCE,
-  TICK_MS,
+  REVIEWER_SPEED_LABEL,
+  TICKS_PER_SECOND,
   expect,
-  expectElapsedAtTick,
   expectEmptyLanes,
   expectSimulatorOpen,
   expectPending,
@@ -16,7 +18,6 @@ import {
   runFor,
   setSliders,
   startAndRunFor,
-  startSimulation,
   test,
   tilesIn,
 } from './fixtures.js'
@@ -24,6 +25,15 @@ import {
 test.describe.configure({ mode: 'parallel' })
 
 const SECONDS_TO_AI_PENDING_22 = 5.7
+
+// Exact: the AI lane gains exactly one pending PR per tick, so Pending Review is n after n ticks.
+// Values from the plan's "Default arithmetic", independent of src.
+const EXACT_AI_PRESET = Object.freeze({
+  [HUMAN_CODE_WRITTEN_LABEL]: 5,
+  [REVIEWER_SPEED_LABEL]: 100,
+  [AI_SKIM_LABEL]: 1,
+  [AI_CODE_WRITTEN_LABEL]: 704,
+})
 
 // Plan, "Default arithmetic": the exact AI preset displays AI Pending Review n after n ticks, for
 // every n up to 100 (C is at most 98, so C + 1 is covered).
@@ -81,9 +91,8 @@ test.describe('Pending Review tiles', () => {
     })
 
     await test.step('When I press Start and C ticks pass', async () => {
-      await startSimulation(page)
-      await page.clock.runFor(capacity * TICK_MS)
-      await expectElapsedAtTick(page, capacity)
+      // runFor waits for the elapsed readout to advance by exactly C ticks.
+      await startAndRunFor(page, capacity / TICKS_PER_SECOND)
     })
 
     await test.step('Then the AI lane shows Pending Review C, C tiles, and no overflow indicator', async () => {

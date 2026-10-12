@@ -12,7 +12,7 @@ import {
   researchPanel,
   researchToggle,
   sourceLink,
-  startAndRunFor,
+  startSimulation,
   tabTo,
   test,
   textColors,
@@ -67,11 +67,14 @@ const ASSUMPTION_PHRASES = [
 const CALIBRATION_SENTENCE =
   "The defaults were calibrated to land near Faros's +242.7% incidents per PR"
 const FAROS_URL = SOURCES[2].url
-const SECONDS_BEFORE_EXPANDING = 1
 const SECONDS_AFTER_EXPANDING = 1
 
 const assumptionsParagraph = (page) =>
   researchPanel(page).locator('p', { hasText: ASSUMPTIONS_START })
+
+// The source's finding is visible in the panel, verbatim.
+const expectFindingShown = (page, { wording, label }) =>
+  expect(researchPanel(page).getByText(wording), label).toBeVisible()
 
 test.describe('Research behind the simulation', () => {
   test('Panel is collapsed by default', async ({ page }) => {
@@ -106,17 +109,11 @@ test.describe('Research behind the simulation', () => {
     })
 
     await test.step('Then the panel contains "2,500 reviews of 3.2 million lines of code over 10 months"', async () => {
-      await expect(
-        researchPanel(page).getByText(SOURCES[0].wording),
-        SOURCES[0].label,
-      ).toBeVisible()
+      await expectFindingShown(page, SOURCES[0])
     })
 
     await test.step('And the panel contains "Review no more than 200–400 LOC at a time"', async () => {
-      await expect(
-        researchPanel(page).getByText(SOURCES[1].wording),
-        SOURCES[1].label,
-      ).toBeVisible()
+      await expectFindingShown(page, SOURCES[1])
     })
 
     await test.step('And the panel contains "faster than 500 LOC/hour"', async () => {
@@ -124,24 +121,15 @@ test.describe('Research behind the simulation', () => {
     })
 
     await test.step('And the panel contains "PR size +51%" and "(+242.7%)"', async () => {
-      await expect(
-        researchPanel(page).getByText(SOURCES[2].wording),
-        SOURCES[2].label,
-      ).toBeVisible()
+      await expectFindingShown(page, SOURCES[2])
     })
 
     await test.step('And the panel contains "AI PRs wait 4.6× longer before review, but are reviewed 2× faster once picked up"', async () => {
-      await expect(
-        researchPanel(page).getByText(SOURCES[3].wording),
-        SOURCES[3].label,
-      ).toBeVisible()
+      await expectFindingShown(page, SOURCES[3])
     })
 
     await test.step('And the panel contains "practitioner observation" and "locally coherent but globally brittle"', async () => {
-      await expect(
-        researchPanel(page).getByText(SOURCES[4].wording),
-        SOURCES[4].label,
-      ).toBeVisible()
+      await expectFindingShown(page, SOURCES[4])
     })
 
     await test.step("And the panel links to all five source URLs from the spec's Research Sources table, each opening in a new tab", async () => {
@@ -207,7 +195,7 @@ test.describe('Research behind the simulation', () => {
   test('Panel is keyboard operable and does not interrupt the simulation', async ({ page }) => {
     await test.step('Given the simulation is running', async () => {
       await openSimulator(page)
-      await startAndRunFor(page, SECONDS_BEFORE_EXPANDING)
+      await startSimulation(page)
     })
 
     await test.step('When I Tab to the research toggle and press Enter', async () => {
@@ -217,8 +205,9 @@ test.describe('Research behind the simulation', () => {
 
     await test.step('Then the panel expands and the status still reads "Running"', async () => {
       await expect(researchPanel(page)).toHaveAttribute('open', '')
-      await expect(page.getByText('Running', { exact: true })).toBeVisible()
+      // "Still" running: time keeps advancing the elapsed readout after the panel opens.
       await runFor(page, SECONDS_AFTER_EXPANDING)
+      await expect(page.getByText('Running', { exact: true })).toBeVisible()
     })
   })
 

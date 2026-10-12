@@ -6,7 +6,7 @@ const FILE_PROTOCOL = 'file:'
 
 // The page may only talk to the local server. A file:// page may only load its own
 // document (plus inline data:/blob: URIs); the build must be self-contained.
-export const isAllowedRequest = ({ url, isMainDocument }) => {
+const isAllowedRequest = ({ url, isMainDocument }) => {
   const { protocol, hostname } = new URL(url)
   if (INLINE_PROTOCOLS.has(protocol)) return true
   if (protocol === FILE_PROTOCOL) return isMainDocument
@@ -128,31 +128,32 @@ export const pauseSimulation = async (page) => {
   await expect(buttonNamed(page, 'Start')).toBeVisible()
 }
 
-export const expectPending = (page, laneId, count) =>
-  expect(metric(page, laneId, 'pending')).toHaveText(String(count))
+// The lane's `name` metric shows `shown` (a number or text).
+export const expectMetric = (page, laneId, name, shown) =>
+  expect(metric(page, laneId, name)).toHaveText(String(shown))
 
-export const expectDeployed = (page, laneId, count) =>
-  expect(metric(page, laneId, 'deployed')).toHaveText(String(count))
+export const expectPending = (page, laneId, count) => expectMetric(page, laneId, 'pending', count)
+
+export const expectDeployed = (page, laneId, count) => expectMetric(page, laneId, 'deployed', count)
 
 export const expectDefectsCaught = (page, laneId, shown) =>
-  expect(metric(page, laneId, 'defectsCaught')).toHaveText(shown)
+  expectMetric(page, laneId, 'defectsCaught', shown)
+
+// The lane's metrics grid (Deployed through Pickup wait).
+export const metricsGrid = (page, laneId) =>
+  laneLocator(page, laneId).locator('dl', { has: page.locator('[data-metric="incidents"]') })
 
 export const expectCounts = async (page, laneId, { pending, deployed }) => {
   await expectPending(page, laneId, pending)
   await expectDeployed(page, laneId, deployed)
 }
 
-const QUEUE_LABEL_BY_LANE = { human: 'Human', ai: 'AI' }
-
-// The red of the warning state: --color-warning (#ef4444) in src/index.css.
-export const WARNING_BORDER_COLOR = 'rgb(239, 68, 68)'
-// The dark page: --color-canvas (#0b0d12) in src/index.css.
-export const PAGE_BACKGROUND = 'rgb(11, 13, 18)'
-
-export const FULL_RUN_SECONDS = 10
 // Setting values and run lengths several specs share (e2e-only; the unit tests keep their own).
-export const DRAIN_SECONDS = 6
-export const NEXT_TICK_SECONDS = 0.1
+export const FULL_RUN_SECONDS = 10
+// The default Human lane deploys its first whole PR at tick 80, so 7.9 s is the last tick before.
+export const LAST_TICK_BEFORE_FIRST_HUMAN_PR_SECONDS = 7.9
+export const MAX_SKIM = 3
+export const QUARTER_PR_PER_DAY = 0.25
 // The busy-AI preset leaves 115 PRs pending after 30 s, beyond any tile capacity C (at most 98).
 export const OVERFLOW_RUN_SECONDS = 30
 // Declared here on purpose: data-state is a fixed hook, so a rename in the app must fail the tests.
@@ -167,26 +168,12 @@ export const expectQueueState = async (page, laneId, count, state) => {
   await expect(queueBox(page, laneId)).toHaveAttribute('data-state', state)
 }
 
-// What a warning box looks like: the state, the alert icon, and the red border.
-export const expectWarningBox = async (page, laneId) => {
-  const box = queueBox(page, laneId)
-  await expect(box).toHaveAttribute('data-state', QUEUE_STATE.warning)
-  await expect(box.locator('[data-icon="triangle-alert"]')).toBeVisible()
-  await expect(box).toHaveCSS('border-color', WARNING_BORDER_COLOR)
-}
-
-// The lane's status element announces the warning.
-export const expectWarningAnnounced = (page, laneId) =>
-  expect(laneLocator(page, laneId).getByRole('status')).toHaveText(
-    `${QUEUE_LABEL_BY_LANE[laneId]} Pending Review over threshold`,
-  )
-
 // The tiles a queue box draws and the overflow text it adds ("+N more").
 export const tilesIn = (page, laneId) => queueBox(page, laneId).locator('[data-tile]')
 export const overflowIn = (page, laneId) => queueBox(page, laneId).getByText(/^\+\d+ more$/)
 
 // The capacity C the app puts on the queue box; specs never hard-code it.
-export const readTileCapacity = async (page) =>
+const readTileCapacity = async (page) =>
   Number(await queueBox(page, 'human').getAttribute('data-capacity'))
 
 // Plan AC12: C is between 22 (the busy-AI queue at 5.7 s) and 98 (the exact preset's n after n ticks).
@@ -207,6 +194,7 @@ export const SECOND_MS = 1000
 // the app's tick period fails the tests (an independent oracle, like the other constants).
 export const TICK_MS = 100
 export const TICKS_PER_SECOND = SECOND_MS / TICK_MS
+export const NEXT_TICK_SECONDS = TICK_MS / SECOND_MS
 const ticksToSeconds = (ticks) => ticks / TICKS_PER_SECOND
 
 export const HUMAN_CODE_WRITTEN_LABEL = 'Human code written (LOC/hr)'
@@ -221,19 +209,6 @@ export const THRESHOLD_LABEL = 'Warning threshold'
 // stays at its default.
 // Busy AI: +0.38631 AI pending PR per tick, so 3 PRs pending at 1 s and 115 at 30 s.
 export const BUSY_AI_PRESET = Object.freeze({ [AI_CODE_WRITTEN_LABEL]: 2000 })
-// Exact: the AI lane gains exactly one pending PR per tick, so Pending Review is n after n ticks.
-export const EXACT_AI_PRESET = Object.freeze({
-  [HUMAN_CODE_WRITTEN_LABEL]: 5,
-  [REVIEWER_SPEED_LABEL]: 100,
-  [AI_SKIM_LABEL]: 1,
-  [AI_CODE_WRITTEN_LABEL]: 704,
-})
-// Human backlog: 400 LOC human PRs; the human queue gains one PR every 4 s (6 pending at 24 s).
-export const HUMAN_BACKLOG_PRESET = Object.freeze({
-  [HUMAN_CODE_WRITTEN_LABEL]: 200,
-  [HUMAN_PRS_PER_DAY_LABEL]: 4,
-  [REVIEWER_SPEED_LABEL]: 100,
-})
 // Drain: the settings the drain scenarios switch a busy AI lane to (AI effective speed 2000 LOC/hr).
 export const AI_DRAIN_SETTINGS = Object.freeze({
   [AI_CODE_WRITTEN_LABEL]: 5,
@@ -247,7 +222,8 @@ export const AI_DRAIN_SETTINGS = Object.freeze({
 // the displayed (floored) values.
 export const REFERENCE = Object.freeze({
   // Generation model (plan, "Default arithmetic"). Internal values in brackets.
-  // Defaults: both queues stay empty; a human PR is 240 LOC, reviewed at 3 LOC per tick.
+  // Defaults: both queues stay empty; a human PR is 240 LOC, reviewed at 30 LOC per tick (3 LOC
+  // generated per tick).
   defaultHumanDeployedAtTick79: 0, // (0.9875)
   defaultHumanDeployedAtTick80: 1,
   defaultHumanPendingAtTick100: 0,
@@ -262,10 +238,10 @@ export const REFERENCE = Object.freeze({
   defaultAiIncidentsPerPr: '6.16',
   defaultHeadlineRatio: '3.65×', // 6.161 / 1.6896
   // Human code written 50 (PR size 400, detection 4%) from the start: 1.25 deployed, 9.6 incidents.
-  largeHumanPrPendingAtTick100: 0,
-  largeHumanPrDeployedAtTick100: 1,
-  largeHumanPrIncidentsAtTick100: 9,
-  largeHumanPrIncidentsPerPrAtTick100: '7.68',
+  humanPendingAtTick100WithCodeWritten50: 0,
+  humanDeployedAtTick100WithCodeWritten50: 1,
+  humanIncidentsAtTick100WithCodeWritten50: 9,
+  humanIncidentsPerPrAtTick100WithCodeWritten50: '7.68',
   // Defaults for 1 s, then one Human change (AC7c): Defects caught on the next tick, then the
   // Human lane at 10 s.
   // Human code written 50: PR size 400.
@@ -301,10 +277,10 @@ export const REFERENCE = Object.freeze({
   busyAiDeployedAtTick100: 16, // 100 x 0.16556 (16.556)
   // AC7d, AI code written 1000 against an effective review speed of 600: pending LOC grows by
   // exactly 40 per tick (6,000 at 15 s).
-  ai1000PendingAtTick150: 16, // (16.556)
+  aiCodeWritten1000PendingAtTick150: 16, // (16.556)
   // AI code written 600, equal to the effective review speed: the queue stays empty.
-  ai600PendingAtTick100: 0,
-  ai600DeployedAtTick100: 16, // (16.556)
+  aiCodeWritten600PendingAtTick100: 0,
+  aiCodeWritten600DeployedAtTick100: 16, // (16.556)
   // Plan, Slice 2 check: from the busy-AI state at 1 s, one more tick with reviewer speed 1000 and
   // skim 3 reviews 300 LOC (AI deployed 2.483); with reviewer speed 100, pending reaches 4.360.
   busyAiDeployedAtTick11WithFasterReview: 2,
@@ -315,24 +291,41 @@ export const REFERENCE = Object.freeze({
   busyAiPendingLocAtTick30AfterHumanPrsPerDay05: '4,200',
   // Plan, Slice 5 check: from 5 s, AI_DRAIN_SETTINGS remove 0.551 PR per tick (16.01 at 5.6 s,
   // 15.46 at 5.7 s); from 2 s they empty the queue well within 6 s.
-  busyAiPendingAtTick56AfterDraining: 16,
-  busyAiPendingAtTick57AfterDraining: 15,
+  drainedAiPendingAtTick56: 16,
+  drainedAiPendingAtTick57: 15,
   drainedAiDefectsCaught: '2%', // PR size 362.4 at 2000 LOC/hr: 0.8 x 0.2286 x 0.1 = 0.018
   // Human backlog preset plus AI code written 2000, at 24 s.
-  humanBacklogPendingAtTick240: 6,
+  humanBacklogHumanPendingAtTick240: 6,
   humanBacklogAiPendingAtTick240: 71,
 })
 
 export const headline = (page) => page.locator('[data-metric="headlineRatio"]')
 
+// A { human, ai } sample has exactly one finite number per lane, so no check on it passes vacuously.
+const expectLaneSample = (sample, label) => {
+  expect(Object.keys(sample).sort(), `${label}: one value per lane`).toEqual(
+    [...ALL_LANE_IDS].sort(),
+  )
+  const notFinite = Object.entries(sample).filter(([, value]) => !Number.isFinite(value))
+  expect(notFinite, `${label}: every value is a finite number`).toEqual([])
+}
+
 // samples are { human, ai } values read once per tick; none may be lower than the one before.
 export const expectNeverDecreases = (samples) => {
+  expect(samples.length, 'samples to compare').toBeGreaterThan(1)
+  samples.forEach((sample, index) => expectLaneSample(sample, `sample ${index}`))
   const decreases = samples
     .slice(1)
     .filter((current, sampleIndex) =>
       Object.entries(current).some(([laneId, value]) => value < samples[sampleIndex][laneId]),
     )
   expect(decreases).toEqual([])
+}
+
+// Every sample is greater than the one before it.
+export const expectStrictlyIncreasing = (samples, label) => {
+  const notIncreasing = samples.slice(1).filter((sample, index) => !(sample > samples[index]))
+  expect(notIncreasing, label).toEqual([])
 }
 
 export const expectEmptyLanes = async (page) => {
@@ -364,8 +357,8 @@ export const visibleValue = async (sliderLocator) => {
 
 // The shown values of one metric as { human, ai }, keyed by each value's own lane. Thousands
 // separators are dropped, so "6,000" reads as 6000.
-export const metricValues = (page, name) =>
-  page.evaluate(
+export const metricValues = async (page, name) => {
+  const values = await page.evaluate(
     (metricName) =>
       Object.fromEntries(
         [...document.querySelectorAll(`[data-lane] [data-metric="${metricName}"]`)].map(
@@ -377,6 +370,9 @@ export const metricValues = (page, name) =>
       ),
     name,
   )
+  expectLaneSample(values, name)
+  return values
+}
 
 // Lanes and the elapsed readout come from one React state, so they commit together.
 // Waiting for the readout therefore tells us the lanes are current, with no clock-dependent waits.
@@ -442,13 +438,16 @@ export const flushPendingRenders = (page) =>
       }),
   )
 
+// For a paused or reset simulation: lets `seconds` of fake time pass, then flushes any render
+// that queued, so a check afterwards sees whatever (if anything) changed.
+export const idleFor = async (page, seconds) => {
+  await page.clock.runFor(seconds * SECOND_MS)
+  await flushPendingRenders(page)
+}
+
 export const PHONE = { width: 375, height: 667 }
 export const NARROWEST_PHONE = { width: 320, height: 568 } // WCAG 1.4.10 reflow
 export const MIN_TEXT_CONTRAST = 4.5 // WCAG 1.4.3, normal-size text
-
-// The right and bottom edges of a bounding box.
-export const rightOf = ({ x, width }) => x + width
-export const bottomOf = ({ y, height }) => y + height
 
 export const expectNoHorizontalScroll = async (page) => {
   const scroll = await page.evaluate(() => ({
@@ -471,6 +470,11 @@ export const textColors = (locator) =>
       return [...context.getImageData(0, 0, 1, 1).data]
     }
     const OPAQUE = 255
+    // An RGBA colour composited over an opaque RGB colour beneath it.
+    const over = ([red, green, blue, alpha], beneath) =>
+      [red, green, blue].map(
+        (channel, index) => (channel * alpha + beneath[index] * (OPAQUE - alpha)) / OPAQUE,
+      )
     const layers = []
     for (let holder = element; holder; holder = holder.parentElement) {
       const layer = toRgba(getComputedStyle(holder).backgroundColor)
@@ -478,18 +482,9 @@ export const textColors = (locator) =>
       if (layer[3] === OPAQUE) break
     }
     // Composite translucent backgrounds (e.g. bg-white/5) over what lies beneath them.
-    const background = layers.reduceRight(
-      (beneath, [red, green, blue, alpha]) =>
-        [red, green, blue].map(
-          (channel, index) => (channel * alpha + beneath[index] * (OPAQUE - alpha)) / OPAQUE,
-        ),
-      [0, 0, 0],
-    )
-    const [red, green, blue, alpha] = toRgba(getComputedStyle(element).color)
+    const background = layers.reduceRight((beneath, layer) => over(layer, beneath), [0, 0, 0])
     // A translucent text colour is seen blended with the background behind it.
-    const foreground = [red, green, blue].map(
-      (channel, index) => (channel * alpha + background[index] * (OPAQUE - alpha)) / OPAQUE,
-    )
+    const foreground = over(toRgba(getComputedStyle(element).color), background)
     return { foreground, background }
   })
 
