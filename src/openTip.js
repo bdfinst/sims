@@ -2,7 +2,8 @@
 // One tip is active at a time. A tip is shown when it is the active tip, it is not dismissed, and
 // it is hovered by a mouse, has keyboard focus, or is pinned by a press (click, tap, Enter, Space).
 // A tip closes only when the pointer and keyboard focus have both left it: when one of them leaves
-// and no tip is left shown, the tip the other still holds shows again, unless Escape dismissed it.
+// and no tip is left shown, the tip the other still holds shows again, unless Escape or a closing
+// press dismissed it.
 
 export const TIP_EVENT = Object.freeze({
   pointerEnter: 'pointerEnter',
@@ -23,7 +24,7 @@ export const INITIAL_TIP_STATE = Object.freeze({
   focusedKey: null,
   isPinned: false,
   isDismissed: false,
-  // The hovered and the focused tip Escape last dismissed, so neither shows again when the other
+  // The hovered and the focused tip Escape or a closing press last dismissed, so neither shows again when the other
   // of pointer and focus leaves. Each is cleared once that tip is hovered or focused afresh.
   dismissedHoverKey: null,
   dismissedFocusKey: null,
@@ -50,7 +51,7 @@ const dismiss = (state) => ({ ...state, isPinned: false, isDismissed: true })
 
 // Once a hover or a focus has ended: if no tip is left shown, the tip `waitingKey` still holds
 // (focus or hover) shows again. A pinned or dismissed tip stays in charge, and so does a tip
-// Escape dismissed (`dismissedKey`).
+// Escape or a closing press dismissed (`dismissedKey`).
 const fallBackTo = (state, waitingKey, dismissedKey) => {
   const isWaiting =
     shownTipKey(state) === null &&
@@ -74,8 +75,20 @@ const endFocus = (state) =>
     state.dismissedHoverKey,
   )
 
-// Clears a record of Escape's dismissal when its tip is engaged afresh.
+// Clears a record of a tip's dismissal when that tip is engaged afresh.
 const forget = (dismissedKey, key) => (dismissedKey === key ? null : dismissedKey)
+
+// Escape and a closing press: dismisses the shown tip and records whether the pointer or focus
+// still holds it, so it does not show again when the other of the two leaves.
+const dismissShown = (state) => {
+  const shownKey = shownTipKey(state)
+  if (shownKey === null) return state
+  return dismiss({
+    ...state,
+    dismissedHoverKey: shownKey === state.hoveredKey ? shownKey : state.dismissedHoverKey,
+    dismissedFocusKey: shownKey === state.focusedKey ? shownKey : state.dismissedFocusKey,
+  })
+}
 
 const pressTip = (state, key) => {
   const engaged = {
@@ -84,17 +97,7 @@ const pressTip = (state, key) => {
     dismissedFocusKey: forget(state.dismissedFocusKey, key),
   }
   if (!isTipShown(state, key)) return { ...activate(engaged, key), isPinned: true }
-  return state.isPinned ? dismiss(engaged) : { ...engaged, isPinned: true }
-}
-
-const escape = (state) => {
-  const shownKey = shownTipKey(state)
-  if (shownKey === null) return state
-  return dismiss({
-    ...state,
-    dismissedHoverKey: shownKey === state.hoveredKey ? shownKey : state.dismissedHoverKey,
-    dismissedFocusKey: shownKey === state.focusedKey ? shownKey : state.dismissedFocusKey,
-  })
+  return state.isPinned ? dismissShown(engaged) : { ...engaged, isPinned: true }
 }
 
 export const openTipReducer = (state, event) => {
@@ -122,7 +125,7 @@ export const openTipReducer = (state, event) => {
     case TIP_EVENT.pointerDownOutside:
       return state.isPinned ? dismiss(state) : state
     case TIP_EVENT.escape:
-      return escape(state)
+      return dismissShown(state)
     default:
       return state
   }

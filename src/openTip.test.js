@@ -115,10 +115,42 @@ describe('openTipReducer, one test per truth-table row', () => {
     expect(shownAfter(...events)).toEqual([TIP])
   })
 
-  it('reopens a tip closed by a press when the mouse leaves and re-enters', () => {
+  it.each([
+    [
+      'the mouse leaves and re-enters',
+      [mouseEnter(TIP), press(TIP), press(TIP), pointerLeave(TIP), mouseEnter(TIP)],
+    ],
+    [
+      'keyboard focus leaves and returns',
+      [keyboardFocus(TIP), press(TIP), press(TIP), blur(TIP), keyboardFocus(TIP)],
+    ],
+    ['the button is pressed again', [mouseEnter(TIP), press(TIP), press(TIP), press(TIP)]],
+  ])('reopens a tip closed by a press when %s', (_how, events) => {
+    expect(shownAfter(...events)).toEqual([TIP])
+  })
+
+  it('keeps a focused tip closed by a press closed when a hover on another tip ends', () => {
     expect(
-      shownAfter(mouseEnter(TIP), press(TIP), press(TIP), pointerLeave(TIP), mouseEnter(TIP)),
-    ).toEqual([TIP])
+      shownAfter(
+        keyboardFocus(TIP),
+        press(TIP),
+        press(TIP),
+        mouseEnter(OTHER_TIP),
+        pointerLeave(OTHER_TIP),
+      ),
+    ).toEqual(NONE_SHOWN)
+  })
+
+  it('keeps a hovered tip closed by a press closed when focus leaves another tip', () => {
+    expect(
+      shownAfter(
+        mouseEnter(TIP),
+        press(TIP),
+        press(TIP),
+        keyboardFocus(OTHER_TIP),
+        blur(OTHER_TIP),
+      ),
+    ).toEqual(NONE_SHOWN)
   })
 })
 
