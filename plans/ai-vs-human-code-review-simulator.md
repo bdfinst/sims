@@ -828,7 +828,6 @@ Feature: Pending Review tiles and layout
   Background:
     Given the queue tile capacity C is read from the queue box
 
-  @wip
   Scenario: One tile per pending PR
     Given I set "AI code written (LOC/hr)" to 2000
     When I press Start and 5.7 seconds pass
@@ -838,7 +837,6 @@ Feature: Pending Review tiles and layout
     Given I open the simulator
     Then neither Pending Review box shows any tiles
 
-  @wip
   Scenario: Exactly at capacity has no overflow indicator
     Given I set "Human code written (LOC/hr)" to 5, "Reviewer speed (LOC/hr, both lanes)" to 100, "AI skim multiplier" to 1, and "AI code written (LOC/hr)" to 704
     When I press Start and C ticks pass
@@ -846,13 +844,11 @@ Feature: Pending Review tiles and layout
     When 0.1 more seconds pass
     Then the AI lane shows Pending Review C + 1, C tiles, and the text "+1 more"
 
-  @wip
   Scenario: Overflow beyond capacity
     Given I set "AI code written (LOC/hr)" to 2000
     When I press Start and 30 seconds pass
     Then the AI lane shows C tiles and the text "+N more", where N is 115 minus C
 
-  @wip
   Scenario: Projector fit at 1280 × 720
     Given the viewport is 1280 × 720
     And I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 30 seconds
@@ -862,7 +858,6 @@ Feature: Pending Review tiles and layout
     Given the viewport is 1280 × 800
     Then each metric row in the Human lane has the same left edge as the matching row in the AI lane
 
-  @wip
   Scenario: No horizontal scroll on a phone, even when overflowing
     Given the viewport is 375 × 667
     And I set "AI code written (LOC/hr)" to 2000
@@ -1523,7 +1518,7 @@ Your decisions (recorded in the spec's Ambiguity Log):
   - [x] Step 8.2: New slider keys, lane-model fields, and reducer handling (additive)
   - [x] Step 8.3: Cut over the model and the UI to the new sliders
   - [x] Step 8.4: Revised run, pause, reset, and controls scenarios
-  - [ ] Step 8.5: Revised metrics and warning scenarios
+  - [x] Step 8.5: Revised metrics and warning scenarios
   - [ ] Step 8.6: Revised tile and layout scenarios
   - [ ] Step 8.7: Generation scenarios
 

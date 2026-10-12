@@ -1,7 +1,9 @@
 import {
-  FULL_RUN_SECONDS,
+  BUSY_AI_PRESET,
+  EXACT_AI_PRESET,
+  NEXT_TICK_SECONDS,
+  OVERFLOW_RUN_SECONDS,
   REFERENCE,
-  REVIEWER_SPEED_LABEL,
   TICK_MS,
   expect,
   expectElapsedAtTick,
@@ -11,44 +13,39 @@ import {
   overflowIn,
   queueBox,
   openAndReadCapacity,
-  setSlider,
+  runFor,
+  setSliders,
   startAndRunFor,
   startSimulation,
   test,
   tilesIn,
-  ticksToSeconds,
-  BUSY_HUMAN_GEN,
 } from './fixtures.js'
 
 test.describe.configure({ mode: 'parallel' })
 
-const HUGE_PR_SIZE = 1000
-const SLOW_REVIEWER_SPEED = 100
-const ONE_TICK = 1
+const SECONDS_TO_AI_PENDING_22 = 5.7
 
-// Pre-cutover setup (Human generation 10 PRs per hour, PR size 1000, speed 100) shows n - 1 pending
-// PRs after n ticks, so the queue holds exactly C PRs after C + 1 ticks. Step 8.6 replaces it with
-// the exact AI preset, where the queue holds n after n ticks.
-const ticksToFillQueue = (capacity) => capacity + 1
+// Plan, "Default arithmetic": the exact AI preset displays AI Pending Review n after n ticks, for
+// every n up to 100 (C is at most 98, so C + 1 is covered).
+const exactAiPendingAfterTicks = (ticks) => ticks
 
 test.describe('Pending Review tiles', () => {
-  // @wip: Step 8.6
-  test.fixme('One tile per pending PR', async ({ page }) => {
+  test('One tile per pending PR', async ({ page }) => {
     await test.step('Given the queue tile capacity C is read from the queue box', async () => {
       await openAndReadCapacity(page)
     })
 
-    await test.step('Given I open the simulator', async () => {
-      await expectSimulatorOpen(page)
+    await test.step('Given I set "AI code written (LOC/hr)" to 2000', async () => {
+      await setSliders(page, BUSY_AI_PRESET)
     })
 
-    await test.step('When I press Start and 1.2 seconds pass', async () => {
-      await startAndRunFor(page, ticksToSeconds(REFERENCE.aiTickWithPending22))
+    await test.step('When I press Start and 5.7 seconds pass', async () => {
+      await startAndRunFor(page, SECONDS_TO_AI_PENDING_22)
     })
 
     await test.step('Then the AI lane shows Pending Review 22, 22 tiles, and no overflow indicator', async () => {
-      await expectPending(page, 'ai', REFERENCE.aiPendingAtTick12)
-      await expect(tilesIn(page, 'ai')).toHaveCount(REFERENCE.aiPendingAtTick12)
+      await expectPending(page, 'ai', REFERENCE.busyAiPendingAtTick57)
+      await expect(tilesIn(page, 'ai')).toHaveCount(REFERENCE.busyAiPendingAtTick57)
       await expect(overflowIn(page, 'ai')).toHaveCount(0)
     })
   })
@@ -72,67 +69,60 @@ test.describe('Pending Review tiles', () => {
     })
   })
 
-  // @wip: Step 8.6
-  test.fixme('Exactly at capacity has no overflow indicator', async ({ page }) => {
+  test('Exactly at capacity has no overflow indicator', async ({ page }) => {
     let capacity
-    let ticksAtCapacity
 
     await test.step('Given the queue tile capacity C is read from the queue box', async () => {
       capacity = await openAndReadCapacity(page)
-      ticksAtCapacity = ticksToFillQueue(capacity)
     })
 
-    await test.step('Given I set "Human generation (PRs/hr)" to 10, "PR size (LOC, both lanes)" to 1000, and "Reviewer speed (LOC/hr, both lanes)" to 100', async () => {
-      await setSlider(page, 'Human generation (PRs/hr)', BUSY_HUMAN_GEN)
-      await setSlider(page, 'PR size (LOC, both lanes)', HUGE_PR_SIZE)
-      await setSlider(page, REVIEWER_SPEED_LABEL, SLOW_REVIEWER_SPEED)
+    await test.step('Given I set "Human code written (LOC/hr)" to 5, "Reviewer speed (LOC/hr, both lanes)" to 100, "AI skim multiplier" to 1, and "AI code written (LOC/hr)" to 704', async () => {
+      await setSliders(page, EXACT_AI_PRESET)
     })
 
-    await test.step('When I press Start and C + 1 ticks pass', async () => {
+    await test.step('When I press Start and C ticks pass', async () => {
       await startSimulation(page)
-      await page.clock.runFor(ticksAtCapacity * TICK_MS)
-      await expectElapsedAtTick(page, ticksAtCapacity)
+      await page.clock.runFor(capacity * TICK_MS)
+      await expectElapsedAtTick(page, capacity)
     })
 
-    await test.step('Then the Human lane shows Pending Review C, C tiles, and no overflow indicator', async () => {
-      await expectPending(page, 'human', capacity)
-      await expect(tilesIn(page, 'human')).toHaveCount(capacity)
-      await expect(overflowIn(page, 'human')).toHaveCount(0)
+    await test.step('Then the AI lane shows Pending Review C, C tiles, and no overflow indicator', async () => {
+      await expectPending(page, 'ai', exactAiPendingAfterTicks(capacity))
+      await expect(tilesIn(page, 'ai')).toHaveCount(capacity)
+      await expect(overflowIn(page, 'ai')).toHaveCount(0)
     })
 
     await test.step('When 0.1 more seconds pass', async () => {
-      await page.clock.runFor(TICK_MS)
-      await expectElapsedAtTick(page, ticksAtCapacity + ONE_TICK)
+      await runFor(page, NEXT_TICK_SECONDS)
     })
 
-    await test.step('Then the Human lane shows Pending Review C + 1, C tiles, and the text "+1 more"', async () => {
-      await expectPending(page, 'human', capacity + 1)
-      await expect(tilesIn(page, 'human')).toHaveCount(capacity)
-      await expect(overflowIn(page, 'human')).toHaveText('+1 more')
+    await test.step('Then the AI lane shows Pending Review C + 1, C tiles, and the text "+1 more"', async () => {
+      await expectPending(page, 'ai', exactAiPendingAfterTicks(capacity + 1))
+      await expect(tilesIn(page, 'ai')).toHaveCount(capacity)
+      await expect(overflowIn(page, 'ai')).toHaveText('+1 more')
     })
   })
 
-  // @wip: Step 8.6
-  test.fixme('Overflow beyond capacity', async ({ page }) => {
+  test('Overflow beyond capacity', async ({ page }) => {
     let capacity
 
     await test.step('Given the queue tile capacity C is read from the queue box', async () => {
       capacity = await openAndReadCapacity(page)
     })
 
-    await test.step('Given I open the simulator', async () => {
-      await expectSimulatorOpen(page)
+    await test.step('Given I set "AI code written (LOC/hr)" to 2000', async () => {
+      await setSliders(page, BUSY_AI_PRESET)
     })
 
-    await test.step('When I press Start and 10 seconds pass', async () => {
-      await startAndRunFor(page, FULL_RUN_SECONDS)
+    await test.step('When I press Start and 30 seconds pass', async () => {
+      await startAndRunFor(page, OVERFLOW_RUN_SECONDS)
     })
 
-    await test.step('Then the AI lane shows C tiles and the text "+N more", where N is 184 minus C', async () => {
-      await expectPending(page, 'ai', REFERENCE.aiPendingAtTick100)
+    await test.step('Then the AI lane shows C tiles and the text "+N more", where N is 115 minus C', async () => {
+      await expectPending(page, 'ai', REFERENCE.busyAiPendingAtTick300)
       await expect(tilesIn(page, 'ai')).toHaveCount(capacity)
       await expect(overflowIn(page, 'ai')).toHaveText(
-        `+${REFERENCE.aiPendingAtTick100 - capacity} more`,
+        `+${REFERENCE.busyAiPendingAtTick300 - capacity} more`,
       )
     })
   })

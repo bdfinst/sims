@@ -148,9 +148,10 @@ export const PAGE_BACKGROUND = 'rgb(11, 13, 18)'
 
 export const FULL_RUN_SECONDS = 10
 // Setting values and run lengths several specs share (e2e-only; the unit tests keep their own).
-export const BUSY_HUMAN_GEN = 10
 export const DRAIN_SECONDS = 6
 export const NEXT_TICK_SECONDS = 0.1
+// The busy-AI preset leaves 115 PRs pending after 30 s, beyond any tile capacity C (at most 98).
+export const OVERFLOW_RUN_SECONDS = 30
 // Declared here on purpose: data-state is a fixed hook, so a rename in the app must fail the tests.
 export const QUEUE_STATE = Object.freeze({ warning: 'warning', normal: 'normal' })
 
@@ -203,7 +204,7 @@ export const SECOND_MS = 1000
 // the app's tick period fails the tests (an independent oracle, like the other constants).
 export const TICK_MS = 100
 export const TICKS_PER_SECOND = SECOND_MS / TICK_MS
-export const ticksToSeconds = (ticks) => ticks / TICKS_PER_SECOND
+const ticksToSeconds = (ticks) => ticks / TICKS_PER_SECOND
 
 export const HUMAN_CODE_WRITTEN_LABEL = 'Human code written (LOC/hr)'
 export const HUMAN_PRS_PER_DAY_LABEL = 'Human PRs per day'
@@ -240,9 +241,7 @@ export const AI_DRAIN_SETTINGS = Object.freeze({
 // Per tick (0.1 h): a lane gains gen x 0.1 PRs of `size` LOC each, then reviews
 // min(pending LOC, effective speed x 0.1) LOC, taking PRs off the queue in proportion.
 // AI effective speed = reviewer speed x skim. Ticks are 0.1 s each, so tick 10 is 1 s. Counts are
-// the displayed (floored) values. The pre-cutover oracles at the end come from the removed
-// generation and PR size sliders, so only Step 8.6's test.fixme bodies use them until it replaces
-// them with Default arithmetic values.
+// the displayed (floored) values.
 export const REFERENCE = Object.freeze({
   // Generation model (plan, "Default arithmetic"). Internal values in brackets.
   // Defaults: both queues stay empty; a human PR is 240 LOC, reviewed at 3 LOC per tick.
@@ -292,8 +291,10 @@ export const REFERENCE = Object.freeze({
   busyAiDeployedAtTick40: 6, // 40 x 0.16556 (6.622)
   busyAiPendingAtTick42: 16, // (16.225)
   busyAiPendingAtTick50: 19, // (19.316)
+  busyAiPendingAtTick57: 22, // (22.020)
   busyAiPendingAtTick60: 23, // (23.179)
   busyAiPendingAtTick100: 38, // (38.631)
+  busyAiPendingAtTick300: 115, // (115.894)
   busyAiDeployedAtTick100: 16, // 100 x 0.16556 (16.556)
   // Plan, Slice 2 check: from the busy-AI state at 1 s, one more tick with reviewer speed 1000 and
   // skim 3 reviews 300 LOC (AI deployed 2.483); with reviewer speed 100, pending reaches 4.360.
@@ -311,10 +312,6 @@ export const REFERENCE = Object.freeze({
   // Human backlog preset plus AI code written 2000, at 24 s.
   humanBacklogPendingAtTick240: 6,
   humanBacklogAiPendingAtTick240: 71,
-  // Pre-cutover oracles (see above).
-  aiPendingAtTick100: 184,
-  aiPendingAtTick12: 22,
-  aiTickWithPending22: 12,
 })
 
 export const headline = (page) => page.locator('[data-metric="headlineRatio"]')

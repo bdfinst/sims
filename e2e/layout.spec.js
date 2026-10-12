@@ -8,6 +8,7 @@ import {
   HUMAN_PRS_PER_DAY_LABEL,
   MIN_TEXT_CONTRAST,
   NARROWEST_PHONE,
+  OVERFLOW_RUN_SECONDS,
   PAGE_BACKGROUND,
   PHONE,
   RESEARCH_TITLE,
@@ -30,11 +31,9 @@ import {
   researchPanel,
   researchToggle,
   rightOf,
-  runFor,
   setSliders,
   slider,
   startAndRunFor,
-  startSimulation,
   test,
   textColors,
 } from './fixtures.js'
@@ -43,8 +42,6 @@ test.describe.configure({ mode: 'parallel' })
 
 const PROJECTOR = { width: 1280, height: 720 }
 const DESKTOP = { width: 1280, height: 800 }
-// The busy-AI preset leaves 115 PRs pending after 30 s, beyond the tile capacity (TILE_CAPACITY, 48).
-const OVERFLOW_RUN_SECONDS = 30
 const TABLET = { width: 768, height: 1024 }
 // --color-deployed (#22c55e) in src/index.css
 const DEPLOYED_GREEN = 'rgb(34, 197, 94)'
@@ -116,8 +113,7 @@ test.describe('Pending Review layout', () => {
 
       await test.step('And I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 30 seconds', async () => {
         await setSliders(page, BUSY_AI_PRESET)
-        await startSimulation(page)
-        await runFor(page, OVERFLOW_RUN_SECONDS)
+        await startAndRunFor(page, OVERFLOW_RUN_SECONDS)
       })
 
       await test.step("Then the header, the headline ratio, and both lanes' Pending Review counts and metric grids are fully visible without scrolling", async () => {
@@ -281,8 +277,7 @@ test.describe('Pending Review layout', () => {
       })
 
       await test.step('When I press Start and 30 seconds pass', async () => {
-        await startSimulation(page)
-        await runFor(page, OVERFLOW_RUN_SECONDS)
+        await startAndRunFor(page, OVERFLOW_RUN_SECONDS)
       })
 
       await test.step('Then the AI lane shows a "+N more" indicator', async () => {
@@ -345,8 +340,7 @@ test.describe('Pending Review layout', () => {
     test('No horizontal scroll at 320 px, even when overflowing', async ({ page }) => {
       await openSimulator(page)
       await setSliders(page, BUSY_AI_PRESET)
-      await startSimulation(page)
-      await runFor(page, OVERFLOW_RUN_SECONDS)
+      await startAndRunFor(page, OVERFLOW_RUN_SECONDS)
 
       await expect(overflowIn(page, 'ai')).toBeVisible()
       await expectNoHorizontalScroll(page)
