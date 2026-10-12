@@ -5,8 +5,8 @@ export const LANE_IDS = Object.freeze({ human: 'human', ai: 'ai' })
 // Generation model constants. The Faros figures fix the AI lane's PR size (×1.51 the human PR
 // size) and the default AI code written, which gives about ×1.162 the human PRs per day at the
 // defaults. The AI default is fixed: it does not follow later changes to the human sliders. The
-// lane's "1.51×" text comes from these constants, and the research panel's "+51%" should derive
-// from them too, so the model and its text cannot drift.
+// lane's "1.51×" text and the research panel's "+51%", "+16.2%", "1.51×", and "1.162×" all come
+// from these constants, so the model and its text cannot drift.
 export const WORK_HOURS_PER_DAY = 8
 export const FAROS_PR_SIZE_INCREASE_PCT = 51
 export const FAROS_MERGE_RATE_INCREASE_PCT = 16.2
@@ -113,7 +113,10 @@ export const MODEL_ASSUMPTIONS = Object.freeze({
   sizeWall: SIZE_WALL,
   speedKnee: SPEED_KNEE,
   speedWall: SPEED_WALL,
+  humanDefaultLocPerHour: DEFAULT_SETTINGS.humanLocPerHour,
+  humanDefaultPrsPerDay: DEFAULT_SETTINGS.humanPrsPerDay,
   aiSizeMultiplier: LANE_MODELS[LANE_IDS.ai].sizeMultiplier,
+  aiMergeRateMultiplier: FAROS_MERGE_RATE_MULTIPLIER,
 })
 
 // escapedDefects is the model's term; the UI calls it "Incidents".

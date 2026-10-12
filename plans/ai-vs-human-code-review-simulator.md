@@ -922,7 +922,6 @@ Feature: Research behind the simulation
     Then the "Research behind this simulation" toggle is collapsed
     And no research findings are visible
 
-  @wip
   Scenario: Expanding shows every finding verbatim with its source
     Given I open the simulator
     When I expand "Research behind this simulation"
@@ -938,7 +937,6 @@ Feature: Research behind the simulation
     Given I expand "Research behind this simulation"
     Then the page does not contain "near zero", "coined", or "originated"
 
-  @wip
   Scenario: Model assumptions and calibration are stated
     Given I expand "Research behind this simulation"
     Then the panel contains "These are modeling choices, not research findings"

@@ -36,7 +36,7 @@ const SOURCES = [
   },
   {
     wording:
-      'Across 22,000 developers in 4,000 teams, high AI adoption saw PR size +51% and 3× incidents per PR (+242.7%), compared with low adoption.',
+      'Across 22,000 developers in 4,000 teams, high AI adoption saw PR size +51%, PR merge rate +16.2%, and 3× incidents per PR (+242.7%), compared with low adoption.',
     label: 'Faros AI, AI Engineering Report Q2 2026: The Acceleration Whiplash',
     url: 'https://faros.ai/research/ai-acceleration-whiplash',
   },
@@ -56,21 +56,15 @@ const SOURCES = [
 const NEW_TAB_NOTICE = ' (opens in new tab)'
 const FORBIDDEN_PHRASES = ['near zero', 'coined', 'originated']
 const ASSUMPTIONS_START = 'Model assumptions'
-const ASSUMPTION_PHRASES = [
-  'These are modeling choices, not research findings',
-  'the defect density (20 defects per 1,000 LOC)',
-  "the base detection rate (0.8, picked from SmartBear's 70–90% range)",
-  'the detection floors (0.05 for large PRs and 0.1 for fast reviewing)',
-  'the curve thresholds (PR size 200 to 400 LOC, reviewer speed 500 to 1,000 LOC/hr)',
-  'the 1.51 size multiplier',
-]
 const CALIBRATION_SENTENCE =
-  "The defaults were calibrated to land near Faros's +242.7% incidents per PR"
+  "The human defaults were chosen to land near Faros's +242.7% incidents per PR"
 const FAROS_URL = SOURCES[2].url
 const SECONDS_AFTER_EXPANDING = 1
 
 const assumptionsParagraph = (page) =>
   researchPanel(page).locator('p', { hasText: ASSUMPTIONS_START })
+
+const expectPanelContains = (page, text) => expect(researchPanel(page)).toContainText(text)
 
 // The source's finding is visible in the panel, verbatim.
 const expectFindingShown = (page, { wording, label }) =>
@@ -117,10 +111,10 @@ test.describe('Research behind the simulation', () => {
     })
 
     await test.step('And the panel contains "faster than 500 LOC/hour"', async () => {
-      await expect(researchPanel(page)).toContainText('faster than 500 LOC/hour')
+      await expectPanelContains(page, 'faster than 500 LOC/hour')
     })
 
-    await test.step('And the panel contains "PR size +51%" and "(+242.7%)"', async () => {
+    await test.step('And the panel contains "high AI adoption saw PR size +51%, PR merge rate +16.2%, and 3× incidents per PR (+242.7%)"', async () => {
       await expectFindingShown(page, SOURCES[2])
     })
 
@@ -176,17 +170,50 @@ test.describe('Research behind the simulation', () => {
       await openResearchPanel(page)
     })
 
-    await test.step('Then the panel states that defect density, the base detection rate, the detection floors, the curve thresholds, and the 1.51 size multiplier are modeling choices', async () => {
-      for (const phrase of ASSUMPTION_PHRASES) {
-        await expect(assumptionsParagraph(page)).toContainText(phrase)
-      }
+    await test.step('Then the panel contains "These are modeling choices, not research findings"', async () => {
+      await expectPanelContains(page, 'These are modeling choices, not research findings')
     })
 
-    await test.step("And the panel states that the defaults were calibrated to land near Faros's +242.7% incidents per PR", async () => {
-      const note = assumptionsParagraph(page)
-      await expect(note).toContainText(CALIBRATION_SENTENCE)
+    await test.step('And the panel contains "the defect density (20 defects per 1,000 LOC)"', async () => {
+      await expectPanelContains(page, 'the defect density (20 defects per 1,000 LOC)')
+    })
+
+    await test.step('And the panel contains "the base detection rate (0.8, picked from SmartBear\'s 70–90% range)"', async () => {
+      await expectPanelContains(
+        page,
+        "the base detection rate (0.8, picked from SmartBear's 70–90% range)",
+      )
+    })
+
+    await test.step('And the panel contains "the detection floors (0.05 for large PRs and 0.1 for fast reviewing)"', async () => {
+      await expectPanelContains(
+        page,
+        'the detection floors (0.05 for large PRs and 0.1 for fast reviewing)',
+      )
+    })
+
+    await test.step('And the panel contains "the curve thresholds (PR size 200 to 400 LOC, reviewer speed 500 to 1,000 LOC/hr)"', async () => {
+      await expectPanelContains(
+        page,
+        'the curve thresholds (PR size 200 to 400 LOC, reviewer speed 500 to 1,000 LOC/hr)',
+      )
+    })
+
+    await test.step('And the panel contains "the human-lane defaults (30 LOC/hr and 1 PR per day)"', async () => {
+      await expectPanelContains(page, 'the human-lane defaults (30 LOC/hr and 1 PR per day)')
+    })
+
+    await test.step('And the panel contains "The AI lane\'s PR size (1.51× the human PR size) and default code written (1.162× the human PR merge rate) come from Faros"', async () => {
+      await expectPanelContains(
+        page,
+        "The AI lane's PR size (1.51× the human PR size) and default code written (1.162× the human PR merge rate) come from Faros",
+      )
+    })
+
+    await test.step('And the panel contains "The human defaults were chosen to land near Faros\'s +242.7% incidents per PR"', async () => {
+      await expectPanelContains(page, CALIBRATION_SENTENCE)
       await expect(
-        note.locator(`a[href="${FAROS_URL}"]`),
+        assumptionsParagraph(page).locator(`a[href="${FAROS_URL}"]`),
         'the figure links its source',
       ).toHaveCount(1)
     })

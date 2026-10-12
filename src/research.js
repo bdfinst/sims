@@ -1,8 +1,16 @@
-import { MODEL_ASSUMPTIONS, formatCount } from './engine.js'
+import {
+  FAROS_MERGE_RATE_INCREASE_PCT,
+  FAROS_PR_SIZE_INCREASE_PCT,
+  MODEL_ASSUMPTIONS,
+  formatCount,
+  formatLocPerHour,
+  formatMultiplier,
+} from './engine.js'
 
 // FINDINGS is data: each text is the spec's Research Sources "Panel wording", copied verbatim; the
 // practitioner observation is a quoted paraphrase with an example link, never an attributed source.
-// The assumptions note is derived: its numbers are read from the engine's own constants.
+// The Faros percentages and the assumptions note are derived: their numbers are read from the
+// engine's own constants.
 export const RESEARCH_TITLE = 'Research behind this simulation'
 
 // The calibration target is quoted twice (the Faros finding and the assumptions note), so it is
@@ -35,7 +43,7 @@ export const FINDINGS = Object.freeze([
   Object.freeze({
     id: 'faros-incidents',
     kind: FINDING_KIND.research,
-    text: `Across 22,000 developers in 4,000 teams, high AI adoption saw PR size +51% and 3× incidents per PR (${FAROS_INCIDENTS_INCREASE}), compared with low adoption.`,
+    text: `Across 22,000 developers in 4,000 teams, high AI adoption saw PR size +${FAROS_PR_SIZE_INCREASE_PCT}%, PR merge rate +${FAROS_MERGE_RATE_INCREASE_PCT}%, and 3× incidents per PR (${FAROS_INCIDENTS_INCREASE}), compared with low adoption.`,
     source: Object.freeze({
       label: 'Faros AI, AI Engineering Report Q2 2026: The Acceleration Whiplash',
       url: FAROS_URL,
@@ -61,11 +69,14 @@ export const FINDINGS = Object.freeze([
   }),
 ])
 
+const formatPrsPerDayPhrase = (prsPerDay) =>
+  `${formatCount(prsPerDay)} ${prsPerDay === 1 ? 'PR' : 'PRs'} per day`
+
 // The note is two parts so the calibration figure can render as a link to its source (AC18).
 export const assumptionsNote = (assumptions = MODEL_ASSUMPTIONS) => ({
-  choices: `Model assumptions. These are modeling choices, not research findings: the defect density (${assumptions.defectsPerKloc} defects per 1,000 LOC), the base detection rate (${assumptions.baseDetection}, picked from SmartBear's 70–90% range), the detection floors (${assumptions.sizeFloor} for large PRs and ${assumptions.speedFloor} for fast reviewing), the curve thresholds (PR size ${assumptions.sizeKnee} to ${assumptions.sizeWall} LOC, reviewer speed ${formatCount(assumptions.speedKnee)} to ${formatCount(assumptions.speedWall)} LOC/hr), and the ${assumptions.aiSizeMultiplier} size multiplier for AI PRs.`,
+  choices: `Model assumptions. These are modeling choices, not research findings: the defect density (${assumptions.defectsPerKloc} defects per 1,000 LOC), the base detection rate (${assumptions.baseDetection}, picked from SmartBear's 70–90% range), the detection floors (${assumptions.sizeFloor} for large PRs and ${assumptions.speedFloor} for fast reviewing), the curve thresholds (PR size ${assumptions.sizeKnee} to ${assumptions.sizeWall} LOC, reviewer speed ${formatCount(assumptions.speedKnee)} to ${formatCount(assumptions.speedWall)} LOC/hr), and the human-lane defaults (${formatLocPerHour(assumptions.humanDefaultLocPerHour)} and ${formatPrsPerDayPhrase(assumptions.humanDefaultPrsPerDay)}). The AI lane's PR size (${formatMultiplier(assumptions.aiSizeMultiplier)} the human PR size) and default code written (${formatMultiplier(assumptions.aiMergeRateMultiplier)} the human PR merge rate) come from Faros.`,
   calibration: {
-    lead: 'The defaults were calibrated to land near',
+    lead: 'The human defaults were chosen to land near',
     linkText: `Faros's ${FAROS_INCIDENTS_INCREASE} incidents per PR`,
     url: FAROS_URL,
   },

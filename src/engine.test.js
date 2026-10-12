@@ -941,7 +941,10 @@ describe('MODEL_ASSUMPTIONS', () => {
       sizeWall: 400,
       speedKnee: 500,
       speedWall: 1000,
+      humanDefaultLocPerHour: 30,
+      humanDefaultPrsPerDay: 1,
       aiSizeMultiplier: 1.51,
+      aiMergeRateMultiplier: 1.162,
     })
   })
 })
