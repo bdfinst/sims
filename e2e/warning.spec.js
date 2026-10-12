@@ -14,6 +14,7 @@ import {
   expectWarningAnnounced,
   expectWarningBox,
   laneLocator,
+  openWithSliders,
   openSimulator,
   pauseSimulation,
   queueBox,
@@ -65,8 +66,7 @@ const expectLaneStates = async (page, statesByLane) => {
 test.describe('Pending Review overload warning', () => {
   test('AI queue turns red once it exceeds the default threshold', async ({ page }) => {
     await test.step('Given I set "AI code written (LOC/hr)" to 2000', async () => {
-      await openSimulator(page)
-      await setSliders(page, BUSY_AI_PRESET)
+      await openWithSliders(page, BUSY_AI_PRESET)
     })
 
     await test.step('When I press Start and 3.8 seconds pass', async () => {
@@ -115,8 +115,7 @@ test.describe('Pending Review overload warning', () => {
     page,
   }) => {
     await test.step('Given I set "AI code written (LOC/hr)" to 2000', async () => {
-      await openSimulator(page)
-      await setSliders(page, BUSY_AI_PRESET)
+      await openWithSliders(page, BUSY_AI_PRESET)
     })
 
     await test.step('When I press Start and 3.9 seconds pass', async () => {
@@ -138,8 +137,7 @@ test.describe('Pending Review overload warning', () => {
 
   test('A custom threshold applies to both lanes', async ({ page }) => {
     await test.step('Given I set "Human code written (LOC/hr)" to 200, "Human PRs per day" to 4, "Reviewer speed (LOC/hr, both lanes)" to 100, and "AI code written (LOC/hr)" to 2000, and the simulation ran for 24 seconds and was paused', async () => {
-      await openSimulator(page)
-      await setSliders(page, { ...HUMAN_BACKLOG_PRESET, ...BUSY_AI_PRESET })
+      await openWithSliders(page, { ...HUMAN_BACKLOG_PRESET, ...BUSY_AI_PRESET })
       await startAndRunFor(page, HUMAN_BACKLOG_SECONDS)
       await pauseSimulation(page)
     })
@@ -184,8 +182,7 @@ test.describe('Pending Review overload warning', () => {
 
   test('Raising the threshold while paused clears the warning', async ({ page }) => {
     await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation ran for 6 seconds and was paused', async () => {
-      await openSimulator(page)
-      await setSliders(page, BUSY_AI_PRESET)
+      await openWithSliders(page, BUSY_AI_PRESET)
       await startAndRunFor(page, SECONDS_TO_AI_PENDING_23)
       await pauseSimulation(page)
     })
@@ -205,8 +202,7 @@ test.describe('Pending Review overload warning', () => {
 
   test('Lowering the threshold while running applies immediately', async ({ page }) => {
     await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 2 seconds', async () => {
-      await openSimulator(page)
-      await setSliders(page, BUSY_AI_PRESET)
+      await openWithSliders(page, BUSY_AI_PRESET)
       await startAndRunFor(page, SECONDS_TO_AI_PENDING_7)
     })
 
@@ -226,8 +222,7 @@ test.describe('Pending Review overload warning', () => {
 
   test('Warning clears when the queue drains to the threshold', async ({ page }) => {
     await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 5 seconds', async () => {
-      await openSimulator(page)
-      await setSliders(page, BUSY_AI_PRESET)
+      await openWithSliders(page, BUSY_AI_PRESET)
       await startAndRunFor(page, SECONDS_TO_AI_PENDING_19)
     })
 

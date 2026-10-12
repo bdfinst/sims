@@ -14,12 +14,14 @@ import {
   expect,
   expectCounts,
   expectDeployed,
+  expectDefectsCaught,
   expectNeverDecreases,
   expectPending,
   headline,
   laneLocator,
   metric,
   metricValues,
+  openWithSliders,
   openSimulator,
   pauseSimulation,
   runFor,
@@ -136,9 +138,6 @@ const expectNoLaneIncidents = async (page) => {
 
 const expectNoHeadlineRatio = (page) => expect(headline(page)).toHaveText(NO_VALUE)
 
-const expectDefectsCaught = (page, laneId, shown) =>
-  expect(metric(page, laneId, 'defectsCaught')).toHaveText(shown)
-
 test.describe.configure({ mode: 'parallel' })
 
 test.describe('Review quality metrics', () => {
@@ -163,8 +162,7 @@ test.describe('Review quality metrics', () => {
       page,
     }) => {
       await test.step(`Given I set "Human code written (LOC/hr)" to ${loc} and "Human PRs per day" to ${perDay}`, async () => {
-        await openSimulator(page)
-        await setSliders(page, {
+        await openWithSliders(page, {
           [HUMAN_CODE_WRITTEN_LABEL]: loc,
           [HUMAN_PRS_PER_DAY_LABEL]: perDay,
         })
@@ -184,8 +182,7 @@ test.describe('Review quality metrics', () => {
       page,
     }) => {
       await test.step(`Given I set "Human code written (LOC/hr)" to ${CODE_WRITTEN_AT_SIZE_KNEE} and "Reviewer speed (LOC/hr, both lanes)" to ${speed}`, async () => {
-        await openSimulator(page)
-        await setSliders(page, {
+        await openWithSliders(page, {
           [HUMAN_CODE_WRITTEN_LABEL]: CODE_WRITTEN_AT_SIZE_KNEE,
           [REVIEWER_SPEED_LABEL]: speed,
         })
@@ -199,8 +196,7 @@ test.describe('Review quality metrics', () => {
 
   test('Skimming harder lowers AI defects caught', async ({ page }) => {
     await test.step('Given I set "AI skim multiplier" to 3', async () => {
-      await openSimulator(page)
-      await setSliders(page, { [AI_SKIM_LABEL]: MAX_SKIM })
+      await openWithSliders(page, { [AI_SKIM_LABEL]: MAX_SKIM })
     })
 
     await test.step('Then the AI lane shows Defects caught 5%', async () => {
@@ -210,8 +206,7 @@ test.describe('Review quality metrics', () => {
 
   test('Reviewing AI code at human pace restores some catching', async ({ page }) => {
     await test.step('Given I set "AI skim multiplier" to 1', async () => {
-      await openSimulator(page)
-      await setSliders(page, { [AI_SKIM_LABEL]: HUMAN_PACE_SKIM })
+      await openWithSliders(page, { [AI_SKIM_LABEL]: HUMAN_PACE_SKIM })
     })
 
     await test.step('Then the AI lane shows Defects caught 18%', async () => {
@@ -351,8 +346,7 @@ test.describe('Review quality metrics', () => {
 
   test('Larger PRs accrue more incidents', async ({ page }) => {
     await test.step('Given I set "Human code written (LOC/hr)" to 50', async () => {
-      await openSimulator(page)
-      await setSliders(page, { [HUMAN_CODE_WRITTEN_LABEL]: LARGE_PR_CODE_WRITTEN })
+      await openWithSliders(page, { [HUMAN_CODE_WRITTEN_LABEL]: LARGE_PR_CODE_WRITTEN })
     })
 
     await test.step('When I press Start and 10 seconds pass', async () => {
@@ -407,8 +401,7 @@ test.describe('Review quality metrics', () => {
 
   test('Queued PRs keep their size when PR size changes', async ({ page }) => {
     await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 2 seconds', async () => {
-      await openSimulator(page)
-      await setSliders(page, BUSY_AI_PRESET)
+      await openWithSliders(page, BUSY_AI_PRESET)
       await startAndRunFor(page, QUEUE_BUILDING_SECONDS)
     })
 
@@ -440,8 +433,7 @@ test.describe('Review quality metrics', () => {
 
   test('A drained queue shows no wait', async ({ page }) => {
     await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 2 seconds', async () => {
-      await openSimulator(page)
-      await setSliders(page, BUSY_AI_PRESET)
+      await openWithSliders(page, BUSY_AI_PRESET)
       await startAndRunFor(page, QUEUE_BUILDING_SECONDS)
     })
 
@@ -462,8 +454,7 @@ test.describe('Review quality metrics', () => {
 
   test('Incidents never decrease while running', async ({ page }) => {
     await test.step('Given I set "AI code written (LOC/hr)" to 2000 and press Start', async () => {
-      await openSimulator(page)
-      await setSliders(page, BUSY_AI_PRESET)
+      await openWithSliders(page, BUSY_AI_PRESET)
       await startSimulation(page)
     })
 

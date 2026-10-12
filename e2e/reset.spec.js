@@ -10,9 +10,9 @@ import {
   expectElapsedAtTick,
   expectEmptyLanes,
   flushPendingRenders,
+  openWithSliders,
   openSimulator,
   pauseSimulation,
-  setSliders,
   slider,
   startAndRunFor,
   tabTo,
@@ -48,8 +48,7 @@ test.describe('Reset the simulation', () => {
     page,
   }) => {
     await test.step('Given I set "AI code written (LOC/hr)" to 400 and "Human PRs per day" to 2', async () => {
-      await openSimulator(page)
-      await setSliders(page, KEPT_SETTINGS)
+      await openWithSliders(page, KEPT_SETTINGS)
     })
 
     await test.step('And the simulation is running and has run for 3 seconds', async () => {
@@ -85,8 +84,7 @@ test.describe('Reset the simulation', () => {
 
   test('Reset while paused with non-zero counts clears them', async ({ page }) => {
     await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation ran for 3 seconds and was paused', async () => {
-      await openSimulator(page)
-      await setSliders(page, BUSY_AI_PRESET)
+      await openWithSliders(page, BUSY_AI_PRESET)
       await startAndRunFor(page, LONG_RUN_SECONDS)
       await pauseSimulation(page)
     })
@@ -109,8 +107,7 @@ test.describe('Reset the simulation', () => {
 
   test('Counts stay at zero after Reset', async ({ page }) => {
     await test.step('Given I pressed Reset while running', async () => {
-      await openSimulator(page)
-      await setSliders(page, BUSY_AI_PRESET)
+      await openWithSliders(page, BUSY_AI_PRESET)
       await startAndRunFor(page, SHORT_RUN_SECONDS)
       await expectBusyAiShortRunCounts(page)
       await resetButton(page).click()
@@ -145,8 +142,7 @@ test.describe('Reset the simulation', () => {
 
   test('Start after Reset runs from zero with the kept settings', async ({ page }) => {
     await test.step('Given I set "AI code written (LOC/hr)" to 2000 and pressed Reset', async () => {
-      await openSimulator(page)
-      await setSliders(page, BUSY_AI_PRESET)
+      await openWithSliders(page, BUSY_AI_PRESET)
       await resetButton(page).click()
     })
 
@@ -161,8 +157,7 @@ test.describe('Reset the simulation', () => {
 
   test('Reset is keyboard operable', async ({ page }) => {
     await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 1 second', async () => {
-      await openSimulator(page)
-      await setSliders(page, BUSY_AI_PRESET)
+      await openWithSliders(page, BUSY_AI_PRESET)
       await startAndRunFor(page, SHORT_RUN_SECONDS)
       await expectBusyAiShortRunCounts(page)
     })

@@ -134,6 +134,9 @@ export const expectPending = (page, laneId, count) =>
 export const expectDeployed = (page, laneId, count) =>
   expect(metric(page, laneId, 'deployed')).toHaveText(String(count))
 
+export const expectDefectsCaught = (page, laneId, shown) =>
+  expect(metric(page, laneId, 'defectsCaught')).toHaveText(shown)
+
 export const expectCounts = async (page, laneId, { pending, deployed }) => {
   await expectPending(page, laneId, pending)
   await expectDeployed(page, laneId, deployed)
@@ -296,6 +299,12 @@ export const REFERENCE = Object.freeze({
   busyAiPendingAtTick100: 38, // (38.631)
   busyAiPendingAtTick300: 115, // (115.894)
   busyAiDeployedAtTick100: 16, // 100 x 0.16556 (16.556)
+  // AC7d, AI code written 1000 against an effective review speed of 600: pending LOC grows by
+  // exactly 40 per tick (6,000 at 15 s).
+  ai1000PendingAtTick150: 16, // (16.556)
+  // AI code written 600, equal to the effective review speed: the queue stays empty.
+  ai600PendingAtTick100: 0,
+  ai600DeployedAtTick100: 16, // (16.556)
   // Plan, Slice 2 check: from the busy-AI state at 1 s, one more tick with reviewer speed 1000 and
   // skim 3 reviews 300 LOC (AI deployed 2.483); with reviewer speed 100, pending reaches 4.360.
   busyAiDeployedAtTick11WithFasterReview: 2,
@@ -341,19 +350,29 @@ export const setSliders = async (page, valuesByLabel) => {
   for (const [label, value] of Object.entries(valuesByLabel)) await setSlider(page, label, value)
 }
 
+// The setup of every "Given I set ..." step: opens the simulator, then sets the sliders.
+export const openWithSliders = async (page, valuesByLabel) => {
+  await openSimulator(page)
+  await setSliders(page, valuesByLabel)
+}
+
 // The visible value is a sibling span with id slider-value-<settingKey>; the slider is slider-<settingKey>.
 export const visibleValue = async (sliderLocator) => {
   const sliderId = await sliderLocator.getAttribute('id')
   return sliderLocator.page().locator(`#${sliderId.replace('slider-', 'slider-value-')}`)
 }
 
-// The shown values of one metric as { human, ai }, keyed by each value's own lane.
+// The shown values of one metric as { human, ai }, keyed by each value's own lane. Thousands
+// separators are dropped, so "6,000" reads as 6000.
 export const metricValues = (page, name) =>
   page.evaluate(
     (metricName) =>
       Object.fromEntries(
         [...document.querySelectorAll(`[data-lane] [data-metric="${metricName}"]`)].map(
-          (element) => [element.closest('[data-lane]').dataset.lane, Number(element.textContent)],
+          (element) => [
+            element.closest('[data-lane]').dataset.lane,
+            Number(element.textContent.replaceAll(',', '')),
+          ],
         ),
       ),
     name,

@@ -14,6 +14,7 @@ import {
   flushPendingRenders,
   laneLocator,
   metricValues,
+  openWithSliders,
   openSimulator,
   pauseSimulation,
   runFor,
@@ -138,8 +139,8 @@ test.describe('Adjust the model live', () => {
     })
   }
 
-  // AC23: the derived values are plain read-only text, not sliders. The revised wording and the
-  // changes under it belong to the scenario below, which Step 8.4 reworks.
+  // AC23: the derived values are plain read-only text, not sliders. The scenario below checks
+  // the revised wording and how the values change.
   test('Derived PR sizes and AI PRs per day show at the defaults', async ({ page }) => {
     await openSimulator(page)
 
@@ -237,8 +238,7 @@ test.describe('Adjust the model live', () => {
 
   test('A review-side change applies on the next tick', async ({ page }) => {
     await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 1 second', async () => {
-      await openSimulator(page)
-      await setSliders(page, BUSY_AI_PRESET)
+      await openWithSliders(page, BUSY_AI_PRESET)
       await startAndRunFor(page, BUSY_RUN_SECONDS)
     })
 
@@ -268,8 +268,7 @@ test.describe('Adjust the model live', () => {
 
   test('A change while paused takes effect only after Start', async ({ page }) => {
     await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation ran for 1 second and was paused', async () => {
-      await openSimulator(page)
-      await setSliders(page, BUSY_AI_PRESET)
+      await openWithSliders(page, BUSY_AI_PRESET)
       await startAndRunFor(page, BUSY_RUN_SECONDS)
       await pauseSimulation(page)
     })
@@ -300,8 +299,7 @@ test.describe('Adjust the model live', () => {
     let sampledPending
 
     await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 2 seconds', async () => {
-      await openSimulator(page)
-      await setSliders(page, BUSY_AI_PRESET)
+      await openWithSliders(page, BUSY_AI_PRESET)
       await startAndRunFor(page, DRAIN_START_SECONDS)
     })
 

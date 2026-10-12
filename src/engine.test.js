@@ -569,16 +569,39 @@ describe('AI code written against the AI lane effective review speed (AC7d)', ()
     })
   })
 
-  it('grows the internal pending LOC by (code written - effective speed) x 0.1 per tick at 601 LOC/hr', () => {
-    const trace = traceTicks(emptyLane(), paramsFor(AI, { aiLocPerHour: 601 }), 50)
-    const growthPerTick = trace.map(
-      (lane, index) => lane.pendingLoc - (index === 0 ? 0 : trace[index - 1].pendingLoc),
+  const FIVE_SECONDS_IN_TICKS = 50
+
+  // The change in internal pending LOC over each of `count` ticks from an empty lane, to 9 places.
+  const pendingLocGrowthPerTick = (params, count) =>
+    traceTicks(emptyLane(), params, count).map((lane, index, trace) =>
+      Number((lane.pendingLoc - (index === 0 ? 0 : trace[index - 1].pendingLoc)).toFixed(9)),
     )
-    expect(growthPerTick.map((growth) => Number(growth.toFixed(9)))).toEqual(Array(50).fill(0.1))
+
+  it('grows the internal pending LOC by (code written - effective speed) x 0.1 per tick at 601 LOC/hr', () => {
+    expect(
+      pendingLocGrowthPerTick(paramsFor(AI, { aiLocPerHour: 601 }), FIVE_SECONDS_IN_TICKS),
+    ).toEqual(Array(FIVE_SECONDS_IN_TICKS).fill(0.1))
   })
 
+  // AC7d: growth per tick is (code written - effective speed) x 0.1, whatever the capacity is.
+  it.each([
+    { aiLocPerHour: 602, capacity: 600, overrides: {}, growth: 0.2 },
+    { aiLocPerHour: 101, capacity: 100, overrides: { reviewerSpeed: 100, skim: 1 }, growth: 0.1 },
+    { aiLocPerHour: 1001, capacity: 1000, overrides: { reviewerSpeed: 500, skim: 2 }, growth: 0.1 },
+  ])(
+    'grows the internal pending LOC by $growth per tick at $aiLocPerHour LOC/hr, just above an effective speed of $capacity',
+    ({ aiLocPerHour, overrides, growth }) => {
+      expect(
+        pendingLocGrowthPerTick(
+          paramsFor(AI, { ...overrides, aiLocPerHour }),
+          FIVE_SECONDS_IN_TICKS,
+        ),
+      ).toEqual(Array(FIVE_SECONDS_IN_TICKS).fill(growth))
+    },
+  )
+
   it('accumulates 5 pending LOC in 5 seconds at 601 LOC/hr', () => {
-    const lane = runTicks(emptyLane(), paramsFor(AI, { aiLocPerHour: 601 }), 50)
+    const lane = runTicks(emptyLane(), paramsFor(AI, { aiLocPerHour: 601 }), FIVE_SECONDS_IN_TICKS)
     expect(lane.pendingLoc).toBeCloseTo(5, 6)
   })
 })

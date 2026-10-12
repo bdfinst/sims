@@ -18,6 +18,7 @@ import {
   headline,
   laneLocator,
   metricValues,
+  openWithSliders,
   openSimulator,
   expectPending,
   pauseSimulation,
@@ -221,8 +222,7 @@ test.describe('Run and pause the simulation', () => {
 
   test('Pause freezes the counts', async ({ page }) => {
     await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 3 seconds', async () => {
-      await openSimulator(page)
-      await setSliders(page, BUSY_AI_PRESET)
+      await openWithSliders(page, BUSY_AI_PRESET)
       await startAndRunFor(page, PAUSE_AFTER_SECONDS)
     })
 
@@ -252,8 +252,7 @@ test.describe('Run and pause the simulation', () => {
 
   test('Resume continues from the frozen counts', async ({ page }) => {
     await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation was paused after 3 seconds', async () => {
-      await openSimulator(page)
-      await setSliders(page, BUSY_AI_PRESET)
+      await openWithSliders(page, BUSY_AI_PRESET)
       await startAndRunFor(page, PAUSE_AFTER_SECONDS)
       await pauseSimulation(page)
     })
@@ -274,8 +273,7 @@ test.describe('Run and pause the simulation', () => {
     const readDeployed = () => metricValues(page, 'deployed')
 
     await test.step('Given I set "AI code written (LOC/hr)" to 2000 and press Start', async () => {
-      await openSimulator(page)
-      await setSliders(page, BUSY_AI_PRESET)
+      await openWithSliders(page, BUSY_AI_PRESET)
       await startSimulation(page)
     })
 
@@ -299,8 +297,7 @@ test.describe('Run and pause the simulation', () => {
 
   test('Hiding the tab auto-pauses', async ({ page }) => {
     await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 1 second', async () => {
-      await openSimulator(page)
-      await setSliders(page, BUSY_AI_PRESET)
+      await openWithSliders(page, BUSY_AI_PRESET)
       await startAndRunFor(page, 1)
     })
 
@@ -324,8 +321,7 @@ test.describe('Run and pause the simulation', () => {
 
   test('Showing the tab again stays paused', async ({ page }) => {
     await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation auto-paused when the page became hidden after 1 second', async () => {
-      await openSimulator(page)
-      await setSliders(page, BUSY_AI_PRESET)
+      await openWithSliders(page, BUSY_AI_PRESET)
       await startAndRunFor(page, 1)
       await setVisibility(page, 'hidden')
       await expect(buttonNamed(page, 'Start')).toBeVisible()

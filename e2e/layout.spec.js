@@ -24,6 +24,7 @@ import {
   laneLocator,
   metric,
   openAndReadCapacity,
+  openWithSliders,
   openSimulator,
   overflowIn,
   queueBox,
@@ -338,8 +339,7 @@ test.describe('Pending Review layout', () => {
     test.use({ viewport: NARROWEST_PHONE })
 
     test('No horizontal scroll at 320 px, even when overflowing', async ({ page }) => {
-      await openSimulator(page)
-      await setSliders(page, BUSY_AI_PRESET)
+      await openWithSliders(page, BUSY_AI_PRESET)
       await startAndRunFor(page, OVERFLOW_RUN_SECONDS)
 
       await expect(overflowIn(page, 'ai')).toBeVisible()
