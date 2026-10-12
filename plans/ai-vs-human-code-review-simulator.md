@@ -1007,9 +1007,9 @@ At the build's project-init gate, you chose a build step instead of the single-H
 
 #### Wave 6
 
-- [ ] Slice 6: Tiles, overflow, and layout
-  - [ ] Step 6.1: Tile grid and "+N more"
-  - [ ] Step 6.2: Projector fit, aligned metrics, responsive layout, and focus
+- [x] Slice 6: Tiles, overflow, and layout
+  - [x] Step 6.1: Tile grid and "+N more"
+  - [x] Step 6.2: Projector fit, aligned metrics, responsive layout, and focus
 
 #### Wave 7
 
