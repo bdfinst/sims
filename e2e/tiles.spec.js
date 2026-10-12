@@ -8,17 +8,15 @@ import {
   expectEmptyLanes,
   expectSimulatorOpen,
   expectPending,
-  openSimulator,
   overflowIn,
   queueBox,
-  readTileCapacity,
+  openAndReadCapacity,
   setSlider,
   startAndRunFor,
   startSimulation,
   test,
   tilesIn,
   ticksToSeconds,
-  AI_PENDING_22_AT_TICK,
   BUSY_HUMAN_GEN,
 } from './fixtures.js'
 
@@ -28,16 +26,16 @@ const HUGE_PR_SIZE = 1000
 const SLOW_REVIEWER_SPEED = 100
 const ONE_TICK = 1
 
-// Human at gen 10, PR size 1000, speed 100 shows n - 1 pending PRs after n ticks (plan, Step 6.1),
-// so the queue holds exactly C PRs after C + 1 ticks.
+// Pre-cutover setup (Human generation 10 PRs per hour, PR size 1000, speed 100) shows n - 1 pending
+// PRs after n ticks, so the queue holds exactly C PRs after C + 1 ticks. Step 8.6 replaces it with
+// the exact AI preset, where the queue holds n after n ticks.
 const ticksToFillQueue = (capacity) => capacity + 1
 
 test.describe('Pending Review tiles', () => {
   // @wip: Step 8.6
   test.fixme('One tile per pending PR', async ({ page }) => {
     await test.step('Given the queue tile capacity C is read from the queue box', async () => {
-      await openSimulator(page)
-      await readTileCapacity(page)
+      await openAndReadCapacity(page)
     })
 
     await test.step('Given I open the simulator', async () => {
@@ -45,7 +43,7 @@ test.describe('Pending Review tiles', () => {
     })
 
     await test.step('When I press Start and 1.2 seconds pass', async () => {
-      await startAndRunFor(page, ticksToSeconds(AI_PENDING_22_AT_TICK))
+      await startAndRunFor(page, ticksToSeconds(REFERENCE.aiTickWithPending22))
     })
 
     await test.step('Then the AI lane shows Pending Review 22, 22 tiles, and no overflow indicator', async () => {
@@ -57,8 +55,7 @@ test.describe('Pending Review tiles', () => {
 
   test('Empty queue shows no tiles', async ({ page }) => {
     await test.step('Given the queue tile capacity C is read from the queue box', async () => {
-      await openSimulator(page)
-      await readTileCapacity(page)
+      await openAndReadCapacity(page)
     })
 
     await test.step('Given I open the simulator', async () => {
@@ -81,8 +78,7 @@ test.describe('Pending Review tiles', () => {
     let ticksAtCapacity
 
     await test.step('Given the queue tile capacity C is read from the queue box', async () => {
-      await openSimulator(page)
-      capacity = await readTileCapacity(page)
+      capacity = await openAndReadCapacity(page)
       ticksAtCapacity = ticksToFillQueue(capacity)
     })
 
@@ -121,8 +117,7 @@ test.describe('Pending Review tiles', () => {
     let capacity
 
     await test.step('Given the queue tile capacity C is read from the queue box', async () => {
-      await openSimulator(page)
-      capacity = await readTileCapacity(page)
+      capacity = await openAndReadCapacity(page)
     })
 
     await test.step('Given I open the simulator', async () => {

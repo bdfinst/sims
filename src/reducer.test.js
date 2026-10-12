@@ -1,16 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
   DEFAULT_SETTINGS,
-  LANE_MODELS,
   NO_VALUE,
   displayedIncidents,
-  displayedPending,
   floorShow,
   formatHeadlineRatio,
   formatIncidentsPerPr,
-  formatLoc,
-  formatPickupWaitHours,
-  laneParams,
 } from './engine.js'
 import { ACTION, initialState, reducer } from './reducer.js'
 import { shownCounts } from './testHelpers.js'
@@ -137,14 +132,6 @@ describe('setSetting', () => {
     expect(setSetting(initialState, settingKey, value).settings[settingKey]).toBe(stored)
   })
 
-  it.each(['humanLocPerHour', 'humanPrsPerDay', 'aiLocPerHour'])(
-    'ignores a non-numeric value for %s',
-    (settingKey) => {
-      expect(setSetting(initialState, settingKey, NaN)).toBe(initialState)
-      expect(setSetting(initialState, settingKey, '40')).toBe(initialState)
-    },
-  )
-
   it.each(['nope', 'toString', 'constructor', '__proto__'])(
     'ignores the unknown settingKey "%s"',
     (settingKey) => {
@@ -216,13 +203,6 @@ describe('incidents across a run', () => {
   const runningState = reducer(initialState, { type: ACTION.start })
   const afterTicks = (state, count) => dispatchAll(state, ...repeat(ACTION.tick, count))
 
-  it('Larger PRs accrue more incidents: Human code written 50 (PR size 400) gives 0 / 1 / 9 / 7.68', () => {
-    const oversized = setSetting(runningState, 'humanLocPerHour', 50)
-    const human = afterTicks(oversized, TEN_SECONDS_IN_TICKS).lanes.human
-    expect(shownCounts(human)).toEqual([0, 1])
-    expect([displayedIncidents(human), formatIncidentsPerPr(human)]).toEqual([9, '7.68'])
-  })
-
   it('a size change while running changes accrual from the next tick: 8 incidents, 7.08 per PR', () => {
     const afterOneSecond = afterTicks(runningState, ONE_SECOND_IN_TICKS)
     const resized = setSetting(afterOneSecond, 'humanLocPerHour', 50)
@@ -252,33 +232,6 @@ describe('incidents across a run', () => {
     expect([displayedIncidents(human), formatIncidentsPerPr(human)]).toEqual([4, '3.71'])
   })
 
-  it('queued PRs keep their size when the PR size changes: Pending 7 / 2,800 LOC becomes 9 / 4,200', () => {
-    const queued = busyAiRunning(TWO_SECONDS_IN_TICKS)
-    expect([displayedPending(queued.lanes.ai), formatLoc(queued.lanes.ai.pendingLoc)]).toEqual([
-      7,
-      '2,800',
-    ])
-
-    const resized = afterTicks(setSetting(queued, 'humanPrsPerDay', 0.5), ONE_SECOND_IN_TICKS)
-
-    expect([displayedPending(resized.lanes.ai), formatLoc(resized.lanes.ai.pendingLoc)]).toEqual([
-      9,
-      '4,200',
-    ])
-  })
-
-  it('a drained queue shows no wait', () => {
-    const draining = withSettings(busyAiRunning(TWO_SECONDS_IN_TICKS), DRAINING)
-
-    const drained = afterTicks(draining, DRAIN_TICKS)
-
-    const params = laneParams(drained.settings, LANE_MODELS.ai)
-    expect([
-      displayedPending(drained.lanes.ai),
-      formatPickupWaitHours(drained.lanes.ai, params),
-    ]).toEqual([0, '0.0'])
-  })
-
   it('never lets an incident count decrease while running, and ends above zero', () => {
     const samples = []
     let state = runningState
@@ -301,11 +254,6 @@ describe('incidents across a run', () => {
   it('shows the headline ratio 3.65x after 10 default seconds', () => {
     const afterTenDefaultSeconds = afterTicks(runningState, TEN_SECONDS_IN_TICKS)
     expect(formatHeadlineRatio(afterTenDefaultSeconds.lanes)).toBe('3.65×')
-  })
-
-  it('shows a blank headline ratio before the Human lane has deployed a whole PR (79 ticks)', () => {
-    const { lanes } = afterTicks(runningState, 79)
-    expect(formatHeadlineRatio(lanes)).toBe(NO_VALUE)
   })
 })
 

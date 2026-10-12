@@ -1,6 +1,7 @@
 import { LANE_MODELS, laneParams } from '../engine.js'
 import {
   COLOR_CLASS,
+  DERIVED_AREA,
   LANE_PRESENTATION,
   TILE_CAPACITY,
   TYPE_CLASS,
@@ -13,24 +14,10 @@ import { RateSlider } from './RateSlider.jsx'
 
 const DERIVED_TEXT_CLASS = `${TYPE_CLASS.label} ${COLOR_CLASS.mutedText}`
 
-function DerivedValue({ children }) {
-  return (
-    <p className={DERIVED_TEXT_CLASS}>
-      {children}{' '}
-      <span
-        className={`rounded px-1 uppercase tracking-wide ${COLOR_CLASS.tag} ${TYPE_CLASS.label}`}
-      >
-        derived
-      </span>
-    </p>
-  )
-}
-
 export function Lane({ laneId, lane, settings, onSettingChange }) {
   const presentation = LANE_PRESENTATION[laneId]
   const model = LANE_MODELS[laneId]
   const params = laneParams(settings, model)
-  const hasDerivedSpeed = model.skimApplies
   const renderSlider = (settingKey) => (
     <RateSlider
       key={settingKey}
@@ -40,6 +27,14 @@ export function Lane({ laneId, lane, settings, onSettingChange }) {
       accentClass={presentation.accentSliderClass}
     />
   )
+  const renderDerived = (area) =>
+    presentation.derivedFields
+      .filter((field) => field.area === area)
+      .map((field) => (
+        <p key={field.paramKey} className={DERIVED_TEXT_CLASS}>
+          {derivedFieldText(field, params)}
+        </p>
+      ))
   return (
     <section
       data-lane={laneId}
@@ -53,11 +48,7 @@ export function Lane({ laneId, lane, settings, onSettingChange }) {
           <h2 className={TYPE_CLASS.value}>{presentation.label}</h2>
         </div>
         {presentation.generationSliders.map(renderSlider)}
-        {presentation.derivedFields.map((field) => (
-          <p key={field.param} className={DERIVED_TEXT_CLASS}>
-            {derivedFieldText(field, params)}
-          </p>
-        ))}
+        {renderDerived(DERIVED_AREA.generation)}
       </div>
       <QueueBox
         laneLabel={presentation.label}
@@ -74,7 +65,7 @@ export function Lane({ laneId, lane, settings, onSettingChange }) {
             <p className={TYPE_CLASS.label}>Review</p>
           </div>
           {presentation.reviewSliders.map(renderSlider)}
-          {hasDerivedSpeed && <DerivedValue>Effective speed {params.effSpeed} LOC/hr</DerivedValue>}
+          {renderDerived(DERIVED_AREA.review)}
         </div>
         <LaneMetrics lane={lane} params={params} />
       </div>

@@ -3,7 +3,7 @@ import {
   REFERENCE,
   REVIEWER_SPEED_LABEL,
   THRESHOLD_LABEL,
-  advanceSeconds,
+  runFor,
   buttonNamed,
   expect,
   expectPending,
@@ -24,7 +24,6 @@ import {
   BUSY_HUMAN_GEN,
   QUIET_HUMAN_GEN,
   FAST_REVIEWER_SPEED,
-  AI_PENDING_22_AT_TICK,
 } from './fixtures.js'
 
 test.describe.configure({ mode: 'parallel' })
@@ -44,10 +43,8 @@ const RAISED_THRESHOLD = REFERENCE.aiPendingAtTick12 + 3
 const KEPT_THRESHOLD = 30
 
 const SECONDS_TO_AI_PENDING_14 = 0.8
-const SECONDS_TO_AI_PENDING_16 = 0.9
 const SECONDS_TO_AI_PENDING_9 = 0.5
 const SECONDS_TO_HUMAN_PENDING_15 = 1.8
-const SECONDS_TO_HUMAN_PENDING_16 = 1.9
 const SECONDS_TO_BUILD_BACKLOG = 2
 const SECONDS_TO_AI_PENDING_18 = 1
 const HALF_SECOND = 0.5
@@ -68,7 +65,7 @@ test.describe('Pending Review overload warning', () => {
 
     await test.step('When I press Start and 0.8 seconds pass', async () => {
       await startSimulation(page)
-      await advanceSeconds(page, SECONDS_TO_AI_PENDING_14, SECONDS_TO_AI_PENDING_14)
+      await runFor(page, SECONDS_TO_AI_PENDING_14)
     })
 
     await test.step('Then the AI lane shows Pending Review 14 and is not in the warning state', async () => {
@@ -76,7 +73,7 @@ test.describe('Pending Review overload warning', () => {
     })
 
     await test.step('When 0.1 more seconds pass', async () => {
-      await advanceSeconds(page, TENTH_SECOND, SECONDS_TO_AI_PENDING_16)
+      await runFor(page, TENTH_SECOND)
     })
 
     await test.step('Then the AI lane shows Pending Review 16 and is in the warning state', async () => {
@@ -120,7 +117,7 @@ test.describe('Pending Review overload warning', () => {
 
     await test.step('When I press Start and 1.8 seconds pass', async () => {
       await startSimulation(page)
-      await advanceSeconds(page, SECONDS_TO_HUMAN_PENDING_15, SECONDS_TO_HUMAN_PENDING_15)
+      await runFor(page, SECONDS_TO_HUMAN_PENDING_15)
     })
 
     await test.step('Then the Human lane shows Pending Review 15 and is not in the warning state', async () => {
@@ -133,7 +130,7 @@ test.describe('Pending Review overload warning', () => {
     })
 
     await test.step('When 0.1 more seconds pass', async () => {
-      await advanceSeconds(page, TENTH_SECOND, SECONDS_TO_HUMAN_PENDING_16)
+      await runFor(page, TENTH_SECOND)
     })
 
     await test.step('Then the Human lane shows Pending Review 16 and is in the warning state', async () => {
@@ -199,7 +196,7 @@ test.describe('Pending Review overload warning', () => {
   test.fixme('Raising the threshold while paused clears the warning', async ({ page }) => {
     await test.step('Given the simulation ran for 1.2 seconds and was paused', async () => {
       await openSimulator(page)
-      await startAndRunFor(page, ticksToSeconds(AI_PENDING_22_AT_TICK))
+      await startAndRunFor(page, ticksToSeconds(REFERENCE.aiTickWithPending22))
       await pauseSimulation(page)
     })
 
@@ -260,7 +257,7 @@ test.describe('Pending Review overload warning', () => {
     })
 
     await test.step('And 0.5 seconds pass', async () => {
-      await advanceSeconds(page, HALF_SECOND, SECONDS_TO_BUILD_BACKLOG + HALF_SECOND)
+      await runFor(page, HALF_SECOND)
     })
 
     await test.step('Then the Human lane shows Pending Review 16 and is in the warning state', async () => {
@@ -273,11 +270,7 @@ test.describe('Pending Review overload warning', () => {
     })
 
     await test.step('When 0.1 more seconds pass', async () => {
-      await advanceSeconds(
-        page,
-        TENTH_SECOND,
-        SECONDS_TO_BUILD_BACKLOG + HALF_SECOND + TENTH_SECOND,
-      )
+      await runFor(page, TENTH_SECOND)
     })
 
     await test.step('Then the Human lane shows Pending Review 15 and is not in the warning state', async () => {

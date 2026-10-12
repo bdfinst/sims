@@ -22,10 +22,10 @@ import {
   headline,
   laneLocator,
   metric,
+  openAndReadCapacity,
   openSimulator,
   overflowIn,
   queueBox,
-  readTileCapacity,
   bottomOf,
   researchPanel,
   researchToggle,
@@ -43,7 +43,7 @@ test.describe.configure({ mode: 'parallel' })
 
 const PROJECTOR = { width: 1280, height: 720 }
 const DESKTOP = { width: 1280, height: 800 }
-// The busy-AI preset leaves 115 PRs pending after 30 s, beyond any tile capacity (22 to 98).
+// The busy-AI preset leaves 115 PRs pending after 30 s, beyond the tile capacity (TILE_CAPACITY, 48).
 const OVERFLOW_RUN_SECONDS = 30
 const TABLET = { width: 768, height: 1024 }
 // --color-deployed (#22c55e) in src/index.css
@@ -62,13 +62,6 @@ const GENERATION_LABELS = {
   ai: [AI_CODE_WRITTEN_LABEL],
 }
 const REVIEW_LABELS = { human: REVIEWER_SPEED_LABEL, ai: AI_SKIM_LABEL }
-
-// Background of every scenario in this feature: C is read from the queue box, so the page is
-// opened here (the box does not exist before it).
-const openAndReadCapacity = async (page) => {
-  await openSimulator(page)
-  expect(await readTileCapacity(page), 'queue tile capacity C').toBeGreaterThan(0)
-}
 
 const boxOf = async (locator, label) => {
   const box = await locator.boundingBox()

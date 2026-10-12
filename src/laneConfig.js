@@ -1,23 +1,39 @@
 // Presentation only. Numeric behavior lives in engine.js.
 // Tailwind class strings must stay complete literals so the scanner finds them.
 
-import { FAROS_PR_SIZE_MULTIPLIER, LANE_IDS, formatPrSize, formatPrsPerDay } from './engine.js'
+import { LANE_IDS, LANE_MODELS, formatLocPerHour, formatPrSize, formatPrsPerDay } from './engine.js'
 
-// Read-only values a lane shows under its sliders, from laneParams: `param` is the laneParams
-// field, `format` renders it, `prefix` (may be empty) precedes it and `note` follows it. Lane
-// renders these with no lane-specific branching.
+// Read-only values a lane shows under its sliders, from laneParams: `paramKey` is the laneParams
+// field, `format` renders it, `prefix` (may be empty) precedes it and `note` follows it, and `area`
+// is the column it sits in. Lane renders these with no lane-specific branching.
+export const DERIVED_AREA = Object.freeze({ generation: 'generation', review: 'review' })
+const DERIVED_NOTE = '(derived)'
 const derivedSize = (note) =>
-  Object.freeze({ param: 'size', prefix: 'PR size', format: formatPrSize, note })
+  Object.freeze({
+    paramKey: 'size',
+    area: DERIVED_AREA.generation,
+    prefix: 'PR size',
+    format: formatPrSize,
+    note,
+  })
 const DERIVED_PRS_PER_DAY = Object.freeze({
-  param: 'prsPerDay',
+  paramKey: 'prsPerDay',
+  area: DERIVED_AREA.generation,
   prefix: '',
   format: formatPrsPerDay,
-  note: '(derived)',
+  note: DERIVED_NOTE,
+})
+const DERIVED_EFFECTIVE_SPEED = Object.freeze({
+  paramKey: 'effSpeed',
+  area: DERIVED_AREA.review,
+  prefix: 'Effective speed',
+  format: formatLocPerHour,
+  note: DERIVED_NOTE,
 })
 
 // The plain text a lane shows for one derived field, e.g. "PR size 362 LOC (1.51× human)".
-export const derivedFieldText = ({ param, prefix, format, note }, params) =>
-  [prefix, format(params[param]), note].filter((part) => part !== '').join(' ')
+export const derivedFieldText = ({ paramKey, prefix, format, note }, params) =>
+  [prefix, format(params[paramKey]), note].filter((part) => part !== '').join(' ')
 
 export const LANE_PRESENTATION = Object.freeze({
   [LANE_IDS.human]: Object.freeze({
@@ -31,7 +47,7 @@ export const LANE_PRESENTATION = Object.freeze({
     accentTileClass: 'bg-human',
     generationSliders: ['humanLocPerHour', 'humanPrsPerDay'],
     reviewSliders: ['reviewerSpeed'],
-    derivedFields: [derivedSize('(derived)')],
+    derivedFields: [derivedSize(DERIVED_NOTE)],
   }),
   [LANE_IDS.ai]: Object.freeze({
     label: 'AI',
@@ -44,7 +60,11 @@ export const LANE_PRESENTATION = Object.freeze({
     accentTileClass: 'bg-ai',
     generationSliders: ['aiLocPerHour'],
     reviewSliders: ['skim'],
-    derivedFields: [derivedSize(`(${FAROS_PR_SIZE_MULTIPLIER}× human)`), DERIVED_PRS_PER_DAY],
+    derivedFields: [
+      derivedSize(`(${LANE_MODELS[LANE_IDS.ai].sizeMultiplier}× human)`),
+      DERIVED_PRS_PER_DAY,
+      DERIVED_EFFECTIVE_SPEED,
+    ],
   }),
 })
 

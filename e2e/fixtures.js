@@ -149,7 +149,6 @@ export const BUSY_HUMAN_GEN = 10
 export const QUIET_HUMAN_GEN = 1
 export const FAST_REVIEWER_SPEED = 1000
 export const DRAIN_SECONDS = 6
-export const AI_PENDING_22_AT_TICK = 12
 // Declared here on purpose: data-state is a fixed hook, so a rename in the app must fail the tests.
 export const QUEUE_STATE = Object.freeze({ warning: 'warning', normal: 'normal' })
 
@@ -183,6 +182,19 @@ export const overflowIn = (page, laneId) => queueBox(page, laneId).getByText(/^\
 // The capacity C the app puts on the queue box; specs never hard-code it.
 export const readTileCapacity = async (page) =>
   Number(await queueBox(page, 'human').getAttribute('data-capacity'))
+
+// Plan AC12: C is between 22 (the busy-AI queue at 5.7 s) and 98 (the exact preset's n after n ticks).
+const MIN_TILE_CAPACITY = 22
+const MAX_TILE_CAPACITY = 98
+
+// Background of the tile and layout scenarios: opens the page and reads C from the queue box.
+export const openAndReadCapacity = async (page) => {
+  await openSimulator(page)
+  const capacity = await readTileCapacity(page)
+  expect(capacity, 'queue tile capacity C').toBeGreaterThanOrEqual(MIN_TILE_CAPACITY)
+  expect(capacity, 'queue tile capacity C').toBeLessThanOrEqual(MAX_TILE_CAPACITY)
+  return capacity
+}
 
 export const SECOND_MS = 1000
 // Spec: the tick period is 100 ms. Declared here, not imported from src/engine.js, so a change to
@@ -220,12 +232,17 @@ export const HUMAN_BACKLOG_PRESET = Object.freeze({
 // Expected values from the plan's reference model (plan, "Default arithmetic" under "Slices").
 // Per tick (0.1 h): a lane gains gen x 0.1 PRs of `size` LOC each, then reviews
 // min(pending LOC, effective speed x 0.1) LOC, taking PRs off the queue in proportion.
-// AI size = round(old PR size slider x 1.51); AI effective speed = reviewer speed x skim.
+// Pre-cutover oracles: the 378 and 302 LOC AI sizes and the figures below come from the removed PR
+// size slider (AI size = round(PR size x 1.51)), so only test.fixme bodies use them until Steps
+// 8.4 to 8.6 replace them with Default arithmetic values. AI effective speed = reviewer speed x skim.
 // Ticks are 0.1 s each, so tick 10 is 1 s. Counts are the displayed (floored) values.
 export const REFERENCE = Object.freeze({
   aiPrSizeAtDefaults: 378, // round(250 x 1.51)
   aiPrSizeAtPrSize200: 302, // round(200 x 1.51)
   aiPendingAtTick10: 18,
+  // Busy-AI preset (AI code written 2000) after 1 s: +0.38631 PR per tick generated net of review.
+  busyAiPendingAtTick10: 3,
+  busyAiDeployedAtTick10: 1,
   aiDeployedAtTick10: 1,
   aiPendingAtTick11WithAiGen50: 23,
   aiPendingAtTick10WithAiGen40: 38,
@@ -272,12 +289,13 @@ export const REFERENCE = Object.freeze({
   aiPendingAtTick8: 14,
   aiPendingAtTick9: 16,
   aiPendingAtTick12: 22,
+  aiTickWithPending22: 12,
   humanPendingAtTick18WithHumanGen10: 15,
   humanPendingAtTick19WithHumanGen10: 16,
   // Then 1 PR per hour and reviewer speed 1000: each tick adds 0.1 PR and reviews 100 LOC (0.4 PR).
   humanPendingAtTick25AfterDraining: 16,
   humanPendingAtTick26AfterDraining: 15,
-  humanDefectsCaughtWhenDrained: '6%', // PR size 250 at 1000 LOC/hr: 0.8 x 0.7625 x 0.1
+  humanDefectsCaughtWhenDrained: '6%', // PR size 240 at 1000 LOC/hr: 0.8 x 0.81 x 0.1 = 0.0648
   aiDeployedAtTick11WithFasterReview: 2, // reviewer speed 1000, skim 3 -> 3000 LOC/hr
   // AI generation of 40 PRs per hour, PR size 300 (AI size 453, 60 LOC reviewed per tick), after 3 s:
   aiPendingAtTick30WithAiGen40AndPrSize300: 116,
@@ -365,26 +383,18 @@ const elapsedTicks = async (page) => {
 }
 
 // For a running simulation: runs the fake clock for `seconds`, then waits until the elapsed readout
-// has advanced by that many ticks, so the render for them has happened before any assertion.
+// has advanced by that many ticks. The readout shares one React state with the lanes, so once it
+// shows the new time the lanes are current too, with no clock-dependent waits.
 export const runFor = async (page, seconds) => {
   const startTick = await elapsedTicks(page)
   await page.clock.runFor(seconds * SECOND_MS)
   await expectElapsedAtTick(page, startTick + Math.round(seconds * TICKS_PER_SECOND))
 }
 
-// Runs the fake clock for `seconds`, then waits until the elapsed readout shows `totalSeconds`
-// (the run's total so far), so the render for those ticks has happened before any assertion.
-export const advanceSeconds = async (page, seconds, totalSeconds) => {
-  await page.clock.runFor(seconds * SECOND_MS)
-  await expectElapsedAtTick(page, Math.round(totalSeconds * TICKS_PER_SECOND))
-}
-
-// From a fresh or just-reset page: starts the simulation, runs the fake clock, and waits until the
-// elapsed readout shows the run has rendered. The readout shares one React state with the lanes,
-// so the lanes are current too.
+// From a fresh or just-reset page: presses Start, then runs for `seconds`.
 export const startAndRunFor = async (page, seconds) => {
   await startSimulation(page)
-  await advanceSeconds(page, seconds, seconds)
+  await runFor(page, seconds)
 }
 
 // Resolves after any render React has already queued. React schedules renders on a

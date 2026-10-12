@@ -2,7 +2,7 @@ import {
   MIN_TEXT_CONTRAST,
   NARROWEST_PHONE,
   PHONE,
-  advanceSeconds,
+  runFor,
   contrastRatio,
   expect,
   expectNoHorizontalScroll,
@@ -218,11 +218,7 @@ test.describe('Research behind the simulation', () => {
     await test.step('Then the panel expands and the status still reads "Running"', async () => {
       await expect(researchPanel(page)).toHaveAttribute('open', '')
       await expect(page.getByText('Running', { exact: true })).toBeVisible()
-      await advanceSeconds(
-        page,
-        SECONDS_AFTER_EXPANDING,
-        SECONDS_BEFORE_EXPANDING + SECONDS_AFTER_EXPANDING,
-      )
+      await runFor(page, SECONDS_AFTER_EXPANDING)
     })
   })
 

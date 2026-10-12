@@ -9,8 +9,9 @@ import {
   tileLayout,
 } from './laneConfig.js'
 
-// 22 PRs are queued after 1.2 s (the AI lane) and must each get a tile; 98 is the largest
-// capacity the "exactly at capacity" scenario can reach (n - 1 pending after n ticks, up to tick 99).
+// 22 is the busy-AI queue at 5.7 s, and each of those PRs must get a tile. With the exact AI preset
+// the queue is n pending after n ticks, up to 100, so 98 is the largest capacity C for which both C
+// and C + 1 pending can be shown.
 const MIN_TILE_CAPACITY = 22
 const MAX_TILE_CAPACITY = 98
 
@@ -117,10 +118,19 @@ describe('lane derived fields', () => {
     expect(textFor(LANE_IDS.ai, 1, { prsPerDay: 1.17 })).toBe('1.17 PRs/day (derived)')
   })
 
+  it('has the AI lane show its effective speed, with thousands separators', () => {
+    expect(textFor(LANE_IDS.ai, 2, { effSpeed: 600 })).toBe('Effective speed 600 LOC/hr (derived)')
+    expect(textFor(LANE_IDS.ai, 2, { effSpeed: 3000 })).toBe(
+      'Effective speed 3,000 LOC/hr (derived)',
+    )
+  })
+
   it('reads each field from the laneParams value it names', () => {
     expect(
-      LANE_ORDER.map((laneId) => LANE_PRESENTATION[laneId].derivedFields.map(({ param }) => param)),
-    ).toEqual([['size'], ['size', 'prsPerDay']])
+      LANE_ORDER.map((laneId) =>
+        LANE_PRESENTATION[laneId].derivedFields.map(({ paramKey }) => paramKey),
+      ),
+    ).toEqual([['size'], ['size', 'prsPerDay', 'effSpeed']])
   })
 
   it('rounds sizes to whole LOC with thousands separators and PRs per day to two decimals', () => {

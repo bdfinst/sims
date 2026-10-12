@@ -23,6 +23,7 @@ import {
   formatHeadlineRatio,
   formatIncidentsPerPr,
   formatLoc,
+  formatLocPerHour,
   formatPct,
   formatPickupWaitHours,
   formatPrSize,
@@ -481,6 +482,11 @@ describe('the busy AI lane (AI code written 2000)', () => {
     { ticks: 10, shown: 3 },
     { ticks: 20, shown: 7 },
     { ticks: 30, shown: 11 },
+  ])('shows Pending Review $shown after $ticks ticks', ({ ticks, shown }) => {
+    expect(displayedPending(busyTrace[ticks - 1])).toBe(shown)
+  })
+
+  it.each([
     { ticks: 38, shown: 14, internal: 14.68 },
     { ticks: 39, shown: 15, internal: 15.066 },
     { ticks: 42, shown: 16, internal: 16.225 },
@@ -489,11 +495,14 @@ describe('the busy AI lane (AI code written 2000)', () => {
     { ticks: 60, shown: 23, internal: 23.179 },
     { ticks: 100, shown: 38, internal: 38.631 },
     { ticks: 300, shown: 115, internal: 115.894 },
-  ])('shows Pending Review $shown after $ticks ticks', ({ ticks, shown, internal }) => {
-    const lane = busyTrace[ticks - 1]
-    expect(displayedPending(lane)).toBe(shown)
-    if (internal !== undefined) expect(lane.pendingPrs).toBeCloseTo(internal, 2)
-  })
+  ])(
+    'shows Pending Review $shown (internal $internal) after $ticks ticks',
+    ({ ticks, shown, internal }) => {
+      const lane = busyTrace[ticks - 1]
+      expect(displayedPending(lane)).toBe(shown)
+      expect(lane.pendingPrs).toBeCloseTo(internal, 2)
+    },
+  )
 
   it.each([
     { ticks: 10, shown: 1, internal: 1.656 },
@@ -520,9 +529,10 @@ describe('AI code written against the AI lane effective review speed (AC7d)', ()
 
   it('adds exactly 40 pending LOC per tick at 1,000 LOC/hr: 40, 80, ... 6,000 at 15 seconds', () => {
     const trace = traceTicks(emptyLane(), AI_AT_1000, FIFTEEN_SECONDS_IN_TICKS)
-    trace.forEach((lane, index) => {
-      expect(lane.pendingLoc).toBeCloseTo(40 * (index + 1), 6)
-    })
+    const pendingLoc = trace.map((lane) => Math.round(lane.pendingLoc * 1e6) / 1e6)
+    expect(pendingLoc).toEqual(
+      Array.from({ length: FIFTEEN_SECONDS_IN_TICKS }, (_, i) => 40 * (i + 1)),
+    )
     expect(formatLoc(trace.at(-1).pendingLoc)).toBe('6,000')
   })
 
@@ -542,14 +552,21 @@ describe('AI code written against the AI lane effective review speed (AC7d)', ()
     expect(displayedPending(trace[144])).toBe(16)
   })
 
-  it('keeps the queue at 0 for 30 seconds at 600 LOC/hr, with 16 PRs deployed at 10 seconds', () => {
+  describe('at 600 LOC/hr, equal to the effective review speed', () => {
     const trace = traceTicks(emptyLane(), paramsFor(AI, { aiLocPerHour: 600 }), 300)
-    expect(trace.map((lane) => displayedPending(lane)).filter((shown) => shown !== 0)).toEqual([])
-    expect(
-      trace.map((lane) => formatLoc(lane.pendingLoc)).filter((shown) => shown !== '0'),
-    ).toEqual([])
-    expect(displayedDeployed(trace[99])).toBe(16)
-    expect(trace[99].deployedPrs).toBeCloseTo(16.556, 3)
+
+    it('keeps the displayed queue at 0 for 30 seconds', () => {
+      expect(trace.map((lane) => displayedPending(lane))).toEqual(Array(300).fill(0))
+    })
+
+    it('keeps the displayed Pending LOC at 0 for 30 seconds', () => {
+      expect(trace.map((lane) => formatLoc(lane.pendingLoc))).toEqual(Array(300).fill('0'))
+    })
+
+    it('deploys 16 PRs (16.556) in 10 seconds', () => {
+      expect(displayedDeployed(trace[99])).toBe(16)
+      expect(trace[99].deployedPrs).toBeCloseTo(16.556, 3)
+    })
   })
 
   it('grows the internal pending LOC by (code written - effective speed) x 0.1 per tick at 601 LOC/hr', () => {
@@ -557,8 +574,12 @@ describe('AI code written against the AI lane effective review speed (AC7d)', ()
     const growthPerTick = trace.map(
       (lane, index) => lane.pendingLoc - (index === 0 ? 0 : trace[index - 1].pendingLoc),
     )
-    growthPerTick.forEach((growth) => expect(growth).toBeCloseTo(0.1, 9))
-    expect(trace.at(-1).pendingLoc).toBeCloseTo(5, 6)
+    expect(growthPerTick.map((growth) => Number(growth.toFixed(9)))).toEqual(Array(50).fill(0.1))
+  })
+
+  it('accumulates 5 pending LOC in 5 seconds at 601 LOC/hr', () => {
+    const lane = runTicks(emptyLane(), paramsFor(AI, { aiLocPerHour: 601 }), 50)
+    expect(lane.pendingLoc).toBeCloseTo(5, 6)
   })
 })
 
@@ -598,24 +619,41 @@ describe('draining a backlog', () => {
   const afterBusyTicks = (ticks) => runTicks(emptyLane(), paramsFor(AI, BUSY_AI), ticks)
   const drainingParams = paramsFor(AI, DRAINING)
 
-  it('shows 0 from 7.726 pending PRs after 13 ticks (0.57 internal), empties by tick 15, and never goes below 0', () => {
-    const queued = afterBusyTicks(20)
-    expect(displayedPending(queued)).toBe(7)
+  describe('from 7.726 pending PRs at 2000 LOC/hr effective speed', () => {
+    const pending = traceTicks(afterBusyTicks(20), drainingParams, 30).map(
+      (lane) => lane.pendingPrs,
+    )
 
-    const pending = traceTicks(queued, drainingParams, 30).map((lane) => lane.pendingPrs)
+    it('starts from a displayed 7', () => {
+      expect(displayedPending(afterBusyTicks(20))).toBe(7)
+    })
 
-    expect(floorShow(pending[11])).toBe(1)
-    expect(floorShow(pending[12])).toBe(0)
-    expect(pending[12]).toBeGreaterThan(0)
-    expect(pending[14]).toBe(0)
-    expect(Math.min(...pending)).toBeGreaterThanOrEqual(0)
+    it('shows 1 after 12 ticks and 0 after 13, while 0.57 PR is still queued', () => {
+      expect([floorShow(pending[11]), floorShow(pending[12])]).toEqual([1, 0])
+      expect(pending[12]).toBeGreaterThan(0)
+    })
+
+    it('is empty by tick 15', () => {
+      expect(pending[14]).toBe(0)
+    })
+
+    it('never goes below 0', () => {
+      expect(Math.min(...pending)).toBeGreaterThanOrEqual(0)
+    })
   })
 
-  it('removes 0.551 PR per tick from 19.316: 18.77, 18.21, 17.66, 17.11, 16.56, 16.01 (16), 15.46 (15)', () => {
+  describe('from 19.316 pending PRs, removing 0.551 PR per tick', () => {
     const pending = traceTicks(afterBusyTicks(50), drainingParams, 7).map((lane) => lane.pendingPrs)
-    const expected = [18.77, 18.21, 17.66, 17.11, 16.56, 16.01, 15.46]
-    pending.forEach((value, index) => expect(value).toBeCloseTo(expected[index], 1))
-    expect([floorShow(pending[5]), floorShow(pending[6])]).toEqual([16, 15])
+
+    it('passes through 18.77, 18.21, 17.66, 17.11, 16.56, 16.01 and 15.46', () => {
+      expect(pending.map((value) => Math.round(value * 100) / 100)).toEqual([
+        18.77, 18.21, 17.66, 17.11, 16.56, 16.01, 15.46,
+      ])
+    })
+
+    it('shows 16 after 0.6 s and 15 after 0.7 s', () => {
+      expect([floorShow(pending[5]), floorShow(pending[6])]).toEqual([16, 15])
+    })
   })
 
   it('shows no pickup wait and Defects caught 2% once drained (6 seconds)', () => {
@@ -908,13 +946,28 @@ describe('formatPrSize', () => {
 })
 
 describe('formatPrsPerDay', () => {
+  // Inputs are the model's own values: 53 x 8 / (PR size x 1.51) at the defaults, at 0.5 and 0.25
+  // Human PRs per day, and 2000 x 8 / (240 x 1.51).
   it.each([
     { prsPerDay: 1, shown: '1.00 PRs/day' },
-    { prsPerDay: 1.17, shown: '1.17 PRs/day' },
-    { prsPerDay: 0.585, shown: '0.58 PRs/day' },
-    { prsPerDay: 0.2925, shown: '0.29 PRs/day' },
-    { prsPerDay: 44.15, shown: '44.15 PRs/day' },
+    { prsPerDay: 1.1699779249448123, shown: '1.17 PRs/day' },
+    { prsPerDay: 0.5849889624724062, shown: '0.58 PRs/day' },
+    { prsPerDay: 0.2924944812362031, shown: '0.29 PRs/day' },
+    { prsPerDay: 44.15011037527594, shown: '44.15 PRs/day' },
   ])('shows $shown for $prsPerDay', ({ prsPerDay, shown }) => {
     expect(formatPrsPerDay(prsPerDay)).toBe(shown)
+  })
+
+  it('groups thousands and keeps two decimals for a large value: 1,059.60', () => {
+    expect(formatPrsPerDay(1059.6)).toBe('1,059.60 PRs/day')
+  })
+})
+
+describe('formatLocPerHour', () => {
+  it.each([
+    { locPerHour: 600, shown: '600 LOC/hr' },
+    { locPerHour: 3000, shown: '3,000 LOC/hr' },
+  ])('shows $shown for $locPerHour', ({ locPerHour, shown }) => {
+    expect(formatLocPerHour(locPerHour)).toBe(shown)
   })
 })

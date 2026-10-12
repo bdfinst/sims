@@ -3,8 +3,8 @@
 export const LANE_IDS = Object.freeze({ human: 'human', ai: 'ai' })
 
 // Generation model constants. Faros figures are the research findings the AI lane's PR size and
-// merge rate are derived from; every displayed "+51%", "1.51×", "+16.2%" and "1.162×" comes from
-// these, so the model and the text cannot drift.
+// merge rate are derived from. Today the lane's "1.51×" and the aiLocPerHour default come from
+// these, so the model and that text cannot drift; the research panel's "+51%" joins them in Step 10.1.
 export const WORK_HOURS_PER_DAY = 8
 export const FAROS_PR_SIZE_INCREASE_PCT = 51
 export const FAROS_MERGE_RATE_INCREASE_PCT = 16.2
@@ -26,12 +26,26 @@ export const LANE_MODELS = Object.freeze({
   }),
 })
 
+const HUMAN_LOC_PER_HOUR_DEFAULT = 30
+
 // Slider table: the single source of defaults and ranges (spec State table).
 export const SLIDERS = Object.freeze({
-  humanLocPerHour: Object.freeze({ min: 5, max: 200, step: 5, defaultValue: 30 }),
+  humanLocPerHour: Object.freeze({
+    min: 5,
+    max: 200,
+    step: 5,
+    defaultValue: HUMAN_LOC_PER_HOUR_DEFAULT,
+  }),
   humanPrsPerDay: Object.freeze({ min: 0.25, max: 4, step: 0.25, defaultValue: 1 }),
-  // 53 = round(30 x FAROS_PR_SIZE_MULTIPLIER x FAROS_MERGE_RATE_MULTIPLIER); a unit test pins it.
-  aiLocPerHour: Object.freeze({ min: 5, max: 2000, step: 1, defaultValue: 53 }),
+  // 53: the human default scaled by both Faros multipliers; a unit test pins the value.
+  aiLocPerHour: Object.freeze({
+    min: 5,
+    max: 2000,
+    step: 1,
+    defaultValue: Math.round(
+      HUMAN_LOC_PER_HOUR_DEFAULT * FAROS_PR_SIZE_MULTIPLIER * FAROS_MERGE_RATE_MULTIPLIER,
+    ),
+  }),
   reviewerSpeed: Object.freeze({ min: 100, max: 1000, step: 50, defaultValue: 300 }),
   skim: Object.freeze({ min: 1, max: 3, step: 0.5, defaultValue: 2 }),
   threshold: Object.freeze({ min: 5, max: 50, step: 1, defaultValue: 15 }),
@@ -82,7 +96,8 @@ const SPEED_WALL = 1000
 const SPEED_FLOOR = 0.1
 const EMPTY_QUEUE_EPSILON = 1e-9
 const DISPLAY_EPSILON = 1e-9
-const DEFECTS_PER_KLOC = DEFECTS_PER_LOC * 1000
+const LOC_PER_KLOC = 1000
+const DEFECTS_PER_KLOC = DEFECTS_PER_LOC * LOC_PER_KLOC
 
 // The modeling choices the research panel discloses, read from the model's own constants so the
 // note can never drift from what the simulation does.
@@ -129,7 +144,7 @@ export const speedFactor = (locPerHour) =>
 export const detection = (sizeLoc, locPerHour) =>
   BASE_DETECTION * sizeFactor(sizeLoc) * speedFactor(locPerHour)
 
-export const formatPct = (share) => `${Math.round(share * 100)}%`
+export const formatPct = (share) => `${Math.round(share * PERCENT)}%`
 
 // Defects caught is shown from the lane's nominal size and speed, not from the queue's mix.
 export const formatDefectsCaught = ({ size, effSpeed }) => formatPct(detection(size, effSpeed))
@@ -141,7 +156,11 @@ export const formatLoc = (loc) => formatCount(floorShow(loc))
 // A derived PR size shows rounded to whole LOC, not floored like a count.
 export const formatPrSize = (loc) => `${formatCount(Math.round(loc))} LOC`
 
-export const formatPrsPerDay = (prsPerDay) => `${prsPerDay.toFixed(2)} PRs/day`
+const PRS_PER_DAY_FORMAT = Object.freeze({ minimumFractionDigits: 2, maximumFractionDigits: 2 })
+export const formatPrsPerDay = (prsPerDay) =>
+  `${prsPerDay.toLocaleString('en-US', PRS_PER_DAY_FORMAT)} PRs/day`
+
+export const formatLocPerHour = (locPerHour) => `${formatCount(locPerHour)} LOC/hr`
 
 export const NO_VALUE = '—'
 

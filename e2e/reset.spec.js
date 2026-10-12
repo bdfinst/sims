@@ -30,7 +30,11 @@ const resetButton = (page) => buttonNamed(page, 'Reset')
 
 // The defaults leave both queues empty, so a run that gives a Reset something to clear uses the
 // busy-AI preset: after 1 s the AI lane shows 3 pending PRs and 1 deployed.
-const expectBusyAiShortRunCounts = (page) => expectCounts(page, 'ai', { pending: 3, deployed: 1 })
+const expectBusyAiShortRunCounts = (page) =>
+  expectCounts(page, 'ai', {
+    pending: REFERENCE.busyAiPendingAtTick10,
+    deployed: REFERENCE.busyAiDeployedAtTick10,
+  })
 
 test.describe.configure({ mode: 'parallel' })
 
