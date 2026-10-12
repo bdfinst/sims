@@ -1013,6 +1013,6 @@ At the build's project-init gate, you chose a build step instead of the single-H
 
 #### Wave 7
 
-- [ ] Slice 7: Research panel and docs
-  - [ ] Step 7.1: Collapsible research panel
-  - [ ] Step 7.2: Document the page in CLAUDE.md
+- [x] Slice 7: Research panel and docs
+  - [x] Step 7.1: Collapsible research panel
+  - [x] Step 7.2: Document the page in CLAUDE.md
