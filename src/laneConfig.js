@@ -14,7 +14,6 @@ export const LANE_PRESENTATION = Object.freeze({
     accentSliderClass: 'accent-human',
     generationSliders: ['humanGen', 'prSize'],
     reviewSliders: ['reviewerSpeed'],
-    showsDerivedValues: false,
   }),
   [LANE_IDS.ai]: Object.freeze({
     label: 'AI',
@@ -26,7 +25,6 @@ export const LANE_PRESENTATION = Object.freeze({
     accentSliderClass: 'accent-ai',
     generationSliders: ['aiGen'],
     reviewSliders: ['skim'],
-    showsDerivedValues: true,
   }),
 })
 

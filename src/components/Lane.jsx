@@ -16,6 +16,7 @@ export function Lane({ laneId, lane, settings, onSettingChange }) {
   const presentation = LANE_PRESENTATION[laneId]
   const model = LANE_MODELS[laneId]
   const params = laneParams(settings, model)
+  const hasDerivedValues = model.skimApplies || model.sizeMultiplier !== 1
   const renderSlider = (settingKey) => (
     <RateSlider
       key={settingKey}
@@ -38,7 +39,7 @@ export function Lane({ laneId, lane, settings, onSettingChange }) {
           <h2 className="text-xl font-semibold">{presentation.label}</h2>
         </div>
         {presentation.generationSliders.map(renderSlider)}
-        {presentation.showsDerivedValues && (
+        {hasDerivedValues && (
           <DerivedValue>
             PR size {params.size} LOC (×{model.sizeMultiplier})
           </DerivedValue>
@@ -56,9 +57,7 @@ export function Lane({ laneId, lane, settings, onSettingChange }) {
           <p className="text-base">Review</p>
         </div>
         {presentation.reviewSliders.map(renderSlider)}
-        {presentation.showsDerivedValues && (
-          <DerivedValue>Effective speed {params.effSpeed} LOC/hr</DerivedValue>
-        )}
+        {hasDerivedValues && <DerivedValue>Effective speed {params.effSpeed} LOC/hr</DerivedValue>}
         <dl>
           <dt className="text-base">Deployed</dt>
           <dd data-metric="deployed" className="text-4xl font-bold text-deployed">

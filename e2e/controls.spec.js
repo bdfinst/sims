@@ -91,7 +91,7 @@ test.describe('Adjust the model live', () => {
       await expect(sliderLocator).toHaveAttribute('min', String(min))
       await expect(sliderLocator).toHaveAttribute('max', String(max))
       await expect(sliderLocator).toHaveAttribute('step', String(step))
-      await expect(visibleValue(sliderLocator)).toHaveText(shown)
+      await expect(await visibleValue(sliderLocator)).toHaveText(shown)
       await expect(sliderLocator).toHaveAttribute('aria-valuetext', spoken)
     })
   }
@@ -174,7 +174,7 @@ test.describe('Adjust the model live', () => {
     const sampledPending = await sampleEachTick(page, {
       startTick: 20,
       tickCount: (6 * SECOND_MS) / TICK_MS,
-      read: async () => (await metricValues(page, 'pending'))[0],
+      read: async () => (await metricValues(page, 'pending')).human,
     })
 
     await expect(metric(page, 'human', 'pending')).toHaveText('0')
@@ -189,6 +189,6 @@ test.describe('Adjust the model live', () => {
     await page.keyboard.press('ArrowRight')
 
     await expect(reviewerSpeedSlider).toHaveValue('350')
-    await expect(visibleValue(reviewerSpeedSlider)).toHaveText('350 LOC/hr')
+    await expect(await visibleValue(reviewerSpeedSlider)).toHaveText('350 LOC/hr')
   })
 })

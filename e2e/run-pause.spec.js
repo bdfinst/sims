@@ -181,12 +181,13 @@ test.describe('Run and pause the simulation', () => {
     const decreases = samples
       .slice(1)
       .filter((current, sampleIndex) =>
-        current.some((count, laneIndex) => count < samples[sampleIndex][laneIndex]),
+        Object.entries(current).some(([laneId, count]) => count < samples[sampleIndex][laneId]),
       )
     expect(decreases).toEqual([])
-    await expect
-      .poll(readDeployed)
-      .toEqual([REFERENCE.humanDeployedAtTick100, REFERENCE.aiDeployedAtTick100])
+    await expect.poll(readDeployed).toEqual({
+      human: REFERENCE.humanDeployedAtTick100,
+      ai: REFERENCE.aiDeployedAtTick100,
+    })
   })
 
   test('Hiding the tab auto-pauses', async ({ page }) => {

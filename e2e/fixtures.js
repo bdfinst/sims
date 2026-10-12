@@ -108,14 +108,20 @@ export const slider = (page, name) => page.getByRole('slider', { name, exact: tr
 
 export const setSlider = (page, name, value) => slider(page, name).fill(String(value))
 
-export const visibleValue = (sliderLocator) => sliderLocator.locator('xpath=..').locator('output')
+// The visible value is a sibling span with id slider-value-<settingKey>; the slider is slider-<settingKey>.
+export const visibleValue = async (sliderLocator) => {
+  const sliderId = await sliderLocator.getAttribute('id')
+  return sliderLocator.page().locator(`#${sliderId.replace('slider-', 'slider-value-')}`)
+}
 
-// The shown values of one metric, [human, ai], read in a single round trip.
+// The shown values of one metric as { human, ai }, keyed by each value's own lane.
 export const metricValues = (page, name) =>
   page.evaluate(
     (metricName) =>
-      [...document.querySelectorAll(`[data-metric="${metricName}"]`)].map((element) =>
-        Number(element.textContent),
+      Object.fromEntries(
+        [...document.querySelectorAll(`[data-lane] [data-metric="${metricName}"]`)].map(
+          (element) => [element.closest('[data-lane]').dataset.lane, Number(element.textContent)],
+        ),
       ),
     name,
   )
