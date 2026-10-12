@@ -48,7 +48,7 @@ From the amended spec:
   - AI: 0 pending, 1 deployed, 15%, 9 incidents, 6.16 per PR, 0.0 h wait.
   - Headline "3.65×".
 - [ ] AC7a: At the defaults, AI incidents per PR is 3×–4× human incidents per PR.
-- [ ] AC7b: Defects caught follows the size and speed factors: 80% at a human PR size ≤ 200 (speed 300); 4% at a human PR size ≥ 400; 22% at a human PR size of 200 and speed 900; AI lane 5% at skim 3× and 18% at skim 1×.
+- [ ] AC7b: Defects caught follows the size and speed factors: 80% at a human PR size ≤ 200 (speed 300); 4% at a human PR size ≥ 400; 22% at a human PR size of 200 and speed 900; AI lane 5% at skim 3× and 18% at skim 1×. Vitest pins every value; e2e checks one row per curve.
 - [ ] AC7c: Changing Human code written, Human PRs per day, or reviewer speed while running changes defects caught and incident accrual from the next tick. Changing AI code written changes only the AI lane's PRs per day and its pending queue, never either lane's PR size or defects caught.
 - [ ] AC7d: When AI code written exceeds the AI lane's effective review speed, the AI lane's internal pending LOC grows by (code written − effective speed) × 0.1 every tick (Vitest); at 1,000 LOC/hr the displayed Pending LOC strictly increases every tick (e2e) and it passes the default threshold (Pending Review 16 after 15 s). At 600 LOC/hr the queue stays at 0.
 - [ ] AC8: A queue never shows a negative value.
@@ -79,7 +79,7 @@ From the amended spec:
 
 | Module | Contents |
 | --- | --- |
-| `src/engine.js` | Pure, with no React or DOM: constants, including `WORK_HOURS_PER_DAY = 8`, `FAROS_PR_SIZE_INCREASE_PCT = 51`, `FAROS_MERGE_RATE_INCREASE_PCT = 16.2`, and the derived `FAROS_PR_SIZE_MULTIPLIER = 1 + 51/100` and `FAROS_MERGE_RATE_MULTIPLIER = 1 + 16.2/100` (defined once; every displayed "+51%", "+16.2%", "1.51×", and "1.162×" comes from them). The numeric lane model `LANE_MODELS` (`locSetting`, `sizeMultiplier` — human 1, AI `FAROS_PR_SIZE_MULTIPLIER` — and `skimApplies`), the slider table (min/max/step/default), `humanPrSize(settings)`, `sizeFactor`, `speedFactor`, `detection`, `laneParams(settings, laneModel) → {gen, size, effSpeed, prsPerDay}`, `tick`, `isOverThreshold`, `emptyLane`, `MODEL_ASSUMPTIONS`, and the formatters, including `formatPrSize` and `formatPrsPerDay`. `laneParams` is the only caller of `humanPrSize`. Unit-tested by `src/engine.test.js` (Vitest). An ESLint `no-restricted-imports` override forbids it from importing `react`, `lucide-react`, `./components/*`, or `./laneConfig*`. |
+| `src/engine.js` | Pure, with no React or DOM: constants, including `WORK_HOURS_PER_DAY = 8`, `FAROS_PR_SIZE_INCREASE_PCT = 51`, `FAROS_MERGE_RATE_INCREASE_PCT = 16.2`, and the derived `FAROS_PR_SIZE_MULTIPLIER = 1 + 51/100` and `FAROS_MERGE_RATE_MULTIPLIER = 1 + 16.2/100` (defined once; every displayed "+51%", "+16.2%", and "1.51×" comes from them, and the research note's "1.17×" is the AI-to-human PRs-per-day ratio `laneParams` gives at the defaults). The numeric lane model `LANE_MODELS` (`locSetting`, `sizeMultiplier` — human 1, AI `FAROS_PR_SIZE_MULTIPLIER` — and `skimApplies`), the slider table (min/max/step/default), `humanPrSize(settings)`, `sizeFactor`, `speedFactor`, `detection`, `laneParams(settings, laneModel) → {gen, size, effSpeed, prsPerDay}`, `tick`, `isOverThreshold`, `emptyLane`, `MODEL_ASSUMPTIONS`, and the formatters, including `formatPrSize` and `formatPrsPerDay`. `laneParams` is the only caller of `humanPrSize`. Unit-tested by `src/engine.test.js` (Vitest). An ESLint `no-restricted-imports` override forbids it from importing `react`, `lucide-react`, `./components/*`, or `./laneConfig*`. |
 | `src/reducer.js` | Pure `reducer(state, action)` and `initialState`: `tick`, `start`, `pause`, `reset`, `setSetting`. Unit-tested by `src/reducer.test.js` (Vitest). |
 | `src/openTip.js` | Pure `openTipReducer(state, event)` and `isTipShown(state, key)` for the info-tip truth table below. Unit-tested by `src/openTip.test.js`, one test per truth-table row. Same ESLint purity rule as the engine. |
 | `src/laneConfig.js` | Presentation only: labels, units, spoken units, **info-tip text** (`SLIDER_PRESENTATION[key].info`, `.unitName`, `.lanes`), the derived fields each lane shows, icon names, and complete Tailwind class-string literals per lane, plus the tile layout. Tip text is built from `WORK_HOURS_PER_DAY` and the Faros constants in `engine.js`, never literal numbers. |
@@ -232,7 +232,7 @@ At 1280 × 720 with the panel collapsed and every tip closed, the header, the he
 - **Auto-pause:** a `visibilitychange` event with `visibilityState === 'hidden'` dispatches `pause`. Becoming visible again does nothing.
 - **Research panel:** a `<details>`/`<summary>` element, collapsed by default.
   - Its text comes verbatim from the spec's Research Sources "Panel wording" column, with links to the five URLs (`target="_blank" rel="noopener"`). The Faros finding reads "Across 22,000 developers in 4,000 teams, high AI adoption saw PR size +51%, PR merge rate +16.2%, and 3× incidents per PR (+242.7%), compared with low adoption.", with +51% and +16.2% taken from the engine constants.
-  - Its "Model assumptions" note, built from `MODEL_ASSUMPTIONS`: "Model assumptions. These are modeling choices, not research findings: the defect density (20 defects per 1,000 LOC), the base detection rate (0.8, picked from SmartBear's 70–90% range), the detection floors (0.05 for large PRs and 0.1 for fast reviewing), the curve thresholds (PR size 200 to 400 LOC, reviewer speed 500 to 1,000 LOC/hr), and the human-lane defaults, an assumption (30 LOC/hr and 1 PR per day). The AI lane's PR size (1.51× the human PR size) and default volume (giving 1.162× the human PRs per day) come from Faros." Then: "The human defaults were chosen to land near" + the link "Faros's +242.7% incidents per PR". The note links two more phrases the same way: "SmartBear's 70–90%" links to the SmartBear "Best Practices for Code Review" URL, and "come from Faros" links to the Faros report URL. All three note links open in a new tab (`target="_blank" rel="noopener"`), and each one's accessible name ends " (opens in new tab)".
+  - Its "Model assumptions" note, built from `MODEL_ASSUMPTIONS`: "Model assumptions. These are modeling choices, not research findings: the defect density (20 defects per 1,000 LOC), the base detection rate (0.8, picked from SmartBear's 70–90% range), the detection floors (0.05 for large PRs and 0.1 for fast reviewing), the curve thresholds (PR size 200 to 400 LOC, reviewer speed 500 to 1,000 LOC/hr), and the human-lane defaults, an assumption (30 LOC/hr and 1 PR per day). The AI lane's PR size (1.51× the human PR size) and default volume (giving 1.17× the human PRs per day) come from Faros." Then: "The human defaults were chosen to land near" + the link "Faros's +242.7% incidents per PR". The note links two more phrases the same way: "SmartBear's 70–90%" links to the SmartBear "Best Practices for Code Review" URL, and "come from Faros" links to the Faros report URL. All three note links open in a new tab (`target="_blank" rel="noopener"`), and each one's accessible name ends " (opens in new tab)".
   - The phrases "near zero", "coined", and "originated" never appear.
 
 ## Slices
@@ -445,9 +445,8 @@ Feature: Adjust the model live
     Then the Human lane shows "PR size 240 LOC (derived)"
     And the AI lane shows "PR size 362 LOC (1.51× human)", "1.17 PRs/day (derived)", and "Effective speed 600 LOC/hr"
     And none of the derived values is a slider
-    When I set "Human PRs per day" to 2 and "AI skim multiplier" to 3
-    Then the Human lane shows "PR size 120 LOC (derived)"
-    And the AI lane shows "PR size 181 LOC (1.51× human)", "2.34 PRs/day (derived)", and "Effective speed 900 LOC/hr"
+    When I set "AI skim multiplier" to 3
+    Then the AI lane shows "Effective speed 900 LOC/hr"
 
   Scenario Outline: Sliders stop at their bounds
     Given I open the simulator
@@ -596,28 +595,13 @@ Feature: Review quality metrics
     Then the Human lane shows Defects caught 65% and Pending LOC 0
     And the AI lane shows Defects caught 15% and Pending LOC 0
 
-  Scenario Outline: Defects caught follows PR size
-    Given I set "Human code written (LOC/hr)" to <loc> and "Human PRs per day" to <perDay>
-    Then the Human lane shows "PR size <size> LOC (derived)" and Defects caught <caught>
+  Scenario: Defects caught follows PR size
+    Given I set "Human code written (LOC/hr)" to 75 and "Human PRs per day" to 2
+    Then the Human lane shows "PR size 300 LOC (derived)" and Defects caught 42%
 
-    Examples:
-      | loc | perDay | size  | caught |
-      | 25  | 4      | 50    | 80%    |
-      | 25  | 1      | 200   | 80%    |
-      | 75  | 2      | 300   | 42%    |
-      | 50  | 1      | 400   | 4%     |
-      | 125 | 1      | 1,000 | 4%     |
-
-  Scenario Outline: Defects caught follows reviewer speed
-    Given I set "Human code written (LOC/hr)" to 25 and "Reviewer speed (LOC/hr, both lanes)" to <speed>
-    Then the Human lane shows Defects caught <caught>
-
-    Examples:
-      | speed | caught |
-      | 500   | 80%    |
-      | 750   | 44%    |
-      | 900   | 22%    |
-      | 1000  | 8%     |
+  Scenario: Defects caught follows reviewer speed
+    Given I set "Human code written (LOC/hr)" to 25 and "Reviewer speed (LOC/hr, both lanes)" to 900
+    Then the Human lane shows Defects caught 22%
 
   Scenario: Skimming harder lowers AI defects caught
     Given I set "AI skim multiplier" to 3
@@ -713,7 +697,7 @@ Feature: Review quality metrics
 **TEST**:
 
 - Vitest: `sizeFactor`, `speedFactor`, and `detection` table values.
-- Playwright: defects caught at rest, both outlines, the two skim scenarios.
+- Playwright: defects caught at rest, the PR-size and reviewer-speed scenarios, the two skim scenarios.
 **REFACTOR**: Name the curve constants: `SIZE_KNEE=200`, `SIZE_WALL=400`, `SIZE_FLOOR=0.05`, `SPEED_KNEE=500`, `SPEED_WALL=1000`, `SPEED_FLOOR=0.1`, `BASE_DETECTION=0.8`, `DEFECTS_PER_LOC=0.02`.
 **Files**: `src/**`, `e2e/metrics.spec.js`
 **Commit**: `feat(sim): defects-caught rate from PR size and reviewer speed`
@@ -944,7 +928,7 @@ Feature: Research behind the simulation
     And the panel contains "the detection floors (0.05 for large PRs and 0.1 for fast reviewing)"
     And the panel contains "the curve thresholds (PR size 200 to 400 LOC, reviewer speed 500 to 1,000 LOC/hr)"
     And the panel contains "the human-lane defaults, an assumption (30 LOC/hr and 1 PR per day)"
-    And the panel contains "The AI lane's PR size (1.51× the human PR size) and default volume (giving 1.162× the human PRs per day) come from Faros"
+    And the panel contains "The AI lane's PR size (1.51× the human PR size) and default volume (giving 1.17× the human PRs per day) come from Faros"
     And the panel contains "The human defaults were chosen to land near Faros's +242.7% incidents per PR"
 
   Scenario: Panel is keyboard operable and does not interrupt the simulation
@@ -999,16 +983,6 @@ Feature: Generate code and derive PR size
     When I set "AI code written (LOC/hr)" to 2000
     Then the AI lane shows "PR size 362 LOC (1.51× human)" and "44.15 PRs/day (derived)"
     And the Human lane still shows "PR size 240 LOC (derived)"
-
-  Scenario: A human PR can span several days
-    Given I set "Human PRs per day" to 0.25
-    Then the Human lane shows "PR size 960 LOC (derived)" and Defects caught 4%
-    And the AI lane shows "PR size 1,450 LOC (1.51× human)" and "0.29 PRs/day (derived)"
-
-  Scenario: Derived values round to whole LOC and two decimals
-    Given I set "Human code written (LOC/hr)" to 35 and "Human PRs per day" to 0.75
-    Then the Human lane shows "PR size 373 LOC (derived)"
-    And the AI lane shows "PR size 564 LOC (1.51× human)" and "0.75 PRs/day (derived)"
 
   Scenario: Raising AI code written past review capacity grows the AI queue
     Given I set "AI code written (LOC/hr)" to 1000
@@ -1446,6 +1420,14 @@ Your decisions (recorded in the spec's Ambiguity Log):
 - Human defaults 30 LOC/hr and 1 PR/day (headline 3.65×); one developer; ranges as in the State table.
 - Every slider gets a focusable info button with a hover/focus tip (WCAG 1.4.13).
 - The stakeholder's vsm-workshop repo data was considered and set aside; it is not mentioned in the UI.
+
+## Post-build decisions (2026-10-12)
+
+Decided by the stakeholder after the build:
+
+- **Research note ratio:** the note gives the AI default volume as the ratio the model shows at the defaults, "1.17× the human PRs per day", computed from `laneParams`, not the Faros input 1.162× (the rounded AI default of 53 only approximates it).
+- **Purity lint rule:** ESLint `no-restricted-globals` forbids DOM, browser-storage, network, and timer globals in `engine.js`, `reducer.js`, and `openTip.js`.
+- **Duplicated number tables trimmed from e2e:** `src/engine.test.js` owns the numeric tables. The e2e suite keeps one wiring row per derived field or curve: "Defects caught follows PR size" (300 LOC → 42%) and "Defects caught follows reviewer speed" (900 LOC/hr → 22%) are now single scenarios; "A human PR can span several days" and "Derived values round to whole LOC and two decimals" are removed; "Derived PR sizes, AI PRs per day, and effective speed are read-only" keeps only its skim change.
 
 ## Build Progress
 

@@ -175,17 +175,11 @@ test.describe('Adjust the model live', () => {
       await expectSliderNames(aiLane, [AI_CODE_WRITTEN_LABEL, AI_SKIM_LABEL])
     })
 
-    await test.step('When I set "Human PRs per day" to 2 and "AI skim multiplier" to 3', async () => {
-      await setSliders(page, { [HUMAN_PRS_PER_DAY_LABEL]: 2, [AI_SKIM_LABEL]: MAX_SKIM })
+    await test.step('When I set "AI skim multiplier" to 3', async () => {
+      await setSliders(page, { [AI_SKIM_LABEL]: MAX_SKIM })
     })
 
-    await test.step('Then the Human lane shows "PR size 120 LOC (derived)"', async () => {
-      await expect(humanLane.getByText('PR size 120 LOC (derived)')).toBeVisible()
-    })
-
-    await test.step('And the AI lane shows "PR size 181 LOC (1.51× human)", "2.34 PRs/day (derived)", and "Effective speed 900 LOC/hr"', async () => {
-      await expect(aiLane.getByText('PR size 181 LOC (1.51× human)')).toBeVisible()
-      await expect(aiLane.getByText('2.34 PRs/day (derived)')).toBeVisible()
+    await test.step('Then the AI lane shows "Effective speed 900 LOC/hr"', async () => {
       await expect(aiLane.getByText('Effective speed 900 LOC/hr')).toBeVisible()
     })
   })

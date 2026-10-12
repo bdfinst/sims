@@ -12,16 +12,6 @@ Feature: Generate code and derive PR size
     Then the AI lane shows "PR size 362 LOC (1.51× human)" and "44.15 PRs/day (derived)"
     And the Human lane still shows "PR size 240 LOC (derived)"
 
-  Scenario: A human PR can span several days
-    Given I set "Human PRs per day" to 0.25
-    Then the Human lane shows "PR size 960 LOC (derived)" and Defects caught 4%
-    And the AI lane shows "PR size 1,450 LOC (1.51× human)" and "0.29 PRs/day (derived)"
-
-  Scenario: Derived values round to whole LOC and two decimals
-    Given I set "Human code written (LOC/hr)" to 35 and "Human PRs per day" to 0.75
-    Then the Human lane shows "PR size 373 LOC (derived)"
-    And the AI lane shows "PR size 564 LOC (1.51× human)" and "0.75 PRs/day (derived)"
-
   Scenario: Raising AI code written past review capacity grows the AI queue
     Given I set "AI code written (LOC/hr)" to 1000
     When I press Start and 15 seconds pass

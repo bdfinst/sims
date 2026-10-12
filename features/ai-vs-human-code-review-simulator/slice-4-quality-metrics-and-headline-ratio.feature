@@ -5,28 +5,13 @@ Feature: Review quality metrics
     Then the Human lane shows Defects caught 65% and Pending LOC 0
     And the AI lane shows Defects caught 15% and Pending LOC 0
 
-  Scenario Outline: Defects caught follows PR size
-    Given I set "Human code written (LOC/hr)" to <loc> and "Human PRs per day" to <perDay>
-    Then the Human lane shows "PR size <size> LOC (derived)" and Defects caught <caught>
+  Scenario: Defects caught follows PR size
+    Given I set "Human code written (LOC/hr)" to 75 and "Human PRs per day" to 2
+    Then the Human lane shows "PR size 300 LOC (derived)" and Defects caught 42%
 
-    Examples:
-      | loc | perDay | size  | caught |
-      | 25  | 4      | 50    | 80%    |
-      | 25  | 1      | 200   | 80%    |
-      | 75  | 2      | 300   | 42%    |
-      | 50  | 1      | 400   | 4%     |
-      | 125 | 1      | 1,000 | 4%     |
-
-  Scenario Outline: Defects caught follows reviewer speed
-    Given I set "Human code written (LOC/hr)" to 25 and "Reviewer speed (LOC/hr, both lanes)" to <speed>
-    Then the Human lane shows Defects caught <caught>
-
-    Examples:
-      | speed | caught |
-      | 500   | 80%    |
-      | 750   | 44%    |
-      | 900   | 22%    |
-      | 1000  | 8%     |
+  Scenario: Defects caught follows reviewer speed
+    Given I set "Human code written (LOC/hr)" to 25 and "Reviewer speed (LOC/hr, both lanes)" to 900
+    Then the Human lane shows Defects caught 22%
 
   Scenario: Skimming harder lowers AI defects caught
     Given I set "AI skim multiplier" to 3

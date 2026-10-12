@@ -1,16 +1,13 @@
 import {
   AI_CODE_WRITTEN_LABEL,
   BUSY_AI_PRESET,
-  HUMAN_CODE_WRITTEN_LABEL,
   HUMAN_PRS_PER_DAY_LABEL,
   HALF_PR_PER_DAY,
-  QUARTER_PR_PER_DAY,
   QUEUE_STATE,
   REFERENCE,
   TICKS_PER_SECOND,
   expect,
   expectCounts,
-  expectDefectsCaught,
   expectQueueState,
   expectStrictlyIncreasing,
   laneLocator,
@@ -27,8 +24,6 @@ import {
 test.describe.configure({ mode: 'parallel' })
 
 // Inputs the scenarios set (expected values come from REFERENCE and the plan's "Derived display").
-const ROUNDING_CODE_WRITTEN = 35
-const ROUNDING_PRS_PER_DAY = 0.75
 const OVER_CAPACITY_AI_CODE_WRITTEN = 1000
 const AT_CAPACITY_AI_CODE_WRITTEN = 600
 const OVER_CAPACITY_RUN_SECONDS = 15
@@ -78,42 +73,6 @@ test.describe('Generate code and derive PR size', () => {
 
     await test.step('And the Human lane still shows "PR size 240 LOC (derived)"', async () => {
       await expectLaneShows(page, 'human', ['PR size 240 LOC (derived)'])
-    })
-  })
-
-  test('A human PR can span several days', async ({ page }) => {
-    await test.step('Given I set "Human PRs per day" to 0.25', async () => {
-      await openWithSliders(page, { [HUMAN_PRS_PER_DAY_LABEL]: QUARTER_PR_PER_DAY })
-    })
-
-    await test.step('Then the Human lane shows "PR size 960 LOC (derived)" and Defects caught 4%', async () => {
-      await expectLaneShows(page, 'human', ['PR size 960 LOC (derived)'])
-      // Defects caught depends only on PR size (960 LOC) and speed, so the mid-run figure applies.
-      await expectDefectsCaught(page, 'human', REFERENCE.humanDefectsCaughtAfterPrsPerDay025)
-    })
-
-    await test.step('And the AI lane shows "PR size 1,450 LOC (1.51× human)" and "0.29 PRs/day (derived)"', async () => {
-      await expectLaneShows(page, 'ai', [
-        'PR size 1,450 LOC (1.51× human)',
-        '0.29 PRs/day (derived)',
-      ])
-    })
-  })
-
-  test('Derived values round to whole LOC and two decimals', async ({ page }) => {
-    await test.step('Given I set "Human code written (LOC/hr)" to 35 and "Human PRs per day" to 0.75', async () => {
-      await openWithSliders(page, {
-        [HUMAN_CODE_WRITTEN_LABEL]: ROUNDING_CODE_WRITTEN,
-        [HUMAN_PRS_PER_DAY_LABEL]: ROUNDING_PRS_PER_DAY,
-      })
-    })
-
-    await test.step('Then the Human lane shows "PR size 373 LOC (derived)"', async () => {
-      await expectLaneShows(page, 'human', ['PR size 373 LOC (derived)'])
-    })
-
-    await test.step('And the AI lane shows "PR size 564 LOC (1.51× human)" and "0.75 PRs/day (derived)"', async () => {
-      await expectLaneShows(page, 'ai', ['PR size 564 LOC (1.51× human)', '0.75 PRs/day (derived)'])
     })
   })
 

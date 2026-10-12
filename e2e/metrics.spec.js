@@ -38,21 +38,14 @@ import {
   FULL_RUN_SECONDS,
 } from './fixtures.js'
 
-// Plan, Slice 4 outlines: Human code written and PRs per day set the derived PR size.
-const SIZE_CASES = [
-  { loc: 25, perDay: 4, size: '50', caught: '80%' },
-  { loc: 25, perDay: 1, size: '200', caught: '80%' },
-  { loc: 75, perDay: 2, size: '300', caught: '42%' },
-  { loc: 50, perDay: 1, size: '400', caught: '4%' },
-  { loc: 125, perDay: 1, size: '1,000', caught: '4%' },
-]
-
-const SPEED_CASES = [
-  { speed: 500, caught: '80%' },
-  { speed: 750, caught: '44%' },
-  { speed: 900, caught: '22%' },
-  { speed: 1000, caught: '8%' },
-]
+// Plan, Slice 4: one mid-curve point per curve proves the wiring from slider to Defects caught.
+// The full size and speed tables are pinned in src/engine.test.js ("Defects caught for a lane
+// as displayed").
+const MID_SIZE_CODE_WRITTEN = 75
+const MID_SIZE_PRS_PER_DAY = 2
+const MID_SIZE_CAUGHT = '42%'
+const MID_SPEED = 900
+const MID_SPEED_CAUGHT = '22%'
 
 // 25 LOC/hr at 1 PR per day is a 200 LOC PR, the knee of the size curve.
 const CODE_WRITTEN_AT_SIZE_KNEE = 25
@@ -154,42 +147,32 @@ test.describe('Review quality metrics', () => {
     })
   })
 
-  for (const { loc, perDay, size, caught } of SIZE_CASES) {
-    test(`Defects caught follows PR size: ${loc} LOC/hr at ${perDay} PRs per day gives ${caught}`, async ({
-      page,
-    }) => {
-      await test.step(`Given I set "Human code written (LOC/hr)" to ${loc} and "Human PRs per day" to ${perDay}`, async () => {
-        await openWithSliders(page, {
-          [HUMAN_CODE_WRITTEN_LABEL]: loc,
-          [HUMAN_PRS_PER_DAY_LABEL]: perDay,
-        })
-      })
-
-      await test.step(`Then the Human lane shows "PR size ${size} LOC (derived)" and Defects caught ${caught}`, async () => {
-        await expect(
-          laneLocator(page, 'human').getByText(`PR size ${size} LOC (derived)`),
-        ).toBeVisible()
-        await expectDefectsCaught(page, 'human', caught)
+  test('Defects caught follows PR size', async ({ page }) => {
+    await test.step('Given I set "Human code written (LOC/hr)" to 75 and "Human PRs per day" to 2', async () => {
+      await openWithSliders(page, {
+        [HUMAN_CODE_WRITTEN_LABEL]: MID_SIZE_CODE_WRITTEN,
+        [HUMAN_PRS_PER_DAY_LABEL]: MID_SIZE_PRS_PER_DAY,
       })
     })
-  }
 
-  for (const { speed, caught } of SPEED_CASES) {
-    test(`Defects caught follows reviewer speed: ${speed} LOC/hr gives ${caught}`, async ({
-      page,
-    }) => {
-      await test.step(`Given I set "Human code written (LOC/hr)" to ${CODE_WRITTEN_AT_SIZE_KNEE} and "Reviewer speed (LOC/hr, both lanes)" to ${speed}`, async () => {
-        await openWithSliders(page, {
-          [HUMAN_CODE_WRITTEN_LABEL]: CODE_WRITTEN_AT_SIZE_KNEE,
-          [REVIEWER_SPEED_LABEL]: speed,
-        })
-      })
+    await test.step('Then the Human lane shows "PR size 300 LOC (derived)" and Defects caught 42%', async () => {
+      await expect(laneLocator(page, 'human').getByText('PR size 300 LOC (derived)')).toBeVisible()
+      await expectDefectsCaught(page, 'human', MID_SIZE_CAUGHT)
+    })
+  })
 
-      await test.step(`Then the Human lane shows Defects caught ${caught}`, async () => {
-        await expectDefectsCaught(page, 'human', caught)
+  test('Defects caught follows reviewer speed', async ({ page }) => {
+    await test.step('Given I set "Human code written (LOC/hr)" to 25 and "Reviewer speed (LOC/hr, both lanes)" to 900', async () => {
+      await openWithSliders(page, {
+        [HUMAN_CODE_WRITTEN_LABEL]: CODE_WRITTEN_AT_SIZE_KNEE,
+        [REVIEWER_SPEED_LABEL]: MID_SPEED,
       })
     })
-  }
+
+    await test.step('Then the Human lane shows Defects caught 22%', async () => {
+      await expectDefectsCaught(page, 'human', MID_SPEED_CAUGHT)
+    })
+  })
 
   test('Skimming harder lowers AI defects caught', async ({ page }) => {
     await test.step('Given I set "AI skim multiplier" to 3', async () => {

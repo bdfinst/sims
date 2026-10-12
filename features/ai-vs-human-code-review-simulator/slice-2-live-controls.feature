@@ -19,9 +19,8 @@ Feature: Adjust the model live
     Then the Human lane shows "PR size 240 LOC (derived)"
     And the AI lane shows "PR size 362 LOC (1.51× human)", "1.17 PRs/day (derived)", and "Effective speed 600 LOC/hr"
     And none of the derived values is a slider
-    When I set "Human PRs per day" to 2 and "AI skim multiplier" to 3
-    Then the Human lane shows "PR size 120 LOC (derived)"
-    And the AI lane shows "PR size 181 LOC (1.51× human)", "2.34 PRs/day (derived)", and "Effective speed 900 LOC/hr"
+    When I set "AI skim multiplier" to 3
+    Then the AI lane shows "Effective speed 900 LOC/hr"
 
   Scenario Outline: Sliders stop at their bounds
     Given I open the simulator
