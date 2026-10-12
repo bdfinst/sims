@@ -357,6 +357,10 @@ test.describe('Pending Review layout', () => {
       ]),
       [RESEARCH_TITLE, researchToggle(page)],
     ]
+    // The scenario's step line, verbatim. The Then step checks that inTabOrder lists the same
+    // controls in the same order, so reordering SLIDER_LABELS alone fails the test.
+    const FOCUS_ORDER_STEP =
+      'Then focus visits, in order: Start, Reset, "About Warning threshold", "Warning threshold", "About Human code written (LOC/hr)", "Human code written (LOC/hr)", "About Human PRs per day", "Human PRs per day", "About Reviewer speed (LOC/hr, both lanes)", "Reviewer speed (LOC/hr, both lanes)", "About AI code written (LOC/hr)", "AI code written (LOC/hr)", "About AI skim multiplier", "AI skim multiplier", and "Research behind this simulation"'
     // One entry per Tab press: whether that press focused the expected control, and its focus ring.
     const stops = []
     let leftThePage = false
@@ -388,7 +392,12 @@ test.describe('Pending Review layout', () => {
       )
     })
 
-    await test.step('Then focus visits, in order: Start, Reset, "About Warning threshold", "Warning threshold", "About Human code written (LOC/hr)", "Human code written (LOC/hr)", "About Human PRs per day", "Human PRs per day", "About Reviewer speed (LOC/hr, both lanes)", "Reviewer speed (LOC/hr, both lanes)", "About AI code written (LOC/hr)", "AI code written (LOC/hr)", "About AI skim multiplier", "AI skim multiplier", and "Research behind this simulation"', async () => {
+    await test.step(FOCUS_ORDER_STEP, async () => {
+      const stepNames = inTabOrder.map(([name]) => (name.includes(' ') ? `"${name}"` : name))
+      expect(
+        `Then focus visits, in order: ${stepNames.slice(0, -1).join(', ')}, and ${stepNames.at(-1)}`,
+        'the Tab order walked is the order the step line lists',
+      ).toBe(FOCUS_ORDER_STEP)
       expect(
         stops.map(({ name, isFocused }) => [name, isFocused]),
         'each Tab press focused the next control in order',

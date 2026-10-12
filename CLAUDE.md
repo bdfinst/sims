@@ -41,7 +41,7 @@ Two lanes (human-authored vs. AI-authored code) run side by side; generation out
 - `e2e/` — Playwright specs plus `fixtures.js` (shared helpers and a request guard that fails any test that makes an external request). Specs run in parallel and use `page.clock` for time. `generation.spec.js` covers the generation model and `info-tips.spec.js` the info tips.
 - `features/ai-vs-human-code-review-simulator/slice-N-*.feature` — Gherkin scenarios exported from the plan, one file per slice. Tests that implement a scenario use its title (outline tests append `: <row>`).
 - `tools/gherkin-sync/` — a Playwright reporter (wired in `playwright.config.js`) that fails the e2e run when a scenario test's top-level `test.step` titles differ from the scenario's step lines (keyword plus text, Background first, outline values filled in). Missing scenarios and Examples rows are reported only on a full, unfiltered run. `npx playwright test --list` checks just that every scenario has a test. Scenarios tagged `@wip` are skipped and counted; `GHERKIN_SYNC_STRICT=1` fails the run while any remain. A step may tag scenarios `@wip` in the plan and mark their tests `test.fixme` with `// @wip: Step N.M`. Before a PR there must be zero `@wip` and no `test.fixme`.
-- Unit tests sit next to their source (`src/**/*.test.js`); `src/testHelpers.js` holds their shared helpers.
+- Unit tests sit next to their source (`src/**/*.test.js` and `tools/**/*.test.js`); `src/testHelpers.js` holds the `src/` tests' shared helpers.
 - `docs/specs/`, `plans/` — the spec and the implementation plan.
 
 Test rules:
@@ -67,7 +67,7 @@ Test rules:
 
 ## Conventions in the Mermaid diagrams
 
-- Node roles are encoded both as a bracketed prefix in the label (`[Root]`, `[Effect]`, `[Undesirable Effect]`, `[Injection]`, `[Desired Effect]`) and as a `classDef` (`root`, `effect`, `ude`, `injection`, `de`). Keep both in sync when adding nodes.
+- In the CRT and FRT, node roles are encoded both as a bracketed prefix in the label (`[Root]`, `[Effect]`, `[Undesirable Effect]`, `[Injection]`, `[Desired Effect]`) and as a `classDef` (`root`, `effect`, `ude`, `injection`, `de`). Keep both in sync when adding nodes. `daily-crt.mermaid` uses the `classDef`s only, with no prefixes.
 - Labels are manually wrapped with `<br>` to keep boxes narrow; follow the same short-line wrapping.
 - Edges point cause → effect (bottom-to-top in `graph BT`). Nodes and edges are grouped by branch with `%%` comments.
 - The CRT and FRT are paired: a branch added or renamed in one usually needs a counterpart in the other.

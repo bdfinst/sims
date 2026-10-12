@@ -49,15 +49,30 @@ describe('the exported features', () => {
     'utf8',
   )
 
-  // Every @wip line inside the plan's ```gherkin blocks tags one scenario.
-  const planWipLines = () =>
-    [...plan.matchAll(/^```gherkin\n([\s\S]*?)^```/gm)]
-      .flatMap(([, block]) => block.split('\n'))
-      .filter((line) => line.trim() === '@wip').length
+  // The plan's scenarios, read straight from its ```gherkin blocks: one per Scenario line, @wip
+  // when the tag line directly above it carries @wip.
+  const planScenarios = () =>
+    [...plan.matchAll(/^```gherkin\n([\s\S]*?)^```/gm)].flatMap(([, block]) => {
+      const lines = block.split('\n').map((line) => line.trim())
+      return lines.flatMap((line, index) => {
+        const [, name] = line.match(/^Scenario(?: Outline)?:\s*(.*)$/) ?? []
+        if (name === undefined) return []
+        return [{ name, wip: (lines[index - 1] ?? '').split(/\s+/).includes('@wip') }]
+      })
+    })
+
+  const wipNames = (scenarios) =>
+    scenarios
+      .filter(({ wip }) => wip)
+      .map(({ name }) => name)
+      .sort()
 
   it('exported features carry exactly the @wip tags the plan has', () => {
-    const exportedWip = loadScenarios(featuresDir).filter(({ wip }) => wip).length
+    const exported = loadScenarios(featuresDir)
+    const planned = planScenarios()
 
-    expect(exportedWip).toBe(planWipLines())
+    expect(planned.length, 'the plan has its scenarios').toBeGreaterThan(50)
+    expect(exported.length, 'one exported scenario per plan Scenario line').toBe(planned.length)
+    expect(wipNames(exported)).toEqual(wipNames(planned))
   })
 })
