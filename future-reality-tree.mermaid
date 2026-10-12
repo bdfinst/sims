@@ -1,0 +1,56 @@
+graph BT
+    %% Styling
+    classDef de fill:#d4edda,stroke:#28a745,stroke-width:2px,color:#155724;
+    classDef effect fill:#e2e3e5,stroke:#383d41,stroke-width:1px,color:#383d41;
+    classDef injection fill:#cce5ff,stroke:#004085,stroke-width:3px,color:#004085;
+
+    %% Nodes
+    DE["[Desired<br>Effect] We are<br>able to deliver<br>changes daily"]:::de
+
+    %% Branch 1: Fast Flow
+    FastFlow["[Effect]<br>Code integrated<br>continuously,<br>reviewed in<br>minutes"]:::effect
+    SafeMerge["[Effect]<br>Developers<br>merge safely<br>regardless of<br>story state"]:::effect
+    HideIncomplete["[Effect]<br>Incomplete work<br>is safely<br>hidden in<br>production"]:::effect
+    Toggles["[Injection]<br>Implement<br>Feature Toggles<br>& Branch by<br>Abstraction"]:::injection
+    TinyPR["[Effect]<br>Pull requests<br>are tiny,<br>focused, and<br>immediately<br>verifiable"]:::effect
+    SmallSlices["[Effect]<br>Stories broken<br>into smallest<br>possible<br>vertical slices"]:::effect
+    Amigos["[Injection] PO,<br>Dev, and QA<br>collaboratively<br>define work &<br>executable AC"]:::injection
+
+    %% Branch 2: Quality
+    InstantConf["[Effect]<br>Build is<br>validated<br>instantly,<br>giving high<br>confidence"]:::effect
+    NoHandoffs["[Effect]<br>Testing no<br>longer requires<br>frozen envs,<br>handoffs, or<br>manual setup"]:::effect
+    ApiVerify["[Effect]<br>Integration<br>points verified<br>without heavy<br>populated<br>environments"]:::effect
+    ContractTest["[Injection]<br>Implement<br>Consumer-Driven<br>Contract<br>Testing"]:::injection
+    CommitVerify["[Effect]<br>Quality is<br>verified<br>immediately on<br>every commit"]:::effect
+    AutoTest["[Injection]<br>Build fast<br>developer-owned<br>unit/component<br>tests"]:::injection
+
+    %% Branch 3: Governance
+    DirectProd["[Effect]<br>Code flows<br>directly to<br>production<br>without waiting"]:::effect
+    NoCAB["[Effect]<br>The 3-day<br>manual CAB<br>delay is<br>eliminated"]:::effect
+    GovContinuous["[Effect]<br>Governance and<br>compliance<br>requirements<br>are met<br>continuously"]:::effect
+    StdChange["[Injection]<br>Classify<br>deployments as<br>automated<br>'Standard<br>Changes'"]:::injection
+    PipeEnforce["[Injection]<br>CI/CD pipeline<br>enforces and<br>tracks CAB<br>gates"]:::injection
+
+    %% Connections - Branch 1
+    FastFlow --> DE
+    SafeMerge --> FastFlow
+    TinyPR --> FastFlow
+    HideIncomplete --> SafeMerge
+    Toggles --> HideIncomplete
+    SmallSlices --> TinyPR
+    Amigos --> SmallSlices
+
+    %% Connections - Branch 2
+    InstantConf --> DE
+    NoHandoffs --> InstantConf
+    ApiVerify --> NoHandoffs
+    ContractTest --> ApiVerify
+    CommitVerify --> NoHandoffs
+    AutoTest --> CommitVerify
+
+    %% Connections - Branch 3
+    DirectProd --> DE
+    NoCAB --> DirectProd
+    GovContinuous --> NoCAB
+    StdChange --> GovContinuous
+    PipeEnforce --> GovContinuous

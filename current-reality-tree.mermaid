@@ -1,0 +1,57 @@
+graph BT
+    %% Styling
+    classDef ude fill:#f8d7da,stroke:#dc3545,stroke-width:2px,color:#721c24;
+    classDef effect fill:#e2e3e5,stroke:#383d41,stroke-width:1px,color:#383d41;
+    classDef root fill:#fcf8e3,stroke:#8a6d3b,stroke-width:2px,color:#8a6d3b;
+
+    %% Nodes
+    UDE["[Undesirable Effect]<br>We can't<br>deliver changes<br>daily"]:::ude
+    
+    %% Branch 1: Validation
+    FlowBlocked["[Effect]<br>Code cannot<br>flow quickly<br>from 'complete'<br>to production"]:::effect
+    Approval["[Root]<br>Change approval<br>requires<br>3 days"]:::root
+    TestStop["[Effect]<br>Testing<br>requires<br>stopping the<br>flow of work"]:::effect
+    Freeze["[Root]<br>Test<br>environments<br>must be frozen"]:::root
+    Outsource["[Root]<br>Testing is<br>outsourced<br>(handoff delay)"]:::root
+    DataSetup["[Root]<br>Integration<br>testing<br>requires hours<br>of manual data<br>setup"]:::root
+
+    %% Branch 2: Integration & Batch Size
+    CodeSits["[Effect]<br>Code sits<br>un-merged for<br>days or weeks"]:::effect
+    SlowReview["[Effect]<br>Code reviews<br>are slow,<br>painful, with<br>heavy wait<br>times"]:::effect
+    MassivePR["[Effect]<br>Changes are<br>massive and<br>overwhelming to<br>review"]:::effect
+    ReviewDelay["[Effect]<br>Reviewers put<br>off reviewing<br>large changes"]:::effect
+    LateMerge["[Effect]<br>Developers only<br>integrate code<br>when a story is<br>done or sprint<br>ends"]:::effect
+    CantHide["[Root]<br>Team does not<br>know how to<br>safely deliver<br>incomplete<br>changes"]:::root
+
+    %% Branch 3: Work Definition
+    LargeBatch["[Effect]<br>Developers are<br>forced to work<br>on large,<br>monolithic<br>batches"]:::effect
+    SprintFit["[Root]<br>Stories are<br>sized to fit an<br>entire sprint"]:::root
+    DeliverComplete["[Effect]<br>Team only<br>delivers<br>complete<br>stories"]:::effect
+    Rework["[Effect]<br>Work is prone<br>to rework and<br>unclear<br>definition of<br>done"]:::effect
+    VagueAC["[Root]<br>Acceptance<br>criteria are<br>open to<br>interpretation"]:::root
+    POHandoff["[Root]<br>Stories written<br>in silo by PO<br>and handed over"]:::root
+
+    %% Connections - Branch 1
+    FlowBlocked --> UDE
+    Approval --> FlowBlocked
+    TestStop --> FlowBlocked
+    Freeze --> TestStop
+    Outsource --> TestStop
+    DataSetup --> TestStop
+
+    %% Connections - Branch 2
+    CodeSits --> FlowBlocked
+    SlowReview --> CodeSits
+    LateMerge --> CodeSits
+    MassivePR --> SlowReview
+    ReviewDelay --> SlowReview
+    CantHide --> LateMerge
+
+    %% Connections - Branch 3
+    LargeBatch --> MassivePR
+    SprintFit --> LargeBatch
+    DeliverComplete --> LargeBatch
+    CantHide --> DeliverComplete
+    Rework --> SlowReview
+    VagueAC --> Rework
+    POHandoff --> Rework

@@ -1,0 +1,26 @@
+graph LR
+    %% Styling
+    classDef ude fill:#f8d7da,stroke:#dc3545,stroke-width:2px,color:#721c24;
+    classDef effect fill:#e2e3e5,stroke:#383d41,stroke-width:1px,color:#383d41;
+    classDef root fill:#fcf8e3,stroke:#8a6d3b,stroke-width:2px,color:#8a6d3b;
+
+    %% Nodes
+    UDE["We cannot deliver<br>today's work today"]:::ude
+    CAB["3-day change<br>approval process"]:::effect
+    Freeze["Code freeze and<br>handoff for testing"]:::effect
+    Integration["Integration testing difficult and rare"]:::effect
+    Reviews["Large, manual<br>code reviews"]:::effect
+    LateMerge["Branches integrated<br>when a feature is done"]:::effect
+    CantHide["'Feature complete'<br>coding practices"]:::root
+    VagueAC["Acceptance criteria<br>open to interpretation"]:::effect
+    SiloPO["Stories are written<br>in a silo by the PO"]:::root
+
+    %% Connections
+    CAB --> UDE
+    Freeze --> CAB
+    Integration --> Freeze
+    Reviews --> Integration
+    LateMerge --> Reviews
+    CantHide --> LateMerge
+    VagueAC --> LateMerge
+    SiloPO --> VagueAC

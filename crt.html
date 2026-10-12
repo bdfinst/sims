@@ -1,0 +1,694 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Value Stream - Before & After</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;700&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+    <style>
+      /* Base Setup */
+      * {
+      box-sizing: border-box;
+      }
+
+      body {
+      background-color: #e2e8f0;
+      display: grid;
+      gap: 20px;
+      grid-template-columns: 1fr;
+      margin: 0;
+      min-height: 100vh;
+      padding: 20px 0;
+      place-items: center;
+      }
+
+      .slide-container {
+      align-items: flex-start;
+      background-color: #121212; /* Dark Theme /
+      border-radius: 8px;
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+      display: flex;
+      flex-direction: column;
+      font-family: 'Urbanist', sans-serif;
+      height: 720px;
+      justify-content: flex-start; / Changed to start to allow natural flow */
+      overflow: hidden;
+      padding: 60px;
+      position: relative;
+      width: 1280px;
+      }
+
+      .slide-container::before {
+      background: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0) 100%);
+      content: '';
+      height: 100%;
+      left: 0;
+      position: absolute;
+      top: 0;
+      width: 100%;
+      z-index: 0;
+      }
+
+      .slide-container > * {
+      position: relative;
+      z-index: 1;
+      }
+
+      /* Typography */
+      h2.slide-title {
+      color: #f5f5f5;
+      font-size: 54px;
+      font-weight: 700;
+      margin: 0 0 10px 0;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      }
+
+      .slide-subtitle {
+      color: #9ca3af;
+      font-size: 22px;
+      font-weight: 400;
+      margin: 0 0 40px 0;
+      }
+
+      .content-area {
+      align-items: center;
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+      justify-content: center;
+      width: 100%;
+      }
+
+      /* Timeline Layout Specifics /
+      .timeline-layout {
+      align-items: stretch;
+      display: flex;
+      height: 350px; / Fixed height for the interaction area */
+      justify-content: space-between;
+      position: relative;
+      width: 100%;
+      margin-top: 20px;
+      }
+
+      .timeline-line {
+      height: 6px;
+      left: 5%;
+      position: absolute;
+      top: 50%;
+      transform: translateY(-3px);
+      width: 90%;
+      z-index: 0;
+      border-radius: 3px;
+      }
+
+      .timeline-item {
+      position: relative;
+      text-align: center;
+      width: 23%;
+      }
+
+      .timeline-item::after {
+      background-color: #121212;
+      border-radius: 50%;
+      content: '';
+      height: 28px;
+      left: 50%;
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 28px;
+      z-index: 1;
+      }
+
+      .content-wrapper {
+      left: 0;
+      position: absolute;
+      width: 100%;
+      padding: 0 15px;
+      }
+
+      .timeline-item:nth-child(odd) .content-wrapper {
+      bottom: 50%;
+      margin-bottom: 40px;
+      }
+
+      .timeline-item:nth-child(even) .content-wrapper {
+      margin-top: 40px;
+      top: 50%;
+      }
+
+      .icon-wrapper {
+      font-size: 48px;
+      margin-bottom: 15px;
+      }
+
+      .timeline-item h3 {
+      color: #f3f4f6;
+      font-size: 24px;
+      font-weight: 700;
+      margin: 0 0 10px 0;
+      }
+
+      .timeline-item p {
+      color: #d1d5db;
+      font-size: 18px;
+      line-height: 1.4;
+      margin: 0;
+      }
+
+      /* Slide 1 - Before (Red/Warning Theme) */
+      #slide1 .slide-title span { color: #ef4444; }
+      #slide1 .timeline-line { background-color: #374151; }
+      #slide1 .timeline-item::after { border: 5px solid #ef4444; }
+      #slide1 .icon-wrapper { color: #ef4444; }
+
+      /* Slide 2 - After (Green/Flow Theme) */
+      #slide2 .slide-title span { color: #22c55e; }
+      #slide2 .timeline-line { background-color: #374151; }
+      #slide2 .timeline-item::after { border: 5px solid #22c55e; }
+      #slide2 .icon-wrapper { color: #22c55e; }
+
+      /* Flow Arrows */
+      .flow-arrow {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #374151;
+      font-size: 24px;
+      z-index: 0;
+      }
+
+      .arrow-1 { left: 23%; }
+      .arrow-2 { left: 48%; }
+      .arrow-3 { left: 73%; }
+
+      #slide1 .flow-arrow { color: #ef4444; opacity: 0.5; }
+      #slide2 .flow-arrow { color: #22c55e; opacity: 0.5; }
+    </style>
+    <style>
+      .lms-source-label {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        background-color: #e0e0e0;
+        color: #333;
+        border-radius: 10px;
+        padding: 4px 4px;
+        font-family: sans-serif;
+        font-size: 10px;
+        pointer-events: none;
+        font-weight: 500;
+        box-shadow:
+          0 4px 8px rgba(0, 0, 0, 0.2),
+          0 1px 3px rgba(0, 0, 0, 0.1);
+      }
+    </style>
+    <style>
+      /* The container that fills available space and centers the slide. */
+      #slideshow-holder {
+        flex-grow: 1;
+        width: 100%;
+        padding: 0.25rem 1rem;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      /* UI controls should not be text-selectable. */
+      #nav-controls.select-none,
+      #theme-toggle.select-none {
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      /* The slide canvas, scaled via CSS zoom to fit available space. */
+      #slideshow-wrapper {
+        width: 1280px;
+        height: 720px;
+        position: relative;
+        flex-shrink: 0;
+        border-radius: 0.5rem;
+        box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+        overflow: hidden;
+      }
+
+      /* Update slide container styles */
+      .slide-container {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        position: absolute;
+        top: 0;
+        left: 0;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.5s ease-in-out;
+      }
+
+      /* Make the active slide visible */
+      .slide-container.active {
+        opacity: 1;
+        pointer-events: auto;
+      }
+    </style>
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        corePlugins: {
+          preflight: false,
+        },
+      }
+    </script>
+  </head>
+  <body
+    class="bg-white dark:bg-[#1f1f1f] flex flex-col h-screen transition-colors duration-300 gap-3"
+  >
+    <!-- Slide 1: Before -->
+
+    <!-- Slide 2: After -->
+
+    <button
+      id="theme-toggle"
+      class="select-none absolute top-4 right-4 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm p-2 rounded-full shadow-md text-gray-700 dark:text-gray-300 hover:text-black dark:hover:text-white transition-all duration-300 z-20 border-none leading-[0] cursor-pointer"
+    >
+      <svg
+        id="theme-toggle-dark-icon"
+        class="w-5 h-5 hidden"
+        fill="currentColor"
+        viewBox="0 0 20 20"
+      >
+        <path
+          d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"
+        ></path>
+      </svg>
+      <svg
+        id="theme-toggle-light-icon"
+        class="w-5 h-5 hidden"
+        fill="currentColor"
+        viewBox="0 -960 960 960"
+      >
+        <path
+          d="M480-280q-83 0-141.5-58.5T280-480q0-83 58.5-141.5T480-680q83 0 141.5 58.5T680-480q0 83-58.5 141.5T480-280ZM200-440H40v-80h160v80Zm720 0H760v-80h160v80ZM440-760v-160h80v160h-80Zm0 720v-160h80v160h-80ZM256-650l-101-97 57-59 96 100-52 56Zm492 496-97-101 53-55 101 97-57 59Zm-98-550 97-101 59 57-100 96-56-52ZM154-212l101-97 55 53-97 101-59-57Z"
+        ></path>
+      </svg>
+    </button>
+
+    <div
+      id="nav-controls"
+      class="select-none relative flex-shrink-0 w-full flex justify-center items-center py-2 px-4"
+    >
+      <span
+        id="slide-counter"
+        class="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-600 dark:text-gray-400 font-sans"
+      ></span>
+      <div class="flex items-center space-x-2">
+        <button
+          id="prev-slide"
+          class="bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 p-2 rounded-md transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-md border-none leading-[0] cursor-pointer"
+        >
+          <svg
+            class="h-6 w-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M15 19l-7-7 7-7"
+            ></path>
+          </svg>
+        </button>
+        <button
+          id="next-slide"
+          class="bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 p-2 rounded-md transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-md border-none leading-[0] cursor-pointer"
+        >
+          <svg
+            class="h-6 w-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M9 5l7 7-7 7"
+            ></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div id="slideshow-holder">
+      <div id="slideshow-wrapper">
+        <div class="slide-container" id="slide1">
+          <h2 class="slide-title">
+            <span>Before:</span> Batching & Rework Loops
+          </h2>
+          <p class="slide-subtitle">
+            The constraints and friction points preventing daily delivery.
+          </p>
+
+          <div class="content-area">
+            <div class="timeline-layout">
+              <div class="timeline-line"></div>
+
+              <i class="fa-solid fa-chevron-right flow-arrow arrow-1"></i>
+              <i class="fa-solid fa-chevron-right flow-arrow arrow-2"></i>
+              <i class="fa-solid fa-chevron-right flow-arrow arrow-3"></i>
+
+              <div class="timeline-item">
+                <div class="content-wrapper">
+                  <div class="icon-wrapper">
+                    <i class="fa-solid fa-file-signature"></i>
+                  </div>
+                  <h3>Vague Handoff</h3>
+                  <p>
+                    Large, unclear stories are thrown over the wall by Product.
+                  </p>
+                </div>
+              </div>
+
+              <div class="timeline-item">
+                <div class="content-wrapper">
+                  <div class="icon-wrapper">
+                    <i class="fa-solid fa-layer-group"></i>
+                  </div>
+                  <h3>Massive Batch WIP</h3>
+                  <p>
+                    Weeks of unintegrated code piles up on isolated branches.
+                  </p>
+                </div>
+              </div>
+
+              <div class="timeline-item">
+                <div class="content-wrapper">
+                  <div class="icon-wrapper">
+                    <i class="fa-solid fa-rotate-left"></i>
+                  </div>
+                  <h3>The Frozen Barrier</h3>
+                  <p>
+                    Outsourced QA and frozen environments trigger rework loops.
+                  </p>
+                </div>
+              </div>
+
+              <div class="timeline-item">
+                <div class="content-wrapper">
+                  <div class="icon-wrapper">
+                    <i class="fa-solid fa-hand-paper"></i>
+                  </div>
+                  <h3>Approval Gate</h3>
+                  <p>
+                    A 3-day manual CAB delay halts the rare, high-risk release.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="slide-container" id="slide2">
+          <h2 class="slide-title"><span>After:</span> Continuous Value Flow</h2>
+          <p class="slide-subtitle">
+            Frictionless, automated delivery scaling down to single batches.
+          </p>
+
+          <div class="content-area">
+            <div class="timeline-layout">
+              <div class="timeline-line"></div>
+
+              <i class="fa-solid fa-chevron-right flow-arrow arrow-1"></i>
+              <i class="fa-solid fa-chevron-right flow-arrow arrow-2"></i>
+              <i class="fa-solid fa-chevron-right flow-arrow arrow-3"></i>
+
+              <div class="timeline-item">
+                <div class="content-wrapper">
+                  <div class="icon-wrapper">
+                    <i class="fa-solid fa-comments"></i>
+                  </div>
+                  <h3>Collaborative Slices</h3>
+                  <p>
+                    Product, Dev & QA jointly define microscopic, testable
+                    slices.
+                  </p>
+                </div>
+              </div>
+
+              <div class="timeline-item">
+                <div class="content-wrapper">
+                  <div class="icon-wrapper">
+                    <i class="fa-solid fa-code-merge"></i>
+                  </div>
+                  <h3>Continuous Integration</h3>
+                  <p>
+                    Toggled code is integrated rapidly via fast, tiny Micro PRs.
+                  </p>
+                </div>
+              </div>
+
+              <div class="timeline-item">
+                <div class="content-wrapper">
+                  <div class="icon-wrapper">
+                    <i class="fa-solid fa-robot"></i>
+                  </div>
+                  <h3>Automated Feedback</h3>
+                  <p>
+                    CI pipeline instantly runs unit and consumer-driven contract
+                    tests.
+                  </p>
+                </div>
+              </div>
+
+              <div class="timeline-item">
+                <div class="content-wrapper">
+                  <div class="icon-wrapper">
+                    <i class="fa-solid fa-rocket"></i>
+                  </div>
+                  <h3>Daily Delivery</h3>
+                  <p>
+                    Automated compliance instantly clears deployments as
+                    standard changes.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      /
+
+      ⚬ Fetches an image blob using a method that attempts to bypass CORS issues
+
+      ⚬ by adding 'alr=yes' to the URL and following redirects.
+
+      ⚬ @param {string} urlString
+
+      ⚬ @return {!Promise<!Blob>}
+      */
+      async function fetchFifeImageBlobUsingAlr(urlString) {
+      if (urlString.startsWith('blob:') || urlString.startsWith('data:')) {
+      throw new Error('Input URL is already a blob or data URL.');
+      }
+      let url = new URL(urlString, window.location.href);
+      url.searchParams.set('alr', 'yes');
+      for (let i = 0; i < 5; i++) {
+      const response = await fetch(url.toString(), {credentials: 'include'});
+      if (!response.ok) {
+      throw new Error(Fetch received not OK response: ${response.status});
+      }
+      if (!response.headers.get('content-type')?.startsWith('text/plain')) {
+      const blob = await response.blob();
+      if (blob.size > 0 && blob.type.startsWith('image/')) {
+      return blob;
+      }
+      throw new Error('Fetched blob is not a valid image.');
+      }
+      url = new URL(await response.text());
+      }
+      throw new Error('Exceeded maximum number of redirects.');
+      }
+
+      /
+
+      ⚬ Updates image sources using ALR.
+
+      ⚬ @return {!Promise<void>}
+      */
+      async function updateImageSourcesUsingAlr() {
+      // Use Promise.all to handle all updates concurrently for better performance.
+      await Promise.all(
+      Array.from(document.querySelectorAll('img'), async (img) => {
+      // Only proceed if the img tag has a valid 'src' attribute with a
+      // googleusercontent URL.
+      if (img.src && img.src.includes('googleusercontent')) {
+      try {
+      const blob = await fetchFifeImageBlobUsingAlr(img.src);
+      // Create a new URL from the Blob and set it as the image's source.
+      img.src = URL.createObjectURL(blob);
+      } catch (error) {
+      // Do nothing.
+      }
+      }
+      }));
+      }
+
+      /
+
+      ⚬ Updates background images using ALR.
+
+      ⚬ @return {!Promise<void>}
+      /
+      async function updateBackgroundImagesUsingAlr() {
+      // Find all elements with a googleusercontent background image.
+      const elementsToProcess =
+      document.querySelectorAll('[style="googleusercontent"]');
+      const urlRegex = /url((['"]?)(https?://.?googleusercontent.?)\1)/;
+
+      await Promise.all(Array.from(elementsToProcess, async (element) => {
+      const backgroundImage = element.style.backgroundImage;
+      const match = backgroundImage.match(urlRegex);
+
+      if (match && match[2]) {
+      const originalUrl = match[2];
+      try {
+      const blob = await fetchFifeImageBlobUsingAlr(originalUrl);
+      const blobUrl = URL.createObjectURL(blob);
+
+      // Directly update the element's style property.
+      element.style.backgroundImage =
+      backgroundImage.replace(originalUrl, blobUrl);
+      } catch (error) {
+      // Do nothing.
+      }
+      }
+      }));
+      }
+
+      // --- SLIDESHOW LOGIC ---
+      /
+
+      ⚬ Initializes the slideshow UI logic.
+      */
+      function initializeSlideshowUi() {
+      const slides = document.querySelectorAll('.slide-container');
+      const prevButton = document.getElementById('prev-slide');
+      const nextButton = document.getElementById('next-slide');
+      const slideCounter = document.getElementById('slide-counter');
+      let currentSlide = 0;
+
+      function updateUi() {
+      slides.forEach((slide, index) => {
+      slide.classList.toggle('active', index === currentSlide);
+      });
+      prevButton.disabled = currentSlide === 0;
+      nextButton.disabled = currentSlide === slides.length - 1;
+      slideCounter.textContent = slideCounter.dataset.format === 'compact'
+      ? ${currentSlide + 1} of ${slides.length}
+      : Slide ${currentSlide + 1} of ${slides.length};
+      }
+
+      function showNextSlide() {
+      if (currentSlide < slides.length - 1) {
+      currentSlide++;
+      updateUi();
+      }
+      }
+
+      function showPrevSlide() {
+      if (currentSlide > 0) {
+      currentSlide--;
+      updateUi();
+      }
+      }
+
+      nextButton.addEventListener('click', showNextSlide);
+      prevButton.addEventListener('click', showPrevSlide);
+      document.addEventListener('keydown', (e) => {
+      // Don't intercept arrow keys when the user is editing text.
+      const el = e.target;
+      if (el.isContentEditable || el.tagName === 'INPUT' ||
+      el.tagName === 'TEXTAREA') {
+      return;
+      }
+      if (e.key === 'ArrowRight') {
+      showNextSlide();
+      } else if (e.key === 'ArrowLeft') {
+      showPrevSlide();
+      }
+      });
+
+      const themeToggleBtn = document.getElementById('theme-toggle');
+      const darkIcon = document.getElementById('theme-toggle-dark-icon');
+      const lightIcon = document.getElementById('theme-toggle-light-icon');
+      const htmlEl = document.documentElement;
+
+      function setTheme(isDark) {
+      htmlEl.classList.toggle('dark', isDark);
+      darkIcon.classList.toggle('hidden', isDark);
+      lightIcon.classList.toggle('hidden', !isDark);
+      localStorage.setItem('color-theme', isDark ? 'dark' : 'light');
+      }
+      const isDarkMode = localStorage.getItem('color-theme') === 'dark' ||
+      (!('color-theme' in localStorage) &&
+      window.matchMedia('(prefers-color-scheme: dark)').matches);
+      setTheme(isDarkMode);
+      themeToggleBtn.addEventListener(
+      'click', () => setTheme(!htmlEl.classList.contains('dark')));
+
+      function updateScale() {
+      const baseWidth = 1280;
+      const baseHeight = 720;
+      const slideshowWrapper = document.getElementById('slideshow-wrapper');
+      const slideshowHolder = document.getElementById('slideshow-holder');
+
+      // Subtract padding to get the actual content area dimensions.
+      const holderStyle = getComputedStyle(slideshowHolder);
+      const paddingX = parseFloat(holderStyle.paddingLeft) +
+      parseFloat(holderStyle.paddingRight);
+      const paddingY = parseFloat(holderStyle.paddingTop) +
+      parseFloat(holderStyle.paddingBottom);
+      const availableWidth = slideshowHolder.clientWidth - paddingX;
+      const availableHeight = slideshowHolder.clientHeight - paddingY;
+
+      // Calculate the scale ratio based on both width and height.
+      const scaleX = availableWidth / baseWidth;
+      const scaleY = availableHeight / baseHeight;
+
+      // Use the smaller of the two ratios to ensure it fits.
+      const finalScale = Math.min(scaleX, scaleY);
+
+      // CSS zoom scales both visual appearance and layout box size,
+      // unlike transform:scale() which only affects visual rendering.
+      slideshowWrapper.style.zoom = finalScale;
+      }
+
+      updateUi();
+      updateScale();
+      window.addEventListener('resize', updateScale);
+      }
+
+      document.addEventListener('DOMContentLoaded', async function() {
+      await Promise.all(
+      [updateImageSourcesUsingAlr(), updateBackgroundImagesUsingAlr()]);
+      initializeSlideshowUi();
+      });
+    </script>
+  </body>
+</html>
