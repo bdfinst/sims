@@ -61,6 +61,13 @@ describe('laneParams after settings change', () => {
   })
 })
 
+describe('LANE_MODELS', () => {
+  it('sizeApplies is true exactly for the lane whose PR size is scaled', () => {
+    expect(LANE_MODELS[LANE_IDS.human]).toMatchObject({ sizeApplies: false, sizeMultiplier: 1 })
+    expect(LANE_MODELS[LANE_IDS.ai]).toMatchObject({ sizeApplies: true, sizeMultiplier: 1.51 })
+  })
+})
+
 describe('slider table', () => {
   it('defaults every setting to the spec State table value', () => {
     expect(DEFAULT_SETTINGS).toEqual({
@@ -354,8 +361,19 @@ describe('speedFactor', () => {
 })
 
 describe('detection', () => {
-  it('is 0.8 x sizeFactor x speedFactor', () => {
-    expect(detection(300, 750)).toBeCloseTo(0.8 * sizeFactor(300) * speedFactor(750), 12)
+  // Literals worked out by hand from the spec's curve, not from the code's helpers:
+  // size 300 -> 1 - 0.95 x (300 - 200) / 200 = 0.525; speed 750 -> 1 - 0.9 x (750 - 500) / 500 = 0.55.
+  it('multiplies the 0.8 base by both factors: PR size 300 at 750 LOC/hr is 0.8 x 0.525 x 0.55 = 0.231', () => {
+    expect(detection(300, 750)).toBeCloseTo(0.231, 12)
+  })
+
+  // Default arithmetic: Human 250 LOC at 300 LOC/hr = 0.8 x 0.7625 x 1; AI 378 LOC at 600 LOC/hr
+  // = 0.8 x 0.1545 x 0.82.
+  it.each([
+    { lane: 'Human', size: 250, speed: 300, expected: 0.61 },
+    { lane: 'AI', size: 378, speed: 600, expected: 0.101352 },
+  ])('is $expected for the $lane lane at the defaults', ({ size, speed, expected }) => {
+    expect(detection(size, speed)).toBeCloseTo(expected, 12)
   })
 })
 

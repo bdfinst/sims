@@ -22,7 +22,7 @@ export function Lane({ laneId, lane, settings, onSettingChange }) {
   const presentation = LANE_PRESENTATION[laneId]
   const model = LANE_MODELS[laneId]
   const params = laneParams(settings, model)
-  const hasDerivedSize = model.sizeMultiplier !== 1
+  const hasDerivedSize = model.sizeApplies
   const hasDerivedSpeed = model.skimApplies
   const renderSlider = (settingKey) => (
     <RateSlider

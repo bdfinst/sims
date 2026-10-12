@@ -194,7 +194,6 @@ describe('changing settings mid-run', () => {
 describe('incidents across a run', () => {
   const runningState = reducer(initialState, { type: ACTION.start })
   const afterTicks = (state, count) => dispatchAll(state, ...repeat(ACTION.tick, count))
-  const afterTenDefaultSeconds = afterTicks(runningState, TEN_SECONDS_IN_TICKS)
 
   it('Larger PRs accrue more incidents: PR size 400 gives Human 2 / 7 / 57 / 7.68', () => {
     const oversized = setSetting(runningState, 'prSize', OVERSIZED_PR)
@@ -263,6 +262,7 @@ describe('incidents across a run', () => {
   })
 
   it('shows the headline ratio 3.48x after 10 default seconds', () => {
+    const afterTenDefaultSeconds = afterTicks(runningState, TEN_SECONDS_IN_TICKS)
     expect(formatHeadlineRatio(afterTenDefaultSeconds.lanes)).toBe('3.48×')
   })
 

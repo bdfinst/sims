@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { TILE_CAPACITY, tileLayout } from './laneConfig.js'
+import { LANE_MODELS } from './engine.js'
+import { LANE_ORDER, LANE_PRESENTATION, TILE_CAPACITY, tileLayout } from './laneConfig.js'
 
 // 22 PRs are queued after 1.2 s (the AI lane) and must each get a tile; 98 is the largest
 // capacity the "exactly at capacity" scenario can reach (n - 1 pending after n ticks, up to tick 99).
@@ -26,6 +27,20 @@ describe('tileLayout', () => {
     'draws $tileCount tiles and $overflowCount more for $displayed pending PRs at capacity 5',
     ({ displayed, tileCount, overflowCount }) => {
       expect(tileLayout(displayed, CAPACITY)).toEqual({ tileCount, overflowCount })
+    },
+  )
+})
+
+// The lane <-> settings link is declared twice (engine LANE_MODELS, laneConfig sliders); they must agree.
+describe('lane presentation agrees with the lane model', () => {
+  it.each(LANE_ORDER)(
+    '%s lane shows its generation slider, and the skim slider only if skim applies',
+    (laneId) => {
+      const { genSetting, skimApplies } = LANE_MODELS[laneId]
+      const { generationSliders, reviewSliders } = LANE_PRESENTATION[laneId]
+
+      expect(generationSliders).toContain(genSetting)
+      expect(reviewSliders.includes('skim')).toBe(skimApplies)
     },
   )
 })

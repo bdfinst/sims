@@ -6,10 +6,16 @@ export const LANE_IDS = Object.freeze({ human: 'human', ai: 'ai' })
 export const LANE_MODELS = Object.freeze({
   [LANE_IDS.human]: Object.freeze({
     genSetting: 'humanGen',
+    sizeApplies: false,
     sizeMultiplier: 1,
     skimApplies: false,
   }),
-  [LANE_IDS.ai]: Object.freeze({ genSetting: 'aiGen', sizeMultiplier: 1.51, skimApplies: true }),
+  [LANE_IDS.ai]: Object.freeze({
+    genSetting: 'aiGen',
+    sizeApplies: true,
+    sizeMultiplier: 1.51,
+    skimApplies: true,
+  }),
 })
 
 // Slider table: the single source of defaults and ranges (spec State table).
