@@ -30,4 +30,17 @@ export const test = base.extend({
   ],
 })
 
+export const SIMULATOR_TITLE = 'AI vs. Human Code Review Simulator'
+
+const FIXED_START_MS = Date.parse('2026-01-05T09:00:00Z')
+const CLOCK_PAUSE_OFFSET_MS = 60_000
+
+// Opens the page under a fake clock that then stops: time only moves through page.clock.runFor.
+export const openSimulator = async (page, url = '/') => {
+  await page.clock.install({ time: FIXED_START_MS })
+  await page.goto(url)
+  await expect(page.getByRole('heading', { name: SIMULATOR_TITLE })).toBeVisible()
+  await page.clock.pauseAt(FIXED_START_MS + CLOCK_PAUSE_OFFSET_MS)
+}
+
 export { expect }

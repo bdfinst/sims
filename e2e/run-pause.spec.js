@@ -1,29 +1,28 @@
 import { readdirSync, readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-import { expect, test } from './fixtures.js'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { SIMULATOR_TITLE as TITLE, expect, openSimulator, test } from './fixtures.js'
 
 const DIST_DIR = fileURLToPath(new URL('../dist/', import.meta.url))
-const FIXED_START_MS = Date.parse('2026-01-05T09:00:00Z')
-const CLOCK_PAUSE_OFFSET_MS = 60_000
 const SECOND_MS = 1000
-const TITLE = 'AI vs. Human Code Review Simulator'
+const TICK_MS = 100
+const TICKS_PER_SECOND = SECOND_MS / TICK_MS
 const DESCRIPTION =
   'Watch AI-speed code generation swamp human reviewers and push more defects into production.'
 const HUMAN_BLUE = 'rgb(59, 130, 246)'
 const AI_PURPLE = 'rgb(168, 85, 247)'
 const LANE_IDS = ['human', 'ai']
 
-const openSimulator = async (page) => {
-  await page.clock.install({ time: FIXED_START_MS })
-  await page.goto('/')
-  await expect(page.getByRole('heading', { name: TITLE })).toBeVisible()
-  await page.clock.pauseAt(FIXED_START_MS + CLOCK_PAUSE_OFFSET_MS)
-}
-
 const lane = (page, id) => page.locator(`[data-lane="${id}"]`)
 const metric = (page, laneId, name) => lane(page, laneId).locator(`[data-metric="${name}"]`)
 const iconNames = (laneLocator) =>
   laneLocator.locator('[data-icon]').evaluateAll((els) => els.map((el) => el.dataset.icon))
+
+const toggleButton = (page, name) => page.getByRole('button', { name, exact: true })
+
+const expectCounts = async (page, laneId, { pending, deployed }) => {
+  await expect(metric(page, laneId, 'pending')).toHaveText(String(pending))
+  await expect(metric(page, laneId, 'deployed')).toHaveText(String(deployed))
+}
 
 const expectEmptyLanes = async (page) => {
   for (const laneId of LANE_IDS) {
@@ -88,6 +87,99 @@ test.describe('Run and pause the simulation', () => {
 
     await expectEmptyLanes(page)
     await expect(page.getByText('0.0 work hours', { exact: true })).toBeVisible()
+  })
+
+  test('Start switches the button to Pause', async ({ page }) => {
+    await openSimulator(page)
+
+    await toggleButton(page, 'Start').click()
+
+    await expect(toggleButton(page, 'Pause')).toBeVisible()
+    await expect(page.getByText('Running', { exact: true })).toBeVisible()
+  })
+
+  test('Default flow after 10 seconds', async ({ page }) => {
+    await openSimulator(page)
+
+    await toggleButton(page, 'Start').click()
+    await page.clock.runFor(10 * SECOND_MS)
+
+    await expectCounts(page, 'human', { pending: 0, deployed: 10 })
+    await expectCounts(page, 'ai', { pending: 184, deployed: 15 })
+    await expect(page.getByText('10.0 work hours', { exact: true })).toBeVisible()
+  })
+
+  test('A PR is not shown as deployed until it is fully reviewed', async ({ page }) => {
+    await openSimulator(page)
+
+    await toggleButton(page, 'Start').click()
+    await page.clock.runFor(0.9 * SECOND_MS)
+    await expect(metric(page, 'human', 'deployed')).toHaveText('0')
+
+    await page.clock.runFor(0.1 * SECOND_MS)
+    await expect(metric(page, 'human', 'deployed')).toHaveText('1')
+  })
+
+  test('Pause freezes the counts', async ({ page }) => {
+    await openSimulator(page)
+    await toggleButton(page, 'Start').click()
+    await page.clock.runFor(3 * SECOND_MS)
+
+    await toggleButton(page, 'Pause').click()
+    await page.clock.runFor(5 * SECOND_MS)
+
+    await expectCounts(page, 'ai', { pending: 55, deployed: 4 })
+    await expect(page.getByText('3.0 work hours', { exact: true })).toBeVisible()
+    await expect(toggleButton(page, 'Start')).toBeVisible()
+  })
+
+  test('Resume continues from the frozen counts', async ({ page }) => {
+    await openSimulator(page)
+    await toggleButton(page, 'Start').click()
+    await page.clock.runFor(3 * SECOND_MS)
+    await toggleButton(page, 'Pause').click()
+
+    await toggleButton(page, 'Start').click()
+    await page.clock.runFor(1 * SECOND_MS)
+
+    await expectCounts(page, 'ai', { pending: 73, deployed: 6 })
+  })
+
+  test('Deployed never decreases while running', async ({ page }) => {
+    await openSimulator(page)
+    await toggleButton(page, 'Start').click()
+    const readDeployed = () =>
+      page.evaluate(() =>
+        [...document.querySelectorAll('[data-metric="deployed"]')].map((el) =>
+          Number(el.textContent),
+        ),
+      )
+
+    const samples = [await readDeployed()]
+    for (let tickIndex = 0; tickIndex < 10 * TICKS_PER_SECOND; tickIndex += 1) {
+      await page.clock.runFor(TICK_MS)
+      samples.push(await readDeployed())
+    }
+
+    const decreases = samples
+      .slice(1)
+      .filter((now, i) => now.some((count, lane) => count < samples[i][lane]))
+    expect(decreases).toEqual([])
+    expect(samples.at(-1)).toEqual([10, 15])
+  })
+
+  test('The built file runs from disk with no other requests', async ({ page }) => {
+    const documentUrl = pathToFileURL(`${DIST_DIR}index.html`).href
+    const requestedUrls = []
+    page.on('request', (request) => requestedUrls.push(request.url()))
+    await openSimulator(page, documentUrl)
+
+    await toggleButton(page, 'Start').click()
+    await page.clock.runFor(1 * SECOND_MS)
+
+    await expect(metric(page, 'ai', 'pending')).toHaveText('18')
+    const nonInlineRequests = requestedUrls.filter((url) => !/^(data|blob):/.test(url))
+    expect(nonInlineRequests).toEqual([documentUrl])
   })
 
   test('The build is one self-contained file', async ({ page }) => {
