@@ -434,7 +434,7 @@ describe('isOverThreshold', () => {
   ])(
     'is $isOver when $displayed PRs are pending against a threshold of $threshold',
     ({ threshold, displayed, isOver }) => {
-      expect(isOverThreshold(laneWithPending(displayed), threshold)).toBe(isOver)
+      expect(isOverThreshold(displayed, threshold)).toBe(isOver)
     },
   )
 
@@ -445,7 +445,7 @@ describe('isOverThreshold', () => {
     'judges the displayed count: $internal PRs (shown as $shown) against $threshold is $isOver',
     ({ threshold, internal, shown, isOver }) => {
       expect(displayedPending(laneWithPending(internal))).toBe(shown)
-      expect(isOverThreshold(laneWithPending(internal), threshold)).toBe(isOver)
+      expect(isOverThreshold(displayedPending(laneWithPending(internal)), threshold)).toBe(isOver)
     },
   )
 })

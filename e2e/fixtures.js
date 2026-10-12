@@ -1,6 +1,5 @@
 import { test as base, expect } from '@playwright/test'
 import { TICK_MS } from '../src/engine.js'
-import { QUEUE_STATE } from '../src/laneConfig.js'
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1'])
 export const INLINE_PROTOCOLS = new Set(['data:', 'blob:'])
@@ -94,7 +93,8 @@ export const expectPending = (page, laneId, count) =>
   expect(metric(page, laneId, 'pending')).toHaveText(String(count))
 
 const QUEUE_LABEL_BY_LANE = { human: 'Human', ai: 'AI' }
-export { QUEUE_STATE }
+// Declared here on purpose: data-state is a fixed hook, so a rename in the app must fail the tests.
+export const QUEUE_STATE = Object.freeze({ warning: 'warning', normal: 'normal' })
 
 export const queueBox = (page, laneId) => laneLocator(page, laneId).locator('[data-state]')
 
