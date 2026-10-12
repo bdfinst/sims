@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_SETTINGS, floorShow } from './engine.js'
+import {
+  DEFAULT_SETTINGS,
+  floorShow,
+  formatHeadlineRatio,
+  formatIncidentsPerPr,
+  formatLoc,
+  formatPickupWait,
+  laneParams,
+  LANE_MODELS,
+} from './engine.js'
 import { ACTION, initialState, reducer } from './reducer.js'
 import { shownCounts } from './testHelpers.js'
 
@@ -162,6 +171,76 @@ describe('changing settings mid-run', () => {
 
     expect(Math.min(...pendingEachTick)).toBeGreaterThanOrEqual(0)
     expect(floorShow(pendingEachTick.at(-1))).toBe(0)
+  })
+})
+
+describe('incidents across a run', () => {
+  const running = (...settings) =>
+    settings.reduce(
+      (state, [key, value]) => setSetting(state, key, value),
+      reducer(initialState, { type: ACTION.start }),
+    )
+  const incidents = (lane) => floorShow(lane.escapedDefects)
+
+  it('Larger PRs accrue more incidents: PR size 400 gives Human 2 / 7 / 57 / 7.68', () => {
+    const human = dispatchAll(running(['prSize', 400]), ...repeat(ACTION.tick, 100)).lanes.human
+    expect(shownCounts(human)).toEqual([2, 7])
+    expect([incidents(human), formatIncidentsPerPr(human)]).toEqual([57, '7.68'])
+  })
+
+  it('a size change while running changes accrual from the next tick: 53 incidents, 6.94 per PR', () => {
+    const atOneSecond = dispatchAll(running(), ...repeat(ACTION.tick, 10))
+    const resized = setSetting(atOneSecond, 'prSize', 400)
+
+    const human = dispatchAll(resized, ...repeat(ACTION.tick, 90)).lanes.human
+
+    expect([incidents(human), formatIncidentsPerPr(human)]).toEqual([53, '6.94'])
+  })
+
+  it('queued PRs keep their size when PR size changes: Pending 17 / 4,400 LOC becomes 26 / 9,100', () => {
+    const queued = dispatchAll(running(['humanGen', 10]), ...repeat(ACTION.tick, 20))
+    expect([
+      floorShow(queued.lanes.human.pendingPrs),
+      formatLoc(queued.lanes.human.pendingLoc),
+    ]).toEqual([17, '4,400'])
+
+    const resized = dispatchAll(setSetting(queued, 'prSize', 500), ...repeat(ACTION.tick, 10))
+
+    expect([
+      floorShow(resized.lanes.human.pendingPrs),
+      formatLoc(resized.lanes.human.pendingLoc),
+    ]).toEqual([26, '9,100'])
+  })
+
+  it('a drained queue shows no wait', () => {
+    const queued = dispatchAll(running(['humanGen', 10]), ...repeat(ACTION.tick, 20))
+    const draining = setSetting(setSetting(queued, 'humanGen', 1), 'reviewerSpeed', 1000)
+
+    const drained = dispatchAll(draining, ...repeat(ACTION.tick, 60))
+
+    const { effSpeed } = laneParams(drained.settings, LANE_MODELS.human)
+    expect([
+      floorShow(drained.lanes.human.pendingPrs),
+      formatPickupWait(drained.lanes.human.pendingLoc, effSpeed),
+    ]).toEqual([0, '0.0 h'])
+  })
+
+  it('never lets an incident count decrease while running', () => {
+    let state = running()
+    let previous = [0, 0]
+    for (let tickIndex = 0; tickIndex < 100; tickIndex += 1) {
+      state = reducer(state, { type: ACTION.tick })
+      const current = [state.lanes.human.escapedDefects, state.lanes.ai.escapedDefects]
+      expect(current[0]).toBeGreaterThanOrEqual(previous[0])
+      expect(current[1]).toBeGreaterThanOrEqual(previous[1])
+      previous = current
+    }
+  })
+
+  it('shows the headline ratio 3.48x after 10 default seconds, and blank at 9 ticks', () => {
+    const at = (ticks) => dispatchAll(running(), ...repeat(ACTION.tick, ticks)).lanes
+    expect(formatHeadlineRatio(at(100).ai, at(100).human)).toBe('3.48×')
+    expect(formatHeadlineRatio(at(9).ai, at(9).human)).toBe('—')
   })
 })
 

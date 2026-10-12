@@ -116,6 +116,32 @@ export const REFERENCE = Object.freeze({
   aiPendingAtTick100: 184,
   aiDeployedAtTick100: 15,
   humanDeployedAtTick100: 10,
+  // Incidents = reviewed LOC x 0.02 x (1 - detection). Human at the defaults: 2500 x 0.02 x 0.39 = 19.5
+  // over 10 deployed PRs. AI: 107.84 over 15.87 internal deployed PRs (not the displayed 15).
+  humanIncidentsAtTick100: 19,
+  humanIncidentsPerPrAtTick100: '1.95',
+  aiIncidentsAtTick100: 107,
+  aiIncidentsPerPrAtTick100: '6.79',
+  aiPendingLocAtTick100: '69,600', // 100 ticks x (756 generated - 60 reviewed) LOC
+  aiPickupWaitAtTick100: '116.0 h', // 69,600 LOC / 600 LOC/hr
+  headlineRatioAtTick100: '3.48×', // 6.79 / 1.95 from the internal values
+  humanDeployedAtTick9: 0,
+  humanIncidentsPerPrAtTick10: '1.95',
+  // PR size 400, 10 s: detection falls to 4%, so each reviewed LOC escapes far more often.
+  humanPendingAtTick100WithPrSize400: 2,
+  humanDeployedAtTick100WithPrSize400: 7,
+  humanIncidentsAtTick100WithPrSize400: 57,
+  humanIncidentsPerPrAtTick100WithPrSize400: '7.68',
+  // Defaults for 1 s, then PR size 400 for the remaining 9 s: only the later reviews escape more.
+  humanIncidentsAtTick100AfterSizeChangeAtTick10: 53,
+  humanIncidentsPerPrAtTick100AfterSizeChangeAtTick10: '6.94',
+  humanDefectsCaughtAtPrSize400: '4%',
+  // humanGen 10 for 2 s gives 17 PRs / 4,400 LOC queued; PR size 500 for 1 more second adds
+  // 10 x 500 LOC and reviews 300 LOC: 26 PRs / 9,100 LOC.
+  humanPendingLocAtTick20WithHumanGen10: '4,400',
+  humanPendingAtTick30AfterSizeChangeToPrSize500: 26,
+  humanPendingLocAtTick30AfterSizeChangeToPrSize500: '9,100',
+  humanDefectsCaughtWhenDrained: '6%', // PR size 250 at 1000 LOC/hr: 0.8 x 0.7625 x 0.1
   humanPendingAtTick20WithHumanGen10: 17,
   humanDeployedAtTick20WithHumanGen10: 2,
   aiDeployedAtTick11WithFasterReview: 2, // reviewer speed 1000, skim 3 -> 3000 LOC/hr
@@ -181,8 +207,9 @@ export const tabTo = async (page, target) => {
   throw new Error('Tab never reached the control')
 }
 
-// Starts the simulation, runs the fake clock, and waits until the elapsed readout shows the run
-// has rendered. The readout shares one React state with the lanes, so the lanes are current too.
+// From a fresh or just-reset page: starts the simulation, runs the fake clock, and waits until the
+// elapsed readout shows the run has rendered. The readout shares one React state with the lanes,
+// so the lanes are current too.
 export const startAndRunFor = async (page, seconds) => {
   await startSimulation(page)
   await page.clock.runFor(seconds * SECOND_MS)

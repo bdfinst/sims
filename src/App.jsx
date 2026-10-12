@@ -33,7 +33,7 @@ function App() {
         onReset={() => dispatch({ type: ACTION.reset })}
       />
       <main className="flex flex-col gap-6">
-        <HeadlineBand />
+        <HeadlineBand lanes={state.lanes} />
         {LANE_ORDER.map((laneId) => (
           <Lane
             key={laneId}

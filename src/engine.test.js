@@ -8,10 +8,14 @@ import {
   TICK_MS,
   detection,
   emptyLane,
+  NO_VALUE,
   floorShow,
   formatElapsedHours,
+  formatHeadlineRatio,
+  formatIncidentsPerPr,
   formatLoc,
   formatPct,
+  formatPickupWait,
   laneParams,
   sizeFactor,
   speedFactor,
@@ -94,18 +98,92 @@ describe('tick at the default settings', () => {
   })
 })
 
-describe('tick accumulation at the default settings (detection still stubbed at 0)', () => {
+describe('tick accumulation at the default settings', () => {
   it.each([
-    { laneId: LANE_IDS.human, reviewedLoc: 2500, escapedDefects: 50 },
-    { laneId: LANE_IDS.ai, reviewedLoc: 6000, escapedDefects: 120 },
-  ])(
-    'the $laneId lane reviews $reviewedLoc LOC and lets $escapedDefects defects escape in 10 seconds',
-    ({ laneId, reviewedLoc, escapedDefects }) => {
-      const lane = runTicks(emptyLane(), defaultParams(laneId), 100)
-      expect(lane.deployedLoc).toBeCloseTo(reviewedLoc, 6)
-      expect(lane.escapedDefects).toBeCloseTo(escapedDefects, 6)
-    },
-  )
+    { laneId: LANE_IDS.human, reviewedLoc: 2500 },
+    { laneId: LANE_IDS.ai, reviewedLoc: 6000 },
+  ])('the $laneId lane reviews $reviewedLoc LOC in 10 seconds', ({ laneId, reviewedLoc }) => {
+    const lane = runTicks(emptyLane(), defaultParams(laneId), 100)
+    expect(lane.deployedLoc).toBeCloseTo(reviewedLoc, 6)
+  })
+})
+
+describe('escape accrual at the default settings (10 seconds)', () => {
+  // escaped = reviewed LOC x 0.02 x (1 - detection); Human detection 0.61, AI about 0.1014.
+  it('lets 19.5 defects escape from the Human lane: 2500 x 0.02 x 0.39', () => {
+    const lane = runTicks(emptyLane(), defaultParams(LANE_IDS.human), 100)
+    expect(lane.escapedDefects).toBeCloseTo(19.5, 6)
+  })
+
+  it('lets 107.84 defects escape from the AI lane, over 15.87 internal deployed PRs', () => {
+    const lane = runTicks(emptyLane(), defaultParams(LANE_IDS.ai), 100)
+    expect(lane.escapedDefects).toBeCloseTo(107.84, 2)
+    expect(lane.deployedPrs).toBeCloseTo(15.87, 2)
+  })
+
+  it('shows Incidents 19 and 107 once floored', () => {
+    const human = runTicks(emptyLane(), defaultParams(LANE_IDS.human), 100)
+    const ai = runTicks(emptyLane(), defaultParams(LANE_IDS.ai), 100)
+    expect([floorShow(human.escapedDefects), floorShow(ai.escapedDefects)]).toEqual([19, 107])
+  })
+})
+
+describe('formatIncidentsPerPr', () => {
+  const lane = (deployedPrs, escapedDefects) => ({ ...emptyLane(), deployedPrs, escapedDefects })
+
+  it('divides by internal Deployed, not the floored count (107.84 / 15.87, not 107 / 15)', () => {
+    const ai = runTicks(emptyLane(), defaultParams(LANE_IDS.ai), 100)
+    expect(formatIncidentsPerPr(ai)).toBe('6.79')
+    expect(formatIncidentsPerPr(lane(15, 107))).toBe('7.13')
+  })
+
+  it('is blank while the displayed Deployed is 0 (0.9999 PRs)', () => {
+    expect(formatIncidentsPerPr(lane(0.9, 1.755))).toBe(NO_VALUE)
+  })
+
+  it('shows a value from exactly 1 deployed PR (displayed Deployed 1)', () => {
+    expect(formatIncidentsPerPr(lane(1, 1.95))).toBe('1.95')
+  })
+
+  it('treats float drift just under 1 as 1 deployed PR', () => {
+    expect(formatIncidentsPerPr(lane(0.9999999999999999, 1.95))).toBe('1.95')
+  })
+
+  it('is blank for an empty lane, never NaN or Infinity', () => {
+    expect(formatIncidentsPerPr(emptyLane())).toBe(NO_VALUE)
+  })
+})
+
+describe('formatHeadlineRatio', () => {
+  const lane = (deployedPrs, escapedDefects) => ({ ...emptyLane(), deployedPrs, escapedDefects })
+
+  it('is the AI over Human incidents per PR: 3.48x at the defaults', () => {
+    const human = runTicks(emptyLane(), defaultParams(LANE_IDS.human), 100)
+    const ai = runTicks(emptyLane(), defaultParams(LANE_IDS.ai), 100)
+    expect(formatHeadlineRatio(ai, human)).toBe('3.48×')
+  })
+
+  it('is blank until the Human lane displays Deployed 1', () => {
+    expect(formatHeadlineRatio(lane(5, 30), lane(0.9, 1.7))).toBe(NO_VALUE)
+  })
+
+  it('is blank until the AI lane displays Deployed 1', () => {
+    expect(formatHeadlineRatio(lane(0.9, 6), lane(5, 10))).toBe(NO_VALUE)
+  })
+
+  it('is blank when the Human lane has no incidents yet (no division by zero)', () => {
+    expect(formatHeadlineRatio(lane(5, 30), lane(5, 0))).toBe(NO_VALUE)
+  })
+})
+
+describe('formatPickupWait', () => {
+  it.each([
+    { pendingLoc: 69600, effSpeed: 600, shown: '116.0 h' },
+    { pendingLoc: 0, effSpeed: 300, shown: '0.0 h' },
+    { pendingLoc: 4400, effSpeed: 300, shown: '14.7 h' },
+  ])('shows $shown for $pendingLoc LOC at $effSpeed LOC/hr', ({ pendingLoc, effSpeed, shown }) => {
+    expect(formatPickupWait(pendingLoc, effSpeed)).toBe(shown)
+  })
 })
 
 describe('a PR counts as deployed only when fully reviewed', () => {

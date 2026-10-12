@@ -50,7 +50,7 @@ test.describe('Run and pause the simulation', () => {
   test('Headline shows no ratio before any PR is deployed', async ({ page }) => {
     await openSimulator(page)
 
-    await expect(page.locator('[data-metric="headline-ratio"]')).toHaveText('—')
+    await expect(page.locator('[data-metric="headlineRatio"]')).toHaveText('—')
   })
 
   test('Header content', async ({ page }) => {

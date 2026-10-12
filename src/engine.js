@@ -87,12 +87,28 @@ export const speedFactor = (locPerHour) =>
 export const detection = (prSizeLoc, locPerHour) =>
   BASE_DETECTION * sizeFactor(prSizeLoc) * speedFactor(locPerHour)
 
-// Escapes do not use detection yet: accrual deliberately assumes reviewers catch nothing.
-const accrualDetection = (_avgSize, _effSpeed) => 0
-
 export const formatPct = (share) => `${Math.round(share * 100)}%`
 
 export const formatLoc = (loc) => floorShow(loc).toLocaleString('en-US')
+
+export const NO_VALUE = '—'
+
+const hasDeployedWholePr = (lane) => floorShow(lane.deployedPrs) >= 1
+
+// Escaped defects per deployed PR, from the internal (unfloored) Deployed count.
+const incidentsPerPr = (lane) => lane.escapedDefects / lane.deployedPrs
+
+export const formatIncidentsPerPr = (lane) =>
+  hasDeployedWholePr(lane) ? incidentsPerPr(lane).toFixed(2) : NO_VALUE
+
+export const formatPickupWait = (pendingLoc, effSpeed) => `${(pendingLoc / effSpeed).toFixed(1)} h`
+
+// How many times more incidents per PR the AI lane has; blank until both lanes have shipped a PR.
+export const formatHeadlineRatio = (aiLane, humanLane) => {
+  if (!hasDeployedWholePr(aiLane) || !hasDeployedWholePr(humanLane)) return NO_VALUE
+  const ratio = incidentsPerPr(aiLane) / incidentsPerPr(humanLane)
+  return Number.isFinite(ratio) ? `${ratio.toFixed(2)}×` : NO_VALUE
+}
 
 export const tick = (lane, { gen, size, effSpeed }) => {
   const generatedPrs = gen * TICK_HOURS
@@ -100,7 +116,7 @@ export const tick = (lane, { gen, size, effSpeed }) => {
   const queuedLoc = lane.pendingLoc + generatedPrs * size
 
   const avgSize = queuedPrs > EMPTY_QUEUE_EPSILON ? queuedLoc / queuedPrs : size
-  const detectionRate = accrualDetection(avgSize, effSpeed)
+  const detectionRate = detection(avgSize, effSpeed)
 
   const reviewedLoc = Math.min(queuedLoc, effSpeed * TICK_HOURS)
   const hasQueuedWork = queuedLoc > EMPTY_QUEUE_EPSILON
