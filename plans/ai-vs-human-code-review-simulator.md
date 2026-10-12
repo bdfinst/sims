@@ -981,7 +981,7 @@ At the build's project-init gate, you chose a build step instead of the single-H
 
 - [ ] Slice 1: Two lanes that run and pause
   - [x] Step 1.1: Replace the Vite demo with the styled static shell and offline single-file build
-  - [ ] Step 1.2: Reducer, LOC-based tick, Start/Pause, and elapsed hours
+  - [x] Step 1.2: Reducer, LOC-based tick, Start/Pause, and elapsed hours
   - [ ] Step 1.3: Auto-pause on hidden tab
 
 #### Wave 2
