@@ -986,8 +986,8 @@ At the build's project-init gate, you chose a build step instead of the single-H
 
 #### Wave 2
 
-- [ ] Slice 2: Live controls
-  - [ ] Step 2.1: Labeled sliders, derived AI values, and live/paused changes
+- [x] Slice 2: Live controls
+  - [x] Step 2.1: Labeled sliders, derived AI values, and live/paused changes
 
 #### Wave 3
 
