@@ -165,6 +165,42 @@ describe('changing settings mid-run', () => {
   })
 })
 
+describe('reset', () => {
+  const runningWithCustomSettings = () =>
+    dispatchAll(setSetting(initialState, 'aiGen', 40), 'start', ...repeat('tick', 30))
+
+  it('empties both lanes, zeroes ticks, and pauses', () => {
+    const reset = dispatchAll(runningWithCustomSettings(), 'reset')
+    expect(reset).toMatchObject({ lanes: initialState.lanes, ticks: 0, isRunning: false })
+  })
+
+  it('keeps every setting as it was', () => {
+    const before = runningWithCustomSettings()
+    expect(dispatchAll(before, 'reset').settings).toEqual(before.settings)
+  })
+
+  it('clears a paused run too', () => {
+    const paused = dispatchAll(runningWithCustomSettings(), 'pause')
+    expect(dispatchAll(paused, 'reset')).toMatchObject({ lanes: initialState.lanes, ticks: 0 })
+  })
+
+  it('is idempotent on the initial state', () => {
+    expect(dispatchAll(initialState, 'reset')).toEqual(initialState)
+  })
+
+  it('does not mutate the state it was given', () => {
+    const before = runningWithCustomSettings()
+    const snapshot = structuredClone(before)
+    reducer(before, { type: 'reset' })
+    expect(before).toEqual(snapshot)
+  })
+
+  it('ignores ticks after a reset until Start is pressed', () => {
+    const reset = dispatchAll(runningWithCustomSettings(), 'reset')
+    expect(dispatchAll(reset, ...repeat('tick', 5))).toBe(reset)
+  })
+})
+
 describe('unknown actions', () => {
   it.each(['nope', 'toString', 'constructor', '__proto__', 'hasOwnProperty'])(
     'leave the state unchanged for type "%s"',

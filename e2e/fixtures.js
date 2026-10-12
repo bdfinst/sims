@@ -95,6 +95,8 @@ export const REFERENCE = Object.freeze({
   aiPrSizeAtPrSize200: 302, // round(200 x 1.51)
   aiPendingAtTick10: 18,
   aiPendingAtTick11WithAiGen50: 23,
+  aiPendingAtTick10WithAiGen40: 38,
+  aiDeployedAtTick10WithAiGen40: 1,
   aiPendingAtTick30: 55,
   aiDeployedAtTick30: 4,
   aiPendingAtTick40: 73,
@@ -142,6 +144,17 @@ export const sampleEachTick = async (page, { startTick, tickCount, read }) => {
     samples.push(await read())
   }
   return samples
+}
+
+const MAX_TABS_TO_REACH_A_CONTROL = 15
+
+// Presses real Tab keys until the target holds focus; proves keyboard reachability.
+export const tabTo = async (page, target) => {
+  for (let presses = 0; presses < MAX_TABS_TO_REACH_A_CONTROL; presses += 1) {
+    await page.keyboard.press('Tab')
+    if (await target.evaluate((element) => element === document.activeElement)) return
+  }
+  throw new Error('Tab never reached the control')
 }
 
 export { expect }

@@ -13,26 +13,17 @@ import {
   setSlider,
   slider,
   startSimulation,
+  tabTo,
   test,
   toggleButton,
   visibleValue,
 } from './fixtures.js'
-
-const MAX_TABS_TO_REACH_A_CONTROL = 15
 
 const HUMAN_GEN = 'Human generation (PRs/hr)'
 const AI_GEN = 'AI generation (PRs/hr)'
 const PR_SIZE = 'PR size (LOC, both lanes)'
 const REVIEWER_SPEED = 'Reviewer speed (LOC/hr, both lanes)'
 const AI_SKIM = 'AI skim multiplier'
-
-const tabTo = async (page, target) => {
-  for (let presses = 0; presses < MAX_TABS_TO_REACH_A_CONTROL; presses += 1) {
-    await page.keyboard.press('Tab')
-    if (await target.evaluate((element) => element === document.activeElement)) return
-  }
-  throw new Error('Tab never reached the control')
-}
 
 const DEFAULT_CONTROLS = [
   {

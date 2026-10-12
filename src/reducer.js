@@ -9,9 +9,12 @@ import {
   tick,
 } from './engine.js'
 
+const emptyLanes = () =>
+  Object.fromEntries(Object.values(LANE_IDS).map((laneId) => [laneId, emptyLane()]))
+
 export const initialState = Object.freeze({
   settings: DEFAULT_SETTINGS,
-  lanes: Object.freeze({ [LANE_IDS.human]: emptyLane(), [LANE_IDS.ai]: emptyLane() }),
+  lanes: Object.freeze(emptyLanes()),
   ticks: 0,
   isRunning: false,
 })
@@ -36,6 +39,7 @@ const setSetting = (state, { settingKey, value }) => {
 const HANDLERS = {
   start: (state) => ({ ...state, isRunning: true }),
   pause: (state) => ({ ...state, isRunning: false }),
+  reset: (state) => ({ ...state, lanes: emptyLanes(), ticks: 0, isRunning: false }),
   setSetting,
   tick: (state) =>
     state.isRunning ? { ...state, lanes: tickLanes(state), ticks: state.ticks + 1 } : state,

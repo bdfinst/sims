@@ -30,6 +30,7 @@ function App() {
         isRunning={isRunning}
         ticks={state.ticks}
         onToggleRunning={() => dispatch({ type: isRunning ? 'pause' : 'start' })}
+        onReset={() => dispatch({ type: 'reset' })}
       />
       <main className="flex flex-col gap-6">
         <HeadlineBand />

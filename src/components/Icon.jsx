@@ -1,4 +1,4 @@
-import { Bot, ChevronDown, Eye, TriangleAlert, User } from 'lucide-react'
+import { Bot, ChevronDown, Eye, RotateCcw, TriangleAlert, User } from 'lucide-react'
 
 const ICON_SIZE_PX = 28
 
@@ -9,9 +9,10 @@ const ICONS = Object.freeze({
   eye: Eye,
   'triangle-alert': TriangleAlert,
   'chevron-down': ChevronDown,
+  'rotate-ccw': RotateCcw,
 })
 
-export function Icon({ name, className }) {
+export function Icon({ name, className, size = ICON_SIZE_PX }) {
   const LucideIcon = ICONS[name]
-  return <LucideIcon data-icon={name} className={className} size={ICON_SIZE_PX} />
+  return <LucideIcon data-icon={name} className={className} size={size} />
 }
