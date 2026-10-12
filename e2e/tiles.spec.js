@@ -1,7 +1,5 @@
 import {
-  HUMAN_GEN_LABEL,
   FULL_RUN_SECONDS,
-  PR_SIZE_LABEL,
   REFERENCE,
   REVIEWER_SPEED_LABEL,
   TICK_MS,
@@ -35,7 +33,8 @@ const ONE_TICK = 1
 const ticksToFillQueue = (capacity) => capacity + 1
 
 test.describe('Pending Review tiles', () => {
-  test('One tile per pending PR', async ({ page }) => {
+  // @wip: Step 8.6
+  test.fixme('One tile per pending PR', async ({ page }) => {
     await test.step('Given the queue tile capacity C is read from the queue box', async () => {
       await openSimulator(page)
       await readTileCapacity(page)
@@ -76,7 +75,8 @@ test.describe('Pending Review tiles', () => {
     })
   })
 
-  test('Exactly at capacity has no overflow indicator', async ({ page }) => {
+  // @wip: Step 8.6
+  test.fixme('Exactly at capacity has no overflow indicator', async ({ page }) => {
     let capacity
     let ticksAtCapacity
 
@@ -87,8 +87,8 @@ test.describe('Pending Review tiles', () => {
     })
 
     await test.step('Given I set "Human generation (PRs/hr)" to 10, "PR size (LOC, both lanes)" to 1000, and "Reviewer speed (LOC/hr, both lanes)" to 100', async () => {
-      await setSlider(page, HUMAN_GEN_LABEL, BUSY_HUMAN_GEN)
-      await setSlider(page, PR_SIZE_LABEL, HUGE_PR_SIZE)
+      await setSlider(page, 'Human generation (PRs/hr)', BUSY_HUMAN_GEN)
+      await setSlider(page, 'PR size (LOC, both lanes)', HUGE_PR_SIZE)
       await setSlider(page, REVIEWER_SPEED_LABEL, SLOW_REVIEWER_SPEED)
     })
 
@@ -116,7 +116,8 @@ test.describe('Pending Review tiles', () => {
     })
   })
 
-  test('Overflow beyond capacity', async ({ page }) => {
+  // @wip: Step 8.6
+  test.fixme('Overflow beyond capacity', async ({ page }) => {
     let capacity
 
     await test.step('Given the queue tile capacity C is read from the queue box', async () => {

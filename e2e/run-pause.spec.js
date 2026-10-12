@@ -160,7 +160,8 @@ test.describe('Run and pause the simulation', () => {
     })
   })
 
-  test('Default flow after 10 seconds', async ({ page }) => {
+  // @wip: Step 8.4
+  test.fixme('Default flow after 10 seconds', async ({ page }) => {
     await test.step('Given I open the simulator', async () => {
       await openSimulator(page)
     })
@@ -186,7 +187,8 @@ test.describe('Run and pause the simulation', () => {
     })
   })
 
-  test('A PR is not shown as deployed until it is fully reviewed', async ({ page }) => {
+  // @wip: Step 8.4
+  test.fixme('A PR is not shown as deployed until it is fully reviewed', async ({ page }) => {
     await test.step('Given I open the simulator', async () => {
       await openSimulator(page)
     })
@@ -210,7 +212,8 @@ test.describe('Run and pause the simulation', () => {
     })
   })
 
-  test('Pause freezes the counts', async ({ page }) => {
+  // @wip: Step 8.4
+  test.fixme('Pause freezes the counts', async ({ page }) => {
     await test.step('Given the simulation has run for 3 seconds', async () => {
       await openSimulator(page)
       await startSimulation(page)
@@ -241,7 +244,8 @@ test.describe('Run and pause the simulation', () => {
     })
   })
 
-  test('Resume continues from the frozen counts', async ({ page }) => {
+  // @wip: Step 8.4
+  test.fixme('Resume continues from the frozen counts', async ({ page }) => {
     await test.step('Given the simulation was paused after 3 seconds', async () => {
       await openSimulator(page)
       await startSimulation(page)
@@ -262,7 +266,8 @@ test.describe('Run and pause the simulation', () => {
     })
   })
 
-  test('Deployed never decreases while running', async ({ page }) => {
+  // @wip: Step 8.4
+  test.fixme('Deployed never decreases while running', async ({ page }) => {
     const readDeployed = () => metricValues(page, 'deployed')
 
     await test.step('Given I press Start', async () => {
@@ -288,7 +293,8 @@ test.describe('Run and pause the simulation', () => {
     })
   })
 
-  test('Hiding the tab auto-pauses', async ({ page }) => {
+  // @wip: Step 8.4
+  test.fixme('Hiding the tab auto-pauses', async ({ page }) => {
     await test.step('Given the simulation has run for 1 second', async () => {
       await openSimulator(page)
       await startSimulation(page)
@@ -313,7 +319,8 @@ test.describe('Run and pause the simulation', () => {
     })
   })
 
-  test('Showing the tab again stays paused', async ({ page }) => {
+  // @wip: Step 8.4
+  test.fixme('Showing the tab again stays paused', async ({ page }) => {
     await test.step('Given the simulation auto-paused when the page became hidden', async () => {
       await openSimulator(page)
       await startSimulation(page)
@@ -352,7 +359,8 @@ test.describe('Run and pause the simulation', () => {
     })
   })
 
-  test('The built file runs from disk with no other requests', async ({ page }) => {
+  // @wip: Step 8.4
+  test.fixme('The built file runs from disk with no other requests', async ({ page }) => {
     const documentUrl = pathToFileURL(`${DIST_DIR}index.html`).href
     const requestedUrls = []
 

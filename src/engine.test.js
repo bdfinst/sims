@@ -36,65 +36,97 @@ import {
 } from './engine.js'
 import { shownCounts } from './testHelpers.js'
 
+// Oracles in this file are literals taken from the plan's "Default arithmetic" (generation
+// amendment), never computed from src: they must not move if a src constant is edited by mistake.
+
+const HUMAN = LANE_IDS.human
+const AI = LANE_IDS.ai
+
 describe('laneParams at the default settings', () => {
-  it('gives the Human lane its own generation rate, the base PR size, and the base reviewer speed', () => {
-    expect(laneParams(DEFAULT_SETTINGS, LANE_MODELS[LANE_IDS.human])).toEqual({
-      gen: 1,
-      size: 250,
+  it('gives the Human lane 240 LOC PRs at 1 PR per day, 0.125 PR/hr, and the reviewer speed', () => {
+    expect(laneParams(DEFAULT_SETTINGS, LANE_MODELS[HUMAN])).toEqual({
+      gen: 0.125,
+      size: 240,
       effSpeed: 300,
+      prsPerDay: 1,
     })
   })
 
-  it('gives the AI lane its own generation rate, a 1.51x PR size, and a skim-multiplied speed', () => {
-    expect(laneParams(DEFAULT_SETTINGS, LANE_MODELS[LANE_IDS.ai])).toEqual({
-      gen: 20,
-      size: 378,
-      effSpeed: 600,
-    })
+  it('gives the AI lane 362.4 LOC PRs, 1.17 PRs per day, and a skim-multiplied speed of 600', () => {
+    const params = laneParams(DEFAULT_SETTINGS, LANE_MODELS[AI])
+    expect(params.size).toBeCloseTo(362.4, 10)
+    expect(params.gen).toBeCloseTo(0.14625, 5)
+    expect(params.prsPerDay).toBeCloseTo(1.17, 2)
+    expect(params.effSpeed).toBe(600)
   })
-})
-
-describe('laneParams before the cutover', () => {
-  it.each(Object.values(LANE_IDS))(
-    'ignores the code-written and PRs-per-day settings for the %s lane',
-    (laneId) => {
-      const settings = {
-        ...DEFAULT_SETTINGS,
-        humanLocPerHour: 200,
-        humanPrsPerDay: 4,
-        aiLocPerHour: 2000,
-      }
-      expect(laneParams(settings, LANE_MODELS[laneId])).toEqual(
-        laneParams(DEFAULT_SETTINGS, LANE_MODELS[laneId]),
-      )
-    },
-  )
 })
 
 describe('laneParams after settings change', () => {
-  it('derives AI size and speed from the new PR size and skim (302 LOC, 900 LOC/hr)', () => {
-    const settings = { ...DEFAULT_SETTINGS, prSize: 200, skim: 3 }
-    expect(laneParams(settings, LANE_MODELS[LANE_IDS.ai])).toMatchObject({
-      size: 302,
-      effSpeed: 900,
-    })
+  it('halves both PR sizes and doubles the PRs per day when Human PRs per day goes to 2, and skim 3 gives 900 LOC/hr', () => {
+    const settings = { ...DEFAULT_SETTINGS, humanPrsPerDay: 2, skim: 3 }
+    expect(laneParams(settings, LANE_MODELS[HUMAN])).toMatchObject({ size: 120, prsPerDay: 2 })
+    const ai = laneParams(settings, LANE_MODELS[AI])
+    expect(ai.size).toBeCloseTo(181.2, 10)
+    expect(ai.prsPerDay).toBeCloseTo(2.34, 2)
+    expect(ai.effSpeed).toBe(900)
+  })
+
+  it('moves both PR sizes with Human code written: 50 LOC/hr gives 400 and 604', () => {
+    const settings = { ...DEFAULT_SETTINGS, humanLocPerHour: 50 }
+    expect(laneParams(settings, LANE_MODELS[HUMAN]).size).toBe(400)
+    expect(laneParams(settings, LANE_MODELS[AI]).size).toBeCloseTo(604, 10)
+  })
+
+  it('changes only the AI PRs per day when AI code written goes to 2000: 44.15, sizes unchanged', () => {
+    const settings = { ...DEFAULT_SETTINGS, aiLocPerHour: 2000 }
+    const ai = laneParams(settings, LANE_MODELS[AI])
+    expect(ai.prsPerDay).toBeCloseTo(44.15, 2)
+    expect(ai.size).toBeCloseTo(362.4, 10)
+    expect(laneParams(settings, LANE_MODELS[HUMAN])).toEqual(
+      laneParams(DEFAULT_SETTINGS, LANE_MODELS[HUMAN]),
+    )
   })
 
   it('ignores skim for the Human lane', () => {
     const settings = { ...DEFAULT_SETTINGS, skim: 3 }
-    expect(laneParams(settings, LANE_MODELS[LANE_IDS.human]).effSpeed).toBe(300)
+    expect(laneParams(settings, LANE_MODELS[HUMAN]).effSpeed).toBe(300)
+  })
+
+  it.each([
+    { humanPrsPerDay: 0.5, humanSize: 480, aiSize: 724.8, aiPrsPerDay: 0.585 },
+    { humanPrsPerDay: 0.25, humanSize: 960, aiSize: 1449.6, aiPrsPerDay: 0.2925 },
+  ])(
+    'derives $humanSize and $aiSize LOC PRs at $humanPrsPerDay Human PRs per day',
+    ({ humanPrsPerDay, humanSize, aiSize, aiPrsPerDay }) => {
+      const settings = { ...DEFAULT_SETTINGS, humanPrsPerDay }
+      expect(laneParams(settings, LANE_MODELS[HUMAN]).size).toBeCloseTo(humanSize, 10)
+      const ai = laneParams(settings, LANE_MODELS[AI])
+      expect(ai.size).toBeCloseTo(aiSize, 10)
+      expect(ai.prsPerDay).toBeCloseTo(aiPrsPerDay, 3)
+    },
+  )
+
+  it('derives 373.3 and 563.7 LOC PRs at 35 LOC/hr and 0.75 PRs per day, AI at 0.75 PRs per day', () => {
+    const settings = { ...DEFAULT_SETTINGS, humanLocPerHour: 35, humanPrsPerDay: 0.75 }
+    expect(laneParams(settings, LANE_MODELS[HUMAN]).size).toBeCloseTo(373.33, 2)
+    const ai = laneParams(settings, LANE_MODELS[AI])
+    expect(ai.size).toBeCloseTo(563.73, 2)
+    expect(ai.prsPerDay).toBeCloseTo(0.75, 2)
   })
 })
 
 describe('LANE_MODELS', () => {
-  it('sizeApplies is true exactly for the lane whose PR size is scaled', () => {
-    expect(LANE_MODELS[LANE_IDS.human]).toMatchObject({ sizeApplies: false, sizeMultiplier: 1 })
-    expect(LANE_MODELS[LANE_IDS.ai]).toMatchObject({ sizeApplies: true, sizeMultiplier: 1.51 })
-  })
-
-  it('names the code-written setting each lane generates from', () => {
-    expect(LANE_MODELS[LANE_IDS.human].locSetting).toBe('humanLocPerHour')
-    expect(LANE_MODELS[LANE_IDS.ai].locSetting).toBe('aiLocPerHour')
+  it('describes each lane by its code-written setting, size multiplier, and whether skim applies', () => {
+    expect(LANE_MODELS[HUMAN]).toEqual({
+      locSetting: 'humanLocPerHour',
+      sizeMultiplier: 1,
+      skimApplies: false,
+    })
+    expect(LANE_MODELS[AI]).toEqual({
+      locSetting: 'aiLocPerHour',
+      sizeMultiplier: 1.51,
+      skimApplies: true,
+    })
   })
 
   it.each(Object.values(LANE_IDS))('points the %s lane at a setting that exists', (laneId) => {
@@ -105,9 +137,6 @@ describe('LANE_MODELS', () => {
 describe('slider table', () => {
   it('defaults every setting to the spec State table value', () => {
     expect(DEFAULT_SETTINGS).toEqual({
-      humanGen: 1,
-      aiGen: 20,
-      prSize: 250,
       humanLocPerHour: 30,
       humanPrsPerDay: 1,
       aiLocPerHour: 53,
@@ -121,14 +150,11 @@ describe('slider table', () => {
     { key: 'humanLocPerHour', min: 5, max: 200, step: 5, defaultValue: 30 },
     { key: 'humanPrsPerDay', min: 0.25, max: 4, step: 0.25, defaultValue: 1 },
     { key: 'aiLocPerHour', min: 5, max: 2000, step: 1, defaultValue: 53 },
+    { key: 'reviewerSpeed', min: 100, max: 1000, step: 50, defaultValue: 300 },
+    { key: 'skim', min: 1, max: 3, step: 0.5, defaultValue: 2 },
+    { key: 'threshold', min: 5, max: 50, step: 1, defaultValue: 15 },
   ])('gives $key the range $min to $max in steps of $step', ({ key, ...slider }) => {
     expect(SLIDERS[key]).toEqual(slider)
-  })
-
-  it('leaves the old generation sliders as they were until the cutover', () => {
-    expect(SLIDERS.humanGen).toEqual({ min: 1, max: 10, step: 1, defaultValue: 1 })
-    expect(SLIDERS.aiGen).toEqual({ min: 5, max: 50, step: 1, defaultValue: 20 })
-    expect(SLIDERS.prSize).toEqual({ min: 50, max: 1000, step: 10, defaultValue: 250 })
   })
 
   it('keeps every default inside its own range', () => {
@@ -139,12 +165,17 @@ describe('slider table', () => {
   })
 })
 
-const TEN_SECONDS_IN_TICKS = 100
 const ONE_SECOND_IN_TICKS = 10
-const OVERSIZED_PR = 400
+const TEN_SECONDS_IN_TICKS = 100
 
 const runTicks = (lane, params, count) =>
   Array.from({ length: count }).reduce((current) => tick(current, params), lane)
+
+// The lane after each of `count` ticks (the starting lane is not included).
+const traceTicks = (lane, params, count) =>
+  Array.from({ length: count })
+    .reduce((lanes) => [...lanes, tick(lanes.at(-1), params)], [lane])
+    .slice(1)
 
 const paramsFor = (laneId, overrides = {}) =>
   laneParams({ ...DEFAULT_SETTINGS, ...overrides }, LANE_MODELS[laneId])
@@ -154,7 +185,15 @@ const defaultParams = (laneId) => paramsFor(laneId)
 const afterDefaultRun = (laneId) =>
   runTicks(emptyLane(), defaultParams(laneId), TEN_SECONDS_IN_TICKS)
 
-const lanesOf = ({ ai, human }) => ({ [LANE_IDS.ai]: ai, [LANE_IDS.human]: human })
+// Runs `laneId` at the defaults for `ticksBefore`, then under `overrides` for `ticksAfter` more.
+const afterSettingChange = (laneId, { ticksBefore, overrides, ticksAfter }) =>
+  runTicks(
+    runTicks(emptyLane(), defaultParams(laneId), ticksBefore),
+    paramsFor(laneId, overrides),
+    ticksAfter,
+  )
+
+const lanesOf = ({ ai, human }) => ({ [AI]: ai, [HUMAN]: human })
 
 const laneWithTotals = (deployedPrs, escapedDefects) => ({
   ...emptyLane(),
@@ -162,24 +201,36 @@ const laneWithTotals = (deployedPrs, escapedDefects) => ({
   escapedDefects,
 })
 
-describe('tick at the default settings', () => {
-  it('leaves the Human queue empty and deploys 10 PRs after 10 seconds', () => {
-    expect(shownCounts(afterDefaultRun(LANE_IDS.human))).toEqual([0, 10])
+// AI code written 2000 with everything else at the defaults.
+const BUSY_AI = { aiLocPerHour: 2000 }
+// Human 5 LOC/hr, reviewers at 100 LOC/hr and no skim, AI 704 LOC/hr: a net +1 AI PR per tick.
+const EXACT_AI = { humanLocPerHour: 5, reviewerSpeed: 100, skim: 1, aiLocPerHour: 704 }
+// Human 200 LOC/hr at 4 PRs per day with reviewers at 100 LOC/hr.
+const HUMAN_BACKLOG = { humanLocPerHour: 200, humanPrsPerDay: 4, reviewerSpeed: 100 }
+// Cut AI generation to the minimum and review fast (effective speed 2000 LOC/hr).
+const DRAINING = { aiLocPerHour: 5, reviewerSpeed: 1000 }
+
+describe('tick at the default settings (AC7, 10 seconds)', () => {
+  it('leaves both queues empty and deploys 1 PR each', () => {
+    expect(shownCounts(afterDefaultRun(HUMAN))).toEqual([0, 1])
+    expect(shownCounts(afterDefaultRun(AI))).toEqual([0, 1])
   })
 
-  it('backs up 184 PRs in the AI queue and deploys 15 after 10 seconds', () => {
-    expect(shownCounts(afterDefaultRun(LANE_IDS.ai))).toEqual([184, 15])
+  it('keeps 1.25 PRs deployed in the Human lane and 1.4625 in the AI lane', () => {
+    expect(afterDefaultRun(HUMAN).deployedPrs).toBeCloseTo(1.25, 9)
+    expect(afterDefaultRun(AI).deployedPrs).toBeCloseTo(1.4625, 4)
   })
 
-  it('holds 69,600 pending LOC in the AI queue after 10 seconds', () => {
-    expect(formatLoc(afterDefaultRun(LANE_IDS.ai).pendingLoc)).toBe('69,600')
+  it('holds 0 pending LOC in both lanes', () => {
+    expect(formatLoc(afterDefaultRun(HUMAN).pendingLoc)).toBe('0')
+    expect(formatLoc(afterDefaultRun(AI).pendingLoc)).toBe('0')
   })
 })
 
 describe('deployed LOC', () => {
   it.each([
-    { laneId: LANE_IDS.human, reviewedLoc: 2500 },
-    { laneId: LANE_IDS.ai, reviewedLoc: 6000 },
+    { laneId: HUMAN, reviewedLoc: 300 },
+    { laneId: AI, reviewedLoc: 530 },
   ])(
     'the $laneId lane has reviewed $reviewedLoc LOC after 10 seconds',
     ({ laneId, reviewedLoc }) => {
@@ -203,50 +254,58 @@ describe('displayed counts', () => {
 })
 
 describe('escape accrual at the default settings (10 seconds)', () => {
-  // escaped = reviewed LOC x 0.02 x (1 - detection); Human detection 0.61, AI about 0.1014.
-  it('lets 19.5 defects escape from the Human lane: 2500 x 0.02 x 0.39', () => {
-    expect(afterDefaultRun(LANE_IDS.human).escapedDefects).toBeCloseTo(19.5, 6)
+  // escaped = reviewed LOC x 0.02 x (1 - detection); Human detection 0.648, AI about 0.14996.
+  it('lets 2.112 defects escape from the Human lane: 300 x 0.02 x 0.352', () => {
+    expect(afterDefaultRun(HUMAN).escapedDefects).toBeCloseTo(2.112, 6)
   })
 
-  it('lets 107.84 defects escape from the AI lane, over 15.87 internal deployed PRs', () => {
-    const ai = afterDefaultRun(LANE_IDS.ai)
-    expect(ai.escapedDefects).toBeCloseTo(107.84, 2)
-    expect(ai.deployedPrs).toBeCloseTo(15.87, 2)
+  it('lets 9.010 defects escape from the AI lane: 530 x 0.02 x 0.85004', () => {
+    expect(afterDefaultRun(AI).escapedDefects).toBeCloseTo(9.0104, 3)
   })
 
-  it('shows Incidents 19 and 107 once floored', () => {
-    const human = afterDefaultRun(LANE_IDS.human)
-    const ai = afterDefaultRun(LANE_IDS.ai)
-    expect([displayedIncidents(human), displayedIncidents(ai)]).toEqual([19, 107])
+  it('shows Incidents 2 and 9 once floored', () => {
+    expect([
+      displayedIncidents(afterDefaultRun(HUMAN)),
+      displayedIncidents(afterDefaultRun(AI)),
+    ]).toEqual([2, 9])
   })
 
-  it('shows Human Incidents per PR 1.95', () => {
-    expect(formatIncidentsPerPr(afterDefaultRun(LANE_IDS.human))).toBe('1.95')
+  it('shows Incidents per PR 1.69 for the Human lane and 6.16 for the AI lane', () => {
+    expect(formatIncidentsPerPr(afterDefaultRun(HUMAN))).toBe('1.69')
+    expect(formatIncidentsPerPr(afterDefaultRun(AI))).toBe('6.16')
   })
 
-  it('shows Human Incidents 57 and 7.68 per PR when PR size is 400', () => {
-    const human = runTicks(
-      emptyLane(),
-      paramsFor(LANE_IDS.human, { prSize: OVERSIZED_PR }),
-      TEN_SECONDS_IN_TICKS,
-    )
-    expect([displayedIncidents(human), formatIncidentsPerPr(human)]).toEqual([57, '7.68'])
+  it('shows Defects caught 65% and 15% with a 0.0 h pickup wait in both lanes', () => {
+    expect(formatDefectsCaught(defaultParams(HUMAN))).toBe('65%')
+    expect(formatDefectsCaught(defaultParams(AI))).toBe('15%')
+    expect(formatPickupWaitHours(afterDefaultRun(HUMAN), defaultParams(HUMAN))).toBe('0.0')
+    expect(formatPickupWaitHours(afterDefaultRun(AI), defaultParams(AI))).toBe('0.0')
   })
+})
 
-  it('shows Human Incidents 53 and 6.94 per PR when PR size becomes 400 after 1 second', () => {
-    const afterOneSecond = runTicks(emptyLane(), defaultParams(LANE_IDS.human), ONE_SECOND_IN_TICKS)
-    const human = runTicks(
-      afterOneSecond,
-      paramsFor(LANE_IDS.human, { prSize: OVERSIZED_PR }),
-      TEN_SECONDS_IN_TICKS - ONE_SECOND_IN_TICKS,
-    )
-    expect([displayedIncidents(human), formatIncidentsPerPr(human)]).toEqual([53, '6.94'])
+describe('a PR counts as deployed only when fully reviewed', () => {
+  it.each([
+    { ticks: 79, deployed: 0, internal: 0.9875 },
+    { ticks: 80, deployed: 1, internal: 1 },
+  ])(
+    'shows Human Deployed $deployed after $ticks ticks (internal $internal)',
+    ({ ticks, deployed, internal }) => {
+      const lane = runTicks(emptyLane(), defaultParams(HUMAN), ticks)
+      expect(displayedDeployed(lane)).toBe(deployed)
+      expect(lane.deployedPrs).toBeCloseTo(internal, 9)
+    },
+  )
+
+  it('shows Incidents per PR only once the first whole PR is deployed (tick 80: 1.69)', () => {
+    const at79 = runTicks(emptyLane(), defaultParams(HUMAN), 79)
+    const at80 = runTicks(emptyLane(), defaultParams(HUMAN), 80)
+    expect([formatIncidentsPerPr(at79), formatIncidentsPerPr(at80)]).toEqual([NO_VALUE, '1.69'])
   })
 })
 
 describe('formatIncidentsPerPr', () => {
-  it('divides AI incidents by internal Deployed (unrounded 107.8378 / 15.8730): 6.79', () => {
-    expect(formatIncidentsPerPr(afterDefaultRun(LANE_IDS.ai))).toBe('6.79')
+  it('divides AI incidents by internal Deployed (9.0104 / 1.4625 = 6.16, not 9 / 1 = 9.00)', () => {
+    expect(formatIncidentsPerPr(afterDefaultRun(AI))).toBe('6.16')
   })
 
   it('divides escaped defects by deployed PRs: 107 over 15 gives 7.13', () => {
@@ -271,15 +330,26 @@ describe('formatIncidentsPerPr', () => {
 })
 
 describe('formatHeadlineRatio', () => {
-  it('is the AI over Human incidents per PR: 3.48x at the defaults', () => {
+  it('is the AI over Human incidents per PR: 3.65x at the defaults', () => {
     expect(
       formatHeadlineRatio(
         lanesOf({
-          ai: afterDefaultRun(LANE_IDS.ai),
-          human: afterDefaultRun(LANE_IDS.human),
+          ai: afterDefaultRun(AI),
+          human: afterDefaultRun(HUMAN),
         }),
       ),
-    ).toBe('3.48×')
+    ).toBe('3.65×')
+  })
+
+  it('is blank until the Human lane displays Deployed 1 (tick 79)', () => {
+    expect(
+      formatHeadlineRatio(
+        lanesOf({
+          ai: afterDefaultRun(AI),
+          human: runTicks(emptyLane(), defaultParams(HUMAN), 79),
+        }),
+      ),
+    ).toBe(NO_VALUE)
   })
 
   it('is blank until the Human lane displays Deployed 1', () => {
@@ -320,13 +390,250 @@ describe('formatPickupWaitHours', () => {
   )
 })
 
-describe('a PR counts as deployed only when fully reviewed', () => {
+describe('mid-run changes from the defaults at 1 second (AC7c)', () => {
+  // Hand-derived from the spec's curves: escape per tick = reviewed LOC x 0.02 x (1 - detection).
   it.each([
-    { ticks: 9, deployed: 0 },
-    { ticks: 10, deployed: 1 },
-  ])('shows Human Deployed $deployed after $ticks ticks', ({ ticks, deployed }) => {
-    const lane = runTicks(emptyLane(), defaultParams(LANE_IDS.human), ticks)
-    expect(displayedDeployed(lane)).toBe(deployed)
+    {
+      change: 'Human PRs per day 0.25 (PR size 960)',
+      overrides: { humanPrsPerDay: 0.25 },
+      caught: '4%',
+      escapedOnNextTick: 0.0576, // 3 LOC x 0.02 x 0.96
+      incidents: 5, // 5.395
+      deployed: 0, // 0.406
+      incidentsPerPr: NO_VALUE,
+    },
+    {
+      change: 'Reviewer speed 900',
+      overrides: { reviewerSpeed: 900 },
+      caught: '18%',
+      escapedOnNextTick: 0.0491136, // 3 LOC x 0.02 x (1 - 0.18144)
+      incidents: 4, // 4.631
+      deployed: 1,
+      incidentsPerPr: '3.71',
+    },
+    {
+      change: 'Human code written 50 (PR size 400)',
+      overrides: { humanLocPerHour: 50 },
+      caught: '4%',
+      escapedOnNextTick: 0.096, // 5 LOC x 0.02 x 0.96
+      incidents: 8, // 8.851
+      deployed: 1,
+      incidentsPerPr: '7.08',
+    },
+  ])(
+    '$change: next tick catches $caught, and 10 seconds show Incidents $incidents',
+    ({ overrides, caught, escapedOnNextTick, incidents, deployed, incidentsPerPr }) => {
+      const afterOneSecond = runTicks(emptyLane(), defaultParams(HUMAN), ONE_SECOND_IN_TICKS)
+      const params = paramsFor(HUMAN, overrides)
+      const nextTick = tick(afterOneSecond, params)
+
+      expect(formatDefectsCaught(params)).toBe(caught)
+      expect(nextTick.escapedDefects - afterOneSecond.escapedDefects).toBeCloseTo(
+        escapedOnNextTick,
+        9,
+      )
+
+      const human = afterSettingChange(HUMAN, {
+        ticksBefore: ONE_SECOND_IN_TICKS,
+        overrides,
+        ticksAfter: TEN_SECONDS_IN_TICKS - ONE_SECOND_IN_TICKS,
+      })
+      expect([displayedIncidents(human), displayedDeployed(human)]).toEqual([incidents, deployed])
+      expect(formatIncidentsPerPr(human)).toBe(incidentsPerPr)
+    },
+  )
+
+  it('keeps 0.406 PRs deployed and 5.395 defects escaped after the 0.25 PRs per day change', () => {
+    const human = afterSettingChange(HUMAN, {
+      ticksBefore: ONE_SECOND_IN_TICKS,
+      overrides: { humanPrsPerDay: 0.25 },
+      ticksAfter: TEN_SECONDS_IN_TICKS - ONE_SECOND_IN_TICKS,
+    })
+    expect(human.deployedPrs).toBeCloseTo(0.40625, 5)
+    expect(human.escapedDefects).toBeCloseTo(5.3952, 3)
+  })
+
+  it('shows Human Incidents 9 and 7.68 per PR when Human code written is 50 from the start', () => {
+    const human = runTicks(
+      emptyLane(),
+      paramsFor(HUMAN, { humanLocPerHour: 50 }),
+      TEN_SECONDS_IN_TICKS,
+    )
+    expect([shownCounts(human), displayedIncidents(human), formatIncidentsPerPr(human)]).toEqual([
+      [0, 1],
+      9,
+      '7.68',
+    ])
+  })
+})
+
+describe('the busy AI lane (AI code written 2000)', () => {
+  const busyTrace = traceTicks(emptyLane(), paramsFor(AI, BUSY_AI), 300)
+  const at = (seconds) => busyTrace[seconds * ONE_SECOND_IN_TICKS - 1]
+
+  it('gains 0.38631 pending PR per tick: 3.863, 7.726, and 11.589 after 1, 2, and 3 seconds', () => {
+    expect(at(1).pendingPrs).toBeCloseTo(3.863, 3)
+    expect(at(2).pendingPrs).toBeCloseTo(7.726, 3)
+    expect(at(3).pendingPrs).toBeCloseTo(11.589, 3)
+  })
+
+  it.each([
+    { ticks: 10, shown: 3 },
+    { ticks: 20, shown: 7 },
+    { ticks: 30, shown: 11 },
+    { ticks: 38, shown: 14, internal: 14.68 },
+    { ticks: 39, shown: 15, internal: 15.066 },
+    { ticks: 42, shown: 16, internal: 16.225 },
+    { ticks: 50, shown: 19, internal: 19.316 },
+    { ticks: 57, shown: 22, internal: 22.02 },
+    { ticks: 60, shown: 23, internal: 23.179 },
+    { ticks: 100, shown: 38, internal: 38.631 },
+    { ticks: 300, shown: 115, internal: 115.894 },
+  ])('shows Pending Review $shown after $ticks ticks', ({ ticks, shown, internal }) => {
+    const lane = busyTrace[ticks - 1]
+    expect(displayedPending(lane)).toBe(shown)
+    if (internal !== undefined) expect(lane.pendingPrs).toBeCloseTo(internal, 2)
+  })
+
+  it.each([
+    { ticks: 10, shown: 1, internal: 1.656 },
+    { ticks: 30, shown: 4, internal: 4.967 },
+  ])('shows Deployed $shown after $ticks ticks', ({ ticks, shown, internal }) => {
+    const lane = busyTrace[ticks - 1]
+    expect(displayedDeployed(lane)).toBe(shown)
+    expect(lane.deployedPrs).toBeCloseTo(internal, 3)
+  })
+
+  it('holds 2,800 pending LOC (200 generated minus 60 reviewed per tick) after 2 seconds', () => {
+    expect(formatLoc(at(2).pendingLoc)).toBe('2,800')
+  })
+
+  it('leaves Defects caught at 15% (AI) and 65% (Human) however much code the AI writes', () => {
+    expect(formatDefectsCaught(paramsFor(AI, BUSY_AI))).toBe('15%')
+    expect(formatDefectsCaught(paramsFor(HUMAN, BUSY_AI))).toBe('65%')
+  })
+})
+
+describe('AI code written against the AI lane effective review speed (AC7d)', () => {
+  const AI_AT_1000 = paramsFor(AI, { aiLocPerHour: 1000 })
+  const FIFTEEN_SECONDS_IN_TICKS = 150
+
+  it('adds exactly 40 pending LOC per tick at 1,000 LOC/hr: 40, 80, ... 6,000 at 15 seconds', () => {
+    const trace = traceTicks(emptyLane(), AI_AT_1000, FIFTEEN_SECONDS_IN_TICKS)
+    trace.forEach((lane, index) => {
+      expect(lane.pendingLoc).toBeCloseTo(40 * (index + 1), 6)
+    })
+    expect(formatLoc(trace.at(-1).pendingLoc)).toBe('6,000')
+  })
+
+  it('shows a strictly increasing Pending LOC at 1,000 LOC/hr, tick after tick', () => {
+    const shown = traceTicks(emptyLane(), AI_AT_1000, FIFTEEN_SECONDS_IN_TICKS).map((lane) =>
+      floorShow(lane.pendingLoc),
+    )
+    const notIncreasing = shown.filter((loc, index) => index > 0 && loc <= shown[index - 1])
+    expect(notIncreasing).toEqual([])
+  })
+
+  it('shows Pending Review 11 at 10 seconds and 16 (16.556) at 15 seconds, first reaching 16 at tick 145', () => {
+    const trace = traceTicks(emptyLane(), AI_AT_1000, FIFTEEN_SECONDS_IN_TICKS)
+    expect(displayedPending(trace[99])).toBe(11)
+    expect(trace[149].pendingPrs).toBeCloseTo(16.556, 3)
+    expect(displayedPending(trace[143])).toBe(15)
+    expect(displayedPending(trace[144])).toBe(16)
+  })
+
+  it('keeps the queue at 0 for 30 seconds at 600 LOC/hr, with 16 PRs deployed at 10 seconds', () => {
+    const trace = traceTicks(emptyLane(), paramsFor(AI, { aiLocPerHour: 600 }), 300)
+    expect(trace.map((lane) => displayedPending(lane)).filter((shown) => shown !== 0)).toEqual([])
+    expect(
+      trace.map((lane) => formatLoc(lane.pendingLoc)).filter((shown) => shown !== '0'),
+    ).toEqual([])
+    expect(displayedDeployed(trace[99])).toBe(16)
+    expect(trace[99].deployedPrs).toBeCloseTo(16.556, 3)
+  })
+
+  it('grows the internal pending LOC by (code written - effective speed) x 0.1 per tick at 601 LOC/hr', () => {
+    const trace = traceTicks(emptyLane(), paramsFor(AI, { aiLocPerHour: 601 }), 50)
+    const growthPerTick = trace.map(
+      (lane, index) => lane.pendingLoc - (index === 0 ? 0 : trace[index - 1].pendingLoc),
+    )
+    growthPerTick.forEach((growth) => expect(growth).toBeCloseTo(0.1, 9))
+    expect(trace.at(-1).pendingLoc).toBeCloseTo(5, 6)
+  })
+})
+
+describe('the exact AI preset: a net of +1 pending PR per tick', () => {
+  it('makes the human PR 40 LOC and the AI PR 60.4 LOC', () => {
+    expect(paramsFor(HUMAN, EXACT_AI).size).toBe(40)
+    expect(paramsFor(AI, EXACT_AI).size).toBeCloseTo(60.4, 10)
+  })
+
+  it('shows Pending Review n after n ticks for every n up to 100', () => {
+    const shown = traceTicks(emptyLane(), paramsFor(AI, EXACT_AI), 100).map((lane) =>
+      displayedPending(lane),
+    )
+    expect(shown).toEqual(Array.from({ length: 100 }, (_, index) => index + 1))
+  })
+})
+
+describe('the human backlog preset: a human queue that grows one PR every 4 seconds', () => {
+  it('makes the human PR 400 LOC, so Defects caught is 4%', () => {
+    expect(paramsFor(HUMAN, HUMAN_BACKLOG).size).toBe(400)
+    expect(formatDefectsCaught(paramsFor(HUMAN, HUMAN_BACKLOG))).toBe('4%')
+  })
+
+  it('shows Human Pending Review 1 at 4 seconds and 6 at 24 seconds', () => {
+    const trace = traceTicks(emptyLane(), paramsFor(HUMAN, HUMAN_BACKLOG), 240)
+    expect(displayedPending(trace[39])).toBe(1)
+    expect(displayedPending(trace[239])).toBe(6)
+  })
+
+  it('shows AI Pending Review 71 at 24 seconds when AI code written is 2000 (effective speed 200)', () => {
+    const ai = runTicks(emptyLane(), paramsFor(AI, { ...HUMAN_BACKLOG, ...BUSY_AI }), 240)
+    expect(displayedPending(ai)).toBe(71)
+  })
+})
+
+describe('draining a backlog', () => {
+  const afterBusyTicks = (ticks) => runTicks(emptyLane(), paramsFor(AI, BUSY_AI), ticks)
+  const drainingParams = paramsFor(AI, DRAINING)
+
+  it('shows 0 from 7.726 pending PRs after 13 ticks (0.57 internal), empties by tick 15, and never goes below 0', () => {
+    const queued = afterBusyTicks(20)
+    expect(displayedPending(queued)).toBe(7)
+
+    const pending = traceTicks(queued, drainingParams, 30).map((lane) => lane.pendingPrs)
+
+    expect(floorShow(pending[11])).toBe(1)
+    expect(floorShow(pending[12])).toBe(0)
+    expect(pending[12]).toBeGreaterThan(0)
+    expect(pending[14]).toBe(0)
+    expect(Math.min(...pending)).toBeGreaterThanOrEqual(0)
+  })
+
+  it('removes 0.551 PR per tick from 19.316: 18.77, 18.21, 17.66, 17.11, 16.56, 16.01 (16), 15.46 (15)', () => {
+    const pending = traceTicks(afterBusyTicks(50), drainingParams, 7).map((lane) => lane.pendingPrs)
+    const expected = [18.77, 18.21, 17.66, 17.11, 16.56, 16.01, 15.46]
+    pending.forEach((value, index) => expect(value).toBeCloseTo(expected[index], 1))
+    expect([floorShow(pending[5]), floorShow(pending[6])]).toEqual([16, 15])
+  })
+
+  it('shows no pickup wait and Defects caught 2% once drained (6 seconds)', () => {
+    const drained = runTicks(afterBusyTicks(20), drainingParams, 60)
+    expect(displayedPending(drained)).toBe(0)
+    expect(formatPickupWaitHours(drained, drainingParams)).toBe('0.0')
+    expect(formatDefectsCaught(drainingParams)).toBe('2%')
+  })
+})
+
+describe('queued PRs keep their size when the PR size changes', () => {
+  it('goes from Pending Review 7 and 2,800 LOC to 9 and 4,200 LOC after 1 second at 0.5 Human PRs per day', () => {
+    const queued = runTicks(emptyLane(), paramsFor(AI, BUSY_AI), 20)
+    expect([displayedPending(queued), formatLoc(queued.pendingLoc)]).toEqual([7, '2,800'])
+
+    const resized = runTicks(queued, paramsFor(AI, { ...BUSY_AI, humanPrsPerDay: 0.5 }), 10)
+
+    expect([displayedPending(resized), formatLoc(resized.pendingLoc)]).toEqual([9, '4,200'])
   })
 })
 
@@ -418,11 +725,11 @@ describe('detection', () => {
     expect(detection(300, 750)).toBeCloseTo(0.231, 12)
   })
 
-  // Default arithmetic: Human 250 LOC at 300 LOC/hr = 0.8 x 0.7625 x 1; AI 378 LOC at 600 LOC/hr
-  // = 0.8 x 0.1545 x 0.82.
+  // Default arithmetic: Human 240 LOC at 300 LOC/hr = 0.8 x 0.81 x 1; AI 362.4 LOC at 600 LOC/hr
+  // = 0.8 x 0.2286 x 0.82.
   it.each([
-    { lane: 'Human', size: 250, speed: 300, expected: 0.61 },
-    { lane: 'AI', size: 378, speed: 600, expected: 0.101352 },
+    { lane: 'Human', size: 240, speed: 300, expected: 0.648 },
+    { lane: 'AI', size: 362.4, speed: 600, expected: 0.1499616 },
   ])('is $expected for the $lane lane at the defaults', ({ size, speed, expected }) => {
     expect(detection(size, speed)).toBeCloseTo(expected, 12)
   })
@@ -432,14 +739,18 @@ describe('Defects caught for a lane as displayed', () => {
   const caught = (laneId, overrides) => formatDefectsCaught(paramsFor(laneId, overrides))
 
   it.each([
-    { prSize: 50, shown: '80%' },
-    { prSize: 200, shown: '80%' },
-    { prSize: 300, shown: '42%' },
-    { prSize: 400, shown: '4%' },
-    { prSize: 1000, shown: '4%' },
-  ])('Human at PR size $prSize catches $shown', ({ prSize, shown }) => {
-    expect(caught(LANE_IDS.human, { prSize })).toBe(shown)
-  })
+    { humanLocPerHour: 25, humanPrsPerDay: 4, size: 50, shown: '80%' },
+    { humanLocPerHour: 25, humanPrsPerDay: 1, size: 200, shown: '80%' },
+    { humanLocPerHour: 75, humanPrsPerDay: 2, size: 300, shown: '42%' },
+    { humanLocPerHour: 50, humanPrsPerDay: 1, size: 400, shown: '4%' },
+    { humanLocPerHour: 125, humanPrsPerDay: 1, size: 1000, shown: '4%' },
+  ])(
+    'Human at PR size $size ($humanLocPerHour LOC/hr, $humanPrsPerDay PRs/day) catches $shown',
+    ({ humanLocPerHour, humanPrsPerDay, size, shown }) => {
+      expect(paramsFor(HUMAN, { humanLocPerHour, humanPrsPerDay }).size).toBe(size)
+      expect(caught(HUMAN, { humanLocPerHour, humanPrsPerDay })).toBe(shown)
+    },
+  )
 
   it.each([
     { reviewerSpeed: 500, shown: '80%' },
@@ -449,26 +760,30 @@ describe('Defects caught for a lane as displayed', () => {
   ])(
     'Human at PR size 200 and $reviewerSpeed LOC/hr catches $shown',
     ({ reviewerSpeed, shown }) => {
-      expect(caught(LANE_IDS.human, { prSize: 200, reviewerSpeed })).toBe(shown)
+      expect(caught(HUMAN, { humanLocPerHour: 25, reviewerSpeed })).toBe(shown)
     },
   )
 
   it.each([
-    { laneId: LANE_IDS.human, shown: '61%' },
-    { laneId: LANE_IDS.ai, shown: '10%' },
+    { laneId: HUMAN, shown: '65%' },
+    { laneId: AI, shown: '15%' },
   ])('catches $shown in the $laneId lane at the defaults', ({ laneId, shown }) => {
     expect(caught(laneId, {})).toBe(shown)
   })
 
   it.each([
-    { skim: 3, shown: '3%' },
-    { skim: 1, shown: '12%' },
+    { skim: 3, shown: '5%' },
+    { skim: 1, shown: '18%' },
   ])('AI at skim $skim catches $shown', ({ skim, shown }) => {
-    expect(caught(LANE_IDS.ai, { skim })).toBe(shown)
+    expect(caught(AI, { skim })).toBe(shown)
   })
 
-  it('shows 6% for a drained queue (PR size 250 at 1000 LOC/hr)', () => {
-    expect(caught(LANE_IDS.human, { reviewerSpeed: 1000 })).toBe('6%')
+  it('catches 4% in the AI lane of the human backlog preset (the AI PR follows the human PR: 604 LOC)', () => {
+    expect(caught(AI, HUMAN_BACKLOG)).toBe('4%')
+  })
+
+  it('shows 6% for a drained Human queue (PR size 240 at 1000 LOC/hr)', () => {
+    expect(caught(HUMAN, { reviewerSpeed: 1000 })).toBe('6%')
   })
 })
 

@@ -5,6 +5,7 @@ import {
   LANE_PRESENTATION,
   SLIDER_PRESENTATION,
   TILE_CAPACITY,
+  derivedFieldText,
   tileLayout,
 } from './laneConfig.js'
 
@@ -40,15 +41,35 @@ describe('tileLayout', () => {
 // The lane <-> settings link is declared twice (engine LANE_MODELS, laneConfig sliders); they must agree.
 describe('lane presentation agrees with the lane model', () => {
   it.each(LANE_ORDER)(
-    '%s lane shows its generation slider, and the skim slider only if skim applies',
+    '%s lane shows its code-written slider, and the skim slider only if skim applies',
     (laneId) => {
-      const { genSetting, skimApplies } = LANE_MODELS[laneId]
+      const { locSetting, skimApplies } = LANE_MODELS[laneId]
       const { generationSliders, reviewSliders } = LANE_PRESENTATION[laneId]
 
-      expect(generationSliders).toContain(genSetting)
+      expect(generationSliders).toContain(locSetting)
       expect(reviewSliders.includes('skim')).toBe(skimApplies)
     },
   )
+
+  it('puts the PRs-per-day slider in the Human lane only, after its code-written slider', () => {
+    expect(LANE_PRESENTATION[LANE_IDS.human].generationSliders).toEqual([
+      'humanLocPerHour',
+      'humanPrsPerDay',
+    ])
+    expect(LANE_PRESENTATION[LANE_IDS.ai].generationSliders).toEqual(['aiLocPerHour'])
+  })
+
+  it('shows every slider exactly once across the lanes', () => {
+    const shown = LANE_ORDER.flatMap((laneId) => [
+      ...LANE_PRESENTATION[laneId].generationSliders,
+      ...LANE_PRESENTATION[laneId].reviewSliders,
+    ])
+    expect([...shown].sort()).toEqual(
+      Object.keys(SLIDERS)
+        .filter((key) => key !== 'threshold')
+        .sort(),
+    )
+  })
 })
 
 describe('slider presentation', () => {
@@ -84,22 +105,26 @@ describe('slider presentation', () => {
 })
 
 describe('lane derived fields', () => {
-  const rendered = ({ prefix, format, note }, value) => `${prefix} ${format(value)} ${note}`.trim()
+  const textFor = (laneId, fieldIndex, params) =>
+    derivedFieldText(LANE_PRESENTATION[laneId].derivedFields[fieldIndex], params)
 
   it('has the Human lane show its derived PR size', () => {
-    const [sizeField] = LANE_PRESENTATION[LANE_IDS.human].derivedFields
-    expect(rendered(sizeField, 240)).toBe('PR size 240 LOC (derived)')
+    expect(textFor(LANE_IDS.human, 0, { size: 240 })).toBe('PR size 240 LOC (derived)')
   })
 
   it('has the AI lane show its PR size against the human one, then its PRs per day', () => {
-    const [sizeField, prsPerDayField] = LANE_PRESENTATION[LANE_IDS.ai].derivedFields
-    expect(rendered(sizeField, 362.4)).toBe('PR size 362 LOC (1.51× human)')
-    expect(rendered(prsPerDayField, 1.17)).toBe('1.17 PRs/day (derived)')
+    expect(textFor(LANE_IDS.ai, 0, { size: 362.4 })).toBe('PR size 362 LOC (1.51× human)')
+    expect(textFor(LANE_IDS.ai, 1, { prsPerDay: 1.17 })).toBe('1.17 PRs/day (derived)')
   })
 
   it('reads each field from the laneParams value it names', () => {
     expect(
       LANE_ORDER.map((laneId) => LANE_PRESENTATION[laneId].derivedFields.map(({ param }) => param)),
     ).toEqual([['size'], ['size', 'prsPerDay']])
+  })
+
+  it('rounds sizes to whole LOC with thousands separators and PRs per day to two decimals', () => {
+    expect(textFor(LANE_IDS.ai, 0, { size: 1449.6 })).toBe('PR size 1,450 LOC (1.51× human)')
+    expect(textFor(LANE_IDS.ai, 1, { prsPerDay: 44.15 })).toBe('44.15 PRs/day (derived)')
   })
 })

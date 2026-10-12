@@ -15,6 +15,10 @@ const DERIVED_PRS_PER_DAY = Object.freeze({
   note: '(derived)',
 })
 
+// The plain text a lane shows for one derived field, e.g. "PR size 362 LOC (1.51× human)".
+export const derivedFieldText = ({ param, prefix, format, note }, params) =>
+  [prefix, format(params[param]), note].filter((part) => part !== '').join(' ')
+
 export const LANE_PRESENTATION = Object.freeze({
   [LANE_IDS.human]: Object.freeze({
     label: 'Human',
@@ -25,7 +29,7 @@ export const LANE_PRESENTATION = Object.freeze({
     accentTextClass: 'text-human',
     accentSliderClass: 'accent-human',
     accentTileClass: 'bg-human',
-    generationSliders: ['humanGen', 'prSize'],
+    generationSliders: ['humanLocPerHour', 'humanPrsPerDay'],
     reviewSliders: ['reviewerSpeed'],
     derivedFields: [derivedSize('(derived)')],
   }),
@@ -38,7 +42,7 @@ export const LANE_PRESENTATION = Object.freeze({
     accentTextClass: 'text-ai',
     accentSliderClass: 'accent-ai',
     accentTileClass: 'bg-ai',
-    generationSliders: ['aiGen'],
+    generationSliders: ['aiLocPerHour'],
     reviewSliders: ['skim'],
     derivedFields: [derivedSize(`(${FAROS_PR_SIZE_MULTIPLIER}× human)`), DERIVED_PRS_PER_DAY],
   }),
@@ -48,21 +52,6 @@ export const LANE_ORDER = Object.freeze(Object.values(LANE_IDS))
 
 // Labels are the sliders' accessible names. Ranges and defaults come only from engine.SLIDERS.
 export const SLIDER_PRESENTATION = Object.freeze({
-  humanGen: Object.freeze({
-    label: 'Human generation (PRs/hr)',
-    unit: ' PRs/hr',
-    spokenUnit: 'PRs per hour',
-  }),
-  aiGen: Object.freeze({
-    label: 'AI generation (PRs/hr)',
-    unit: ' PRs/hr',
-    spokenUnit: 'PRs per hour',
-  }),
-  prSize: Object.freeze({
-    label: 'PR size (LOC, both lanes)',
-    unit: ' LOC',
-    spokenUnit: 'lines of code',
-  }),
   humanLocPerHour: Object.freeze({
     label: 'Human code written (LOC/hr)',
     unit: ' LOC/hr',

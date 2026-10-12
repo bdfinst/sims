@@ -21,14 +21,19 @@ const dispatchAll = (state, ...types) =>
 const setSetting = (state, settingKey, value) =>
   reducer(state, { type: ACTION.setSetting, settingKey, value })
 
+// Oracles are literals from the plan's "Default arithmetic" (generation amendment).
 const ONE_SECOND_IN_TICKS = 10
 const TWO_SECONDS_IN_TICKS = 20
 const TEN_SECONDS_IN_TICKS = 100
 const DRAIN_TICKS = 60 // six seconds
-const BUSY_HUMAN_GEN = 10
-const OVERSIZED_PR = 400
+const BUSY_AI = { aiLocPerHour: 2000 }
+// Cut AI generation to the minimum and review fast (effective speed 2000 LOC/hr).
+const DRAINING = { aiLocPerHour: 5, reviewerSpeed: 1000 }
 
 const repeat = (type, count) => Array.from({ length: count }, () => type)
+
+const withSettings = (state, settings) =>
+  Object.entries(settings).reduce((current, [key, value]) => setSetting(current, key, value), state)
 
 describe('initialState', () => {
   it('starts paused at tick 0 with default settings and empty lanes', () => {
@@ -67,7 +72,7 @@ describe('tick', () => {
       ticks: state.ticks,
       human: shownCounts(state.lanes.human),
       ai: shownCounts(state.lanes.ai),
-    }).toEqual({ ticks: 100, human: [0, 10], ai: [184, 15] })
+    }).toEqual({ ticks: 100, human: [0, 1], ai: [0, 1] })
   })
 
   it('is a no-op while paused', () => {
@@ -79,10 +84,13 @@ describe('tick', () => {
     expect(dispatchAll(paused, ...repeat(ACTION.tick, 50))).toBe(paused)
   })
 
-  it('resumes from the frozen counts', () => {
-    const paused = dispatchAll(initialState, ACTION.start, ...repeat(ACTION.tick, 30), ACTION.pause)
+  it('resumes from the frozen counts: busy AI is at 11 / 4 after 3 s and 15 / 6 one second later', () => {
+    const busy = withSettings(initialState, BUSY_AI)
+    const paused = dispatchAll(busy, ACTION.start, ...repeat(ACTION.tick, 30), ACTION.pause)
+    expect(shownCounts(paused.lanes.ai)).toEqual([11, 4])
+
     const resumed = dispatchAll(paused, ACTION.start, ...repeat(ACTION.tick, 10))
-    expect(shownCounts(resumed.lanes.ai)).toEqual([73, 6])
+    expect(shownCounts(resumed.lanes.ai)).toEqual([15, 6])
   })
 
   it('does not mutate the previous state', () => {
@@ -97,17 +105,8 @@ describe('tick', () => {
 
 describe('setSetting', () => {
   it('updates the named setting and keeps the others', () => {
-    const next = setSetting(initialState, 'aiGen', 40)
-    expect(next.settings).toEqual({ ...DEFAULT_SETTINGS, aiGen: 40 })
-  })
-
-  it.each([
-    { settingKey: 'aiGen', value: 999, stored: 50 },
-    { settingKey: 'aiGen', value: 0, stored: 5 },
-    { settingKey: 'reviewerSpeed', value: -300, stored: 100 },
-    { settingKey: 'skim', value: 7, stored: 3 },
-  ])('clamps $settingKey=$value to $stored', ({ settingKey, value, stored }) => {
-    expect(setSetting(initialState, settingKey, value).settings[settingKey]).toBe(stored)
+    const next = setSetting(initialState, 'aiLocPerHour', 400)
+    expect(next.settings).toEqual({ ...DEFAULT_SETTINGS, aiLocPerHour: 400 })
   })
 
   it.each([
@@ -117,7 +116,9 @@ describe('setSetting', () => {
     { settingKey: 'humanPrsPerDay', value: 0, stored: 0.25 },
     { settingKey: 'aiLocPerHour', value: 5000, stored: 2000 },
     { settingKey: 'aiLocPerHour', value: 2, stored: 5 },
-  ])('clamps the new $settingKey=$value to $stored', ({ settingKey, value, stored }) => {
+    { settingKey: 'reviewerSpeed', value: -300, stored: 100 },
+    { settingKey: 'skim', value: 7, stored: 3 },
+  ])('clamps $settingKey=$value to $stored', ({ settingKey, value, stored }) => {
     expect(setSetting(initialState, settingKey, value).settings[settingKey]).toBe(stored)
   })
 
@@ -129,27 +130,20 @@ describe('setSetting', () => {
     { settingKey: 'humanPrsPerDay', value: 0.75, stored: 0.75 },
     { settingKey: 'aiLocPerHour', value: 53.4, stored: 53 },
     { settingKey: 'aiLocPerHour', value: 53.6, stored: 54 },
-  ])('snaps the new $settingKey=$value to its step: $stored', ({ settingKey, value, stored }) => {
-    expect(setSetting(initialState, settingKey, value).settings[settingKey]).toBe(stored)
-  })
-
-  it.each(['humanLocPerHour', 'humanPrsPerDay', 'aiLocPerHour'])(
-    'ignores a non-numeric value for the new %s',
-    (settingKey) => {
-      expect(setSetting(initialState, settingKey, NaN)).toBe(initialState)
-      expect(setSetting(initialState, settingKey, '40')).toBe(initialState)
-    },
-  )
-
-  it.each([
-    { settingKey: 'prSize', value: 254, stored: 250 },
-    { settingKey: 'prSize', value: 256, stored: 260 },
     { settingKey: 'skim', value: 2.2, stored: 2 },
     { settingKey: 'skim', value: 2.3, stored: 2.5 },
     { settingKey: 'reviewerSpeed', value: 320, stored: 300 },
   ])('snaps $settingKey=$value to its step: $stored', ({ settingKey, value, stored }) => {
     expect(setSetting(initialState, settingKey, value).settings[settingKey]).toBe(stored)
   })
+
+  it.each(['humanLocPerHour', 'humanPrsPerDay', 'aiLocPerHour'])(
+    'ignores a non-numeric value for %s',
+    (settingKey) => {
+      expect(setSetting(initialState, settingKey, NaN)).toBe(initialState)
+      expect(setSetting(initialState, settingKey, '40')).toBe(initialState)
+    },
+  )
 
   it.each(['nope', 'toString', 'constructor', '__proto__'])(
     'ignores the unknown settingKey "%s"',
@@ -159,12 +153,12 @@ describe('setSetting', () => {
   )
 
   it.each([NaN, Infinity, undefined, null, '40'])('ignores the non-numeric value %s', (value) => {
-    expect(setSetting(initialState, 'aiGen', value)).toBe(initialState)
+    expect(setSetting(initialState, 'aiLocPerHour', value)).toBe(initialState)
   })
 
   it('does not touch lanes, ticks, or whether it is running', () => {
     const running = dispatchAll(initialState, ACTION.start, ...repeat(ACTION.tick, 5))
-    const next = setSetting(running, 'prSize', 400)
+    const next = setSetting(running, 'humanPrsPerDay', 0.5)
     expect([next.lanes, next.ticks, next.isRunning]).toEqual([
       running.lanes,
       running.ticks,
@@ -173,32 +167,28 @@ describe('setSetting', () => {
   })
 })
 
-// Human lane generating 10 PRs/hr for two seconds: 17 PRs (4,400 LOC) waiting, still running.
-const queuedHumanBacklog = () =>
-  dispatchAll(
-    setSetting(initialState, 'humanGen', BUSY_HUMAN_GEN),
-    ACTION.start,
-    ...repeat(ACTION.tick, TWO_SECONDS_IN_TICKS),
-  )
+// The busy AI lane (AI code written 2000) for `ticks` ticks, still running.
+const busyAiRunning = (ticks) =>
+  dispatchAll(withSettings(initialState, BUSY_AI), ACTION.start, ...repeat(ACTION.tick, ticks))
 
 describe('changing settings mid-run', () => {
-  it('leaves a paused queue as it was, then applies the new rate on the next tick', () => {
-    const paused = dispatchAll(initialState, ACTION.start, ...repeat(ACTION.tick, 10), ACTION.pause)
-    expect(paused.lanes.ai.pendingPrs).toBeCloseTo(18.41, 2)
+  it('leaves a paused queue as it was, then applies the new review speed on the next tick', () => {
+    const paused = dispatchAll(busyAiRunning(ONE_SECOND_IN_TICKS), ACTION.pause)
+    expect(paused.lanes.ai.pendingPrs).toBeCloseTo(3.863, 3)
 
-    const changed = setSetting(paused, 'aiGen', 50)
-    expect(shownCounts(changed.lanes.ai)).toEqual([18, 1])
+    const changed = setSetting(paused, 'reviewerSpeed', 100)
+    expect(shownCounts(changed.lanes.ai)).toEqual([3, 1])
 
     const resumed = dispatchAll(changed, ACTION.start, ACTION.tick)
-    expect(resumed.lanes.ai.pendingPrs).toBeCloseTo(23.25, 2)
-    expect(shownCounts(resumed.lanes.ai)).toEqual([23, 1])
+    expect(resumed.lanes.ai.pendingPrs).toBeCloseTo(4.36, 2)
+    expect(shownCounts(resumed.lanes.ai)).toEqual([4, 1])
   })
 
   it('applies a faster review side on the very next tick (AI Deployed 1 -> 2)', () => {
-    const running = dispatchAll(initialState, ACTION.start, ...repeat(ACTION.tick, 10))
+    const running = busyAiRunning(ONE_SECOND_IN_TICKS)
     expect(shownCounts(running.lanes.ai)[1]).toBe(1)
 
-    const faster = setSetting(setSetting(running, 'reviewerSpeed', 1000), 'skim', 3)
+    const faster = withSettings(running, { reviewerSpeed: 1000, skim: 3 })
     const next = reducer(faster, { type: ACTION.tick })
 
     expect(shownCounts(next.lanes.ai)[1]).toBe(2)
@@ -206,15 +196,15 @@ describe('changing settings mid-run', () => {
   })
 
   it('drains a backlog to zero without ever going below zero', () => {
-    const backlog = queuedHumanBacklog()
-    expect(shownCounts(backlog.lanes.human)[0]).toBe(17)
+    const backlog = busyAiRunning(TWO_SECONDS_IN_TICKS)
+    expect(shownCounts(backlog.lanes.ai)[0]).toBe(7)
 
-    const draining = setSetting(setSetting(backlog, 'humanGen', 1), 'reviewerSpeed', 1000)
+    const draining = withSettings(backlog, DRAINING)
     const pendingEachTick = []
     let state = draining
     for (let tickIndex = 0; tickIndex < DRAIN_TICKS; tickIndex += 1) {
       state = reducer(state, { type: ACTION.tick })
-      pendingEachTick.push(state.lanes.human.pendingPrs)
+      pendingEachTick.push(state.lanes.ai.pendingPrs)
     }
 
     expect(Math.min(...pendingEachTick)).toBeGreaterThanOrEqual(0)
@@ -226,50 +216,66 @@ describe('incidents across a run', () => {
   const runningState = reducer(initialState, { type: ACTION.start })
   const afterTicks = (state, count) => dispatchAll(state, ...repeat(ACTION.tick, count))
 
-  it('Larger PRs accrue more incidents: PR size 400 gives Human 2 / 7 / 57 / 7.68', () => {
-    const oversized = setSetting(runningState, 'prSize', OVERSIZED_PR)
+  it('Larger PRs accrue more incidents: Human code written 50 (PR size 400) gives 0 / 1 / 9 / 7.68', () => {
+    const oversized = setSetting(runningState, 'humanLocPerHour', 50)
     const human = afterTicks(oversized, TEN_SECONDS_IN_TICKS).lanes.human
-    expect(shownCounts(human)).toEqual([2, 7])
-    expect([displayedIncidents(human), formatIncidentsPerPr(human)]).toEqual([57, '7.68'])
+    expect(shownCounts(human)).toEqual([0, 1])
+    expect([displayedIncidents(human), formatIncidentsPerPr(human)]).toEqual([9, '7.68'])
   })
 
-  it('a size change while running changes accrual from the next tick: 53 incidents, 6.94 per PR', () => {
+  it('a size change while running changes accrual from the next tick: 8 incidents, 7.08 per PR', () => {
     const afterOneSecond = afterTicks(runningState, ONE_SECOND_IN_TICKS)
-    const resized = setSetting(afterOneSecond, 'prSize', OVERSIZED_PR)
+    const resized = setSetting(afterOneSecond, 'humanLocPerHour', 50)
 
     const human = afterTicks(resized, TEN_SECONDS_IN_TICKS - ONE_SECOND_IN_TICKS).lanes.human
 
-    expect([displayedIncidents(human), formatIncidentsPerPr(human)]).toEqual([53, '6.94'])
+    expect([displayedIncidents(human), formatIncidentsPerPr(human)]).toEqual([8, '7.08'])
   })
 
-  it('queued PRs keep their size when PR size changes: Pending 17 / 4,400 LOC becomes 26 / 9,100', () => {
-    const queued = queuedHumanBacklog()
-    expect([
-      displayedPending(queued.lanes.human),
-      formatLoc(queued.lanes.human.pendingLoc),
-    ]).toEqual([17, '4,400'])
+  it('a PR-frequency change while running shows Incidents 5, Deployed 0 and no Incidents per PR', () => {
+    const afterOneSecond = afterTicks(runningState, ONE_SECOND_IN_TICKS)
+    const rarer = setSetting(afterOneSecond, 'humanPrsPerDay', 0.25)
 
-    const resized = afterTicks(setSetting(queued, 'prSize', 500), ONE_SECOND_IN_TICKS)
+    const human = afterTicks(rarer, TEN_SECONDS_IN_TICKS - ONE_SECOND_IN_TICKS).lanes.human
 
-    expect([
-      displayedPending(resized.lanes.human),
-      formatLoc(resized.lanes.human.pendingLoc),
-    ]).toEqual([26, '9,100'])
+    expect([displayedIncidents(human), shownCounts(human)[1], formatIncidentsPerPr(human)]).toEqual(
+      [5, 0, NO_VALUE],
+    )
+  })
+
+  it('a reviewer-speed change while running shows Incidents 4 and 3.71 per PR', () => {
+    const afterOneSecond = afterTicks(runningState, ONE_SECOND_IN_TICKS)
+    const faster = setSetting(afterOneSecond, 'reviewerSpeed', 900)
+
+    const human = afterTicks(faster, TEN_SECONDS_IN_TICKS - ONE_SECOND_IN_TICKS).lanes.human
+
+    expect([displayedIncidents(human), formatIncidentsPerPr(human)]).toEqual([4, '3.71'])
+  })
+
+  it('queued PRs keep their size when the PR size changes: Pending 7 / 2,800 LOC becomes 9 / 4,200', () => {
+    const queued = busyAiRunning(TWO_SECONDS_IN_TICKS)
+    expect([displayedPending(queued.lanes.ai), formatLoc(queued.lanes.ai.pendingLoc)]).toEqual([
+      7,
+      '2,800',
+    ])
+
+    const resized = afterTicks(setSetting(queued, 'humanPrsPerDay', 0.5), ONE_SECOND_IN_TICKS)
+
+    expect([displayedPending(resized.lanes.ai), formatLoc(resized.lanes.ai.pendingLoc)]).toEqual([
+      9,
+      '4,200',
+    ])
   })
 
   it('a drained queue shows no wait', () => {
-    const draining = setSetting(
-      setSetting(queuedHumanBacklog(), 'humanGen', 1),
-      'reviewerSpeed',
-      1000,
-    )
+    const draining = withSettings(busyAiRunning(TWO_SECONDS_IN_TICKS), DRAINING)
 
     const drained = afterTicks(draining, DRAIN_TICKS)
 
-    const params = laneParams(drained.settings, LANE_MODELS.human)
+    const params = laneParams(drained.settings, LANE_MODELS.ai)
     expect([
-      displayedPending(drained.lanes.human),
-      formatPickupWaitHours(drained.lanes.human, params),
+      displayedPending(drained.lanes.ai),
+      formatPickupWaitHours(drained.lanes.ai, params),
     ]).toEqual([0, '0.0'])
   })
 
@@ -292,13 +298,13 @@ describe('incidents across a run', () => {
     expect(samples.at(-1).ai).toBeGreaterThan(0)
   })
 
-  it('shows the headline ratio 3.48x after 10 default seconds', () => {
+  it('shows the headline ratio 3.65x after 10 default seconds', () => {
     const afterTenDefaultSeconds = afterTicks(runningState, TEN_SECONDS_IN_TICKS)
-    expect(formatHeadlineRatio(afterTenDefaultSeconds.lanes)).toBe('3.48×')
+    expect(formatHeadlineRatio(afterTenDefaultSeconds.lanes)).toBe('3.65×')
   })
 
-  it('shows a blank headline ratio before the Human lane has deployed a whole PR (9 ticks)', () => {
-    const { lanes } = afterTicks(runningState, ONE_SECOND_IN_TICKS - 1)
+  it('shows a blank headline ratio before the Human lane has deployed a whole PR (79 ticks)', () => {
+    const { lanes } = afterTicks(runningState, 79)
     expect(formatHeadlineRatio(lanes)).toBe(NO_VALUE)
   })
 })
@@ -307,7 +313,7 @@ describe('reset', () => {
   const RUN_TICKS = 30
   const runningWithCustomSettings = () =>
     dispatchAll(
-      setSetting(initialState, 'aiGen', 40),
+      setSetting(initialState, 'aiLocPerHour', 400),
       ACTION.start,
       ...repeat(ACTION.tick, RUN_TICKS),
     )
@@ -330,24 +336,22 @@ describe('reset', () => {
 
   it('keeps a customised setting', () => {
     const before = runningWithCustomSettings()
-    expect(before.settings.aiGen).toBe(40)
-    expect(dispatchAll(before, ACTION.reset).settings.aiGen).toBe(40)
+    expect(before.settings.aiLocPerHour).toBe(400)
+    expect(dispatchAll(before, ACTION.reset).settings.aiLocPerHour).toBe(400)
   })
 
-  it('keeps customised code-written and PRs-per-day settings alongside the old ones', () => {
-    const customised = [
-      ['humanLocPerHour', 50],
-      ['humanPrsPerDay', 0.5],
-      ['aiLocPerHour', 1000],
-      ['aiGen', 40],
-    ].reduce((state, [key, value]) => setSetting(state, key, value), initialState)
+  it('keeps customised code-written and PRs-per-day settings', () => {
+    const customised = withSettings(initialState, {
+      humanLocPerHour: 50,
+      humanPrsPerDay: 0.5,
+      aiLocPerHour: 1000,
+    })
 
     expect(dispatchAll(customised, ACTION.reset).settings).toEqual({
       ...DEFAULT_SETTINGS,
       humanLocPerHour: 50,
       humanPrsPerDay: 0.5,
       aiLocPerHour: 1000,
-      aiGen: 40,
     })
   })
 

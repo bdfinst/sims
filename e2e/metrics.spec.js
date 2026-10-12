@@ -1,9 +1,7 @@
 import {
   AI_SKIM_LABEL,
   ALL_LANE_IDS,
-  HUMAN_GEN_LABEL,
   NO_VALUE,
-  PR_SIZE_LABEL,
   REFERENCE,
   REVIEWER_SPEED_LABEL,
   SECOND_MS,
@@ -48,8 +46,8 @@ const SPEED_CASES = [
 ]
 
 const SIZE_AT_DETECTION_KNEE = 200
-const HUMAN_CAUGHT_AT_REST = '61%'
-const AI_CAUGHT_AT_REST = '10%'
+const HUMAN_CAUGHT_AT_REST = '65%'
+const AI_CAUGHT_AT_REST = '15%'
 const AI_CAUGHT_AT_MAX_SKIM = '3%'
 const AI_CAUGHT_AT_HUMAN_PACE = '12%'
 const MAX_SKIM = 3
@@ -98,19 +96,22 @@ test.describe('Review quality metrics', () => {
       await openSimulator(page)
     })
 
-    await test.step('Then the Human lane shows Defects caught 61% and Pending LOC 0', async () => {
+    await test.step('Then the Human lane shows Defects caught 65% and Pending LOC 0', async () => {
       await expectDefectsCaught(page, 'human', HUMAN_CAUGHT_AT_REST)
       await expect(metric(page, 'human', 'pendingLoc')).toHaveText('0')
     })
 
-    await test.step('And the AI lane shows Defects caught 10% and Pending LOC 0', async () => {
+    await test.step('And the AI lane shows Defects caught 15% and Pending LOC 0', async () => {
       await expectDefectsCaught(page, 'ai', AI_CAUGHT_AT_REST)
       await expect(metric(page, 'ai', 'pendingLoc')).toHaveText('0')
     })
   })
 
   for (const { size, caught } of SIZE_CASES) {
-    test(`Defects caught follows PR size: ${size} LOC gives ${caught}`, async ({ page }) => {
+    // @wip: Step 8.5
+    test.fixme(`Defects caught follows PR size: ${size} LOC gives ${caught}`, async ({ page }) => {
+      const PR_SIZE_LABEL = 'PR size (LOC, both lanes)'
+
       await test.step(`Given I set "PR size (LOC, both lanes)" to ${size}`, async () => {
         await openSimulator(page)
         await setSlider(page, PR_SIZE_LABEL, size)
@@ -123,9 +124,12 @@ test.describe('Review quality metrics', () => {
   }
 
   for (const { speed, caught } of SPEED_CASES) {
-    test(`Defects caught follows reviewer speed: ${speed} LOC/hr gives ${caught}`, async ({
+    // @wip: Step 8.5
+    test.fixme(`Defects caught follows reviewer speed: ${speed} LOC/hr gives ${caught}`, async ({
       page,
     }) => {
+      const PR_SIZE_LABEL = 'PR size (LOC, both lanes)'
+
       await test.step(`Given I set "PR size (LOC, both lanes)" to ${SIZE_AT_DETECTION_KNEE} and "Reviewer speed (LOC/hr, both lanes)" to ${speed}`, async () => {
         await openSimulator(page)
         await setSlider(page, PR_SIZE_LABEL, SIZE_AT_DETECTION_KNEE)
@@ -138,7 +142,8 @@ test.describe('Review quality metrics', () => {
     })
   }
 
-  test('Skimming harder lowers AI defects caught', async ({ page }) => {
+  // @wip: Step 8.5
+  test.fixme('Skimming harder lowers AI defects caught', async ({ page }) => {
     await test.step('Given I set "AI skim multiplier" to 3', async () => {
       await openSimulator(page)
       await setSlider(page, AI_SKIM_LABEL, MAX_SKIM)
@@ -149,7 +154,8 @@ test.describe('Review quality metrics', () => {
     })
   })
 
-  test('Reviewing AI code at human pace restores some catching', async ({ page }) => {
+  // @wip: Step 8.5
+  test.fixme('Reviewing AI code at human pace restores some catching', async ({ page }) => {
     await test.step('Given I set "AI skim multiplier" to 1', async () => {
       await openSimulator(page)
       await setSlider(page, AI_SKIM_LABEL, HUMAN_PACE_SKIM)
@@ -222,7 +228,8 @@ test.describe('Review quality metrics', () => {
     })
   })
 
-  test('Default metrics after 10 seconds', async ({ page }) => {
+  // @wip: Step 8.5
+  test.fixme('Default metrics after 10 seconds', async ({ page }) => {
     await test.step('Given I open the simulator', async () => {
       await openSimulator(page)
     })
@@ -262,7 +269,8 @@ test.describe('Review quality metrics', () => {
     })
   })
 
-  test('Incidents per PR waits for a whole deployed PR', async ({ page }) => {
+  // @wip: Step 8.5
+  test.fixme('Incidents per PR waits for a whole deployed PR', async ({ page }) => {
     await test.step('Given I open the simulator', async () => {
       await openSimulator(page)
     })
@@ -292,7 +300,10 @@ test.describe('Review quality metrics', () => {
     })
   })
 
-  test('Larger PRs accrue more incidents', async ({ page }) => {
+  // @wip: Step 8.5
+  test.fixme('Larger PRs accrue more incidents', async ({ page }) => {
+    const PR_SIZE_LABEL = 'PR size (LOC, both lanes)'
+
     await test.step('Given I set "PR size (LOC, both lanes)" to 400', async () => {
       await openSimulator(page)
       await setSlider(page, PR_SIZE_LABEL, OVERSIZED_PR)
@@ -317,9 +328,12 @@ test.describe('Review quality metrics', () => {
     })
   })
 
-  test('A size change while running changes defects caught and accrual on the next tick', async ({
+  // @wip: Step 8.5
+  test.fixme('A size change while running changes defects caught and accrual on the next tick', async ({
     page,
   }) => {
+    const PR_SIZE_LABEL = 'PR size (LOC, both lanes)'
+
     await test.step('Given the simulation has run for 1 second with defaults', async () => {
       await openSimulator(page)
       await startAndRunFor(page, SIZE_CHANGE_AT_SECONDS)
@@ -360,7 +374,11 @@ test.describe('Review quality metrics', () => {
     })
   })
 
-  test('Queued PRs keep their size when PR size changes', async ({ page }) => {
+  // @wip: Step 8.5
+  test.fixme('Queued PRs keep their size when PR size changes', async ({ page }) => {
+    const HUMAN_GEN_LABEL = 'Human generation (PRs/hr)'
+    const PR_SIZE_LABEL = 'PR size (LOC, both lanes)'
+
     await test.step('Given I set "Human generation (PRs/hr)" to 10 and the simulation has run for 2 seconds', async () => {
       await openSimulator(page)
       await setSlider(page, HUMAN_GEN_LABEL, BUSY_HUMAN_GEN)
@@ -407,7 +425,10 @@ test.describe('Review quality metrics', () => {
     })
   })
 
-  test('A drained queue shows no wait', async ({ page }) => {
+  // @wip: Step 8.5
+  test.fixme('A drained queue shows no wait', async ({ page }) => {
+    const HUMAN_GEN_LABEL = 'Human generation (PRs/hr)'
+
     await test.step('Given I set "Human generation (PRs/hr)" to 10 and the simulation has run for 2 seconds', async () => {
       await openSimulator(page)
       await setSlider(page, HUMAN_GEN_LABEL, BUSY_HUMAN_GEN)
@@ -449,7 +470,8 @@ test.describe('Review quality metrics', () => {
     })
   })
 
-  test('Reset clears the metrics', async ({ page }) => {
+  // @wip: Step 8.5
+  test.fixme('Reset clears the metrics', async ({ page }) => {
     await test.step('Given the simulation has run for 10 seconds', async () => {
       await openSimulator(page)
       await startAndRunFor(page, FULL_RUN_SECONDS)

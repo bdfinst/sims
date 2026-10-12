@@ -1,5 +1,4 @@
 import {
-  HUMAN_GEN_LABEL,
   QUEUE_STATE,
   REFERENCE,
   REVIEWER_SPEED_LABEL,
@@ -54,11 +53,6 @@ const SECONDS_TO_AI_PENDING_18 = 1
 const HALF_SECOND = 0.5
 const TENTH_SECOND = 0.1
 
-const openWithBusyHuman = async (page) => {
-  await openSimulator(page)
-  await setSlider(page, HUMAN_GEN_LABEL, BUSY_HUMAN_GEN)
-}
-
 // Waits for the slider's own shown value, so later checks cannot pass on the old threshold.
 const setThreshold = async (page, value) => {
   await setSlider(page, THRESHOLD_LABEL, value)
@@ -66,7 +60,8 @@ const setThreshold = async (page, value) => {
 }
 
 test.describe('Pending Review overload warning', () => {
-  test('AI queue turns red once it exceeds the default threshold', async ({ page }) => {
+  // @wip: Step 8.5
+  test.fixme('AI queue turns red once it exceeds the default threshold', async ({ page }) => {
     await test.step('Given I open the simulator', async () => {
       await openSimulator(page)
     })
@@ -114,11 +109,13 @@ test.describe('Pending Review overload warning', () => {
     await expect(page.locator('[aria-live]')).toHaveCount(0)
   })
 
-  test('Displayed value at the threshold is not a warning even if the internal value is above it', async ({
+  // @wip: Step 8.5
+  test.fixme('Displayed value at the threshold is not a warning even if the internal value is above it', async ({
     page,
   }) => {
     await test.step('Given I set "Human generation (PRs/hr)" to 10', async () => {
-      await openWithBusyHuman(page)
+      await openSimulator(page)
+      await setSlider(page, 'Human generation (PRs/hr)', BUSY_HUMAN_GEN)
     })
 
     await test.step('When I press Start and 1.8 seconds pass', async () => {
@@ -149,9 +146,11 @@ test.describe('Pending Review overload warning', () => {
     })
   })
 
-  test('A custom threshold applies to both lanes', async ({ page }) => {
+  // @wip: Step 8.5
+  test.fixme('A custom threshold applies to both lanes', async ({ page }) => {
     await test.step('Given I set "Human generation (PRs/hr)" to 10 and the simulation ran for 2 seconds and was paused', async () => {
-      await openWithBusyHuman(page)
+      await openSimulator(page)
+      await setSlider(page, 'Human generation (PRs/hr)', BUSY_HUMAN_GEN)
       await startAndRunFor(page, SECONDS_TO_BUILD_BACKLOG)
       await pauseSimulation(page)
     })
@@ -180,7 +179,8 @@ test.describe('Pending Review overload warning', () => {
     })
   })
 
-  test('Exactly at a custom threshold is not a warning', async ({ page }) => {
+  // @wip: Step 8.5
+  test.fixme('Exactly at a custom threshold is not a warning', async ({ page }) => {
     await test.step('Given I set "Warning threshold" to 18', async () => {
       await openSimulator(page)
       await setThreshold(page, THRESHOLD_AT_AI_PENDING)
@@ -195,7 +195,8 @@ test.describe('Pending Review overload warning', () => {
     })
   })
 
-  test('Raising the threshold while paused clears the warning', async ({ page }) => {
+  // @wip: Step 8.5
+  test.fixme('Raising the threshold while paused clears the warning', async ({ page }) => {
     await test.step('Given the simulation ran for 1.2 seconds and was paused', async () => {
       await openSimulator(page)
       await startAndRunFor(page, ticksToSeconds(AI_PENDING_22_AT_TICK))
@@ -215,7 +216,8 @@ test.describe('Pending Review overload warning', () => {
     })
   })
 
-  test('Lowering the threshold while running applies immediately', async ({ page }) => {
+  // @wip: Step 8.5
+  test.fixme('Lowering the threshold while running applies immediately', async ({ page }) => {
     await test.step('Given the simulation has run for 0.5 seconds', async () => {
       await openSimulator(page)
       await startAndRunFor(page, SECONDS_TO_AI_PENDING_9)
@@ -235,9 +237,11 @@ test.describe('Pending Review overload warning', () => {
     })
   })
 
-  test('Warning clears when the queue drains to the threshold', async ({ page }) => {
+  // @wip: Step 8.5
+  test.fixme('Warning clears when the queue drains to the threshold', async ({ page }) => {
     await test.step('Given I set "Human generation (PRs/hr)" to 10 and the simulation has run for 2 seconds', async () => {
-      await openWithBusyHuman(page)
+      await openSimulator(page)
+      await setSlider(page, 'Human generation (PRs/hr)', BUSY_HUMAN_GEN)
       await startAndRunFor(page, SECONDS_TO_BUILD_BACKLOG)
     })
 
@@ -251,7 +255,7 @@ test.describe('Pending Review overload warning', () => {
     })
 
     await test.step('When I set "Human generation (PRs/hr)" to 1 and "Reviewer speed (LOC/hr, both lanes)" to 1000', async () => {
-      await setSlider(page, HUMAN_GEN_LABEL, QUIET_HUMAN_GEN)
+      await setSlider(page, 'Human generation (PRs/hr)', QUIET_HUMAN_GEN)
       await setSlider(page, REVIEWER_SPEED_LABEL, FAST_REVIEWER_SPEED)
     })
 

@@ -1,14 +1,15 @@
 import {
-  AI_GEN_LABEL,
+  AI_CODE_WRITTEN_LABEL,
   AI_SKIM_LABEL,
+  BUSY_AI_PRESET,
   ALL_LANE_IDS,
   FULL_RUN_SECONDS,
-  HUMAN_GEN_LABEL,
+  HUMAN_CODE_WRITTEN_LABEL,
+  HUMAN_PRS_PER_DAY_LABEL,
   MIN_TEXT_CONTRAST,
   NARROWEST_PHONE,
   PAGE_BACKGROUND,
   PHONE,
-  PR_SIZE_LABEL,
   RESEARCH_TITLE,
   REVIEWER_SPEED_LABEL,
   THRESHOLD_LABEL,
@@ -29,8 +30,11 @@ import {
   researchPanel,
   researchToggle,
   rightOf,
+  runFor,
+  setSliders,
   slider,
   startAndRunFor,
+  startSimulation,
   test,
   textColors,
 } from './fixtures.js'
@@ -39,6 +43,8 @@ test.describe.configure({ mode: 'parallel' })
 
 const PROJECTOR = { width: 1280, height: 720 }
 const DESKTOP = { width: 1280, height: 800 }
+// The busy-AI preset leaves 115 PRs pending after 30 s, beyond any tile capacity (22 to 98).
+const OVERFLOW_RUN_SECONDS = 30
 const TABLET = { width: 768, height: 1024 }
 // --color-deployed (#22c55e) in src/index.css
 const DEPLOYED_GREEN = 'rgb(34, 197, 94)'
@@ -52,8 +58,8 @@ const METRIC_ROWS_TOP_TO_BOTTOM = [
   'pickupWait',
 ]
 const GENERATION_LABELS = {
-  human: [HUMAN_GEN_LABEL, PR_SIZE_LABEL],
-  ai: [AI_GEN_LABEL],
+  human: [HUMAN_CODE_WRITTEN_LABEL, HUMAN_PRS_PER_DAY_LABEL],
+  ai: [AI_CODE_WRITTEN_LABEL],
 }
 const REVIEW_LABELS = { human: REVIEWER_SPEED_LABEL, ai: AI_SKIM_LABEL }
 
@@ -111,9 +117,14 @@ test.describe('Pending Review layout', () => {
         await openAndReadCapacity(page)
       })
 
-      await test.step('Given the viewport is 1280 × 720 and the simulation has run for 10 seconds', async () => {
+      await test.step('Given the viewport is 1280 × 720', async () => {
         await expectViewport(page, PROJECTOR)
-        await startAndRunFor(page, FULL_RUN_SECONDS)
+      })
+
+      await test.step('And I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 30 seconds', async () => {
+        await setSliders(page, BUSY_AI_PRESET)
+        await startSimulation(page)
+        await runFor(page, OVERFLOW_RUN_SECONDS)
       })
 
       await test.step("Then the header, the headline ratio, and both lanes' Pending Review counts and metric grids are fully visible without scrolling", async () => {
@@ -272,8 +283,13 @@ test.describe('Pending Review layout', () => {
         await expectViewport(page, PHONE)
       })
 
-      await test.step('When I press Start and 10 seconds pass', async () => {
-        await startAndRunFor(page, FULL_RUN_SECONDS)
+      await test.step('And I set "AI code written (LOC/hr)" to 2000', async () => {
+        await setSliders(page, BUSY_AI_PRESET)
+      })
+
+      await test.step('When I press Start and 30 seconds pass', async () => {
+        await startSimulation(page)
+        await runFor(page, OVERFLOW_RUN_SECONDS)
       })
 
       await test.step('Then the AI lane shows a "+N more" indicator', async () => {
@@ -335,7 +351,9 @@ test.describe('Pending Review layout', () => {
 
     test('No horizontal scroll at 320 px, even when overflowing', async ({ page }) => {
       await openSimulator(page)
-      await startAndRunFor(page, FULL_RUN_SECONDS)
+      await setSliders(page, BUSY_AI_PRESET)
+      await startSimulation(page)
+      await runFor(page, OVERFLOW_RUN_SECONDS)
 
       await expect(overflowIn(page, 'ai')).toBeVisible()
       await expectNoHorizontalScroll(page)
@@ -347,10 +365,10 @@ test.describe('Pending Review layout', () => {
       ['Start', buttonNamed(page, 'Start')],
       ['Reset', buttonNamed(page, 'Reset')],
       [THRESHOLD_LABEL, slider(page, THRESHOLD_LABEL)],
-      [HUMAN_GEN_LABEL, slider(page, HUMAN_GEN_LABEL)],
-      [PR_SIZE_LABEL, slider(page, PR_SIZE_LABEL)],
+      [HUMAN_CODE_WRITTEN_LABEL, slider(page, HUMAN_CODE_WRITTEN_LABEL)],
+      [HUMAN_PRS_PER_DAY_LABEL, slider(page, HUMAN_PRS_PER_DAY_LABEL)],
       [REVIEWER_SPEED_LABEL, slider(page, REVIEWER_SPEED_LABEL)],
-      [AI_GEN_LABEL, slider(page, AI_GEN_LABEL)],
+      [AI_CODE_WRITTEN_LABEL, slider(page, AI_CODE_WRITTEN_LABEL)],
       [AI_SKIM_LABEL, slider(page, AI_SKIM_LABEL)],
       [RESEARCH_TITLE, researchToggle(page)],
     ]

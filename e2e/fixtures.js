@@ -191,17 +191,36 @@ export const TICK_MS = 100
 export const TICKS_PER_SECOND = SECOND_MS / TICK_MS
 export const ticksToSeconds = (ticks) => ticks / TICKS_PER_SECOND
 
-export const HUMAN_GEN_LABEL = 'Human generation (PRs/hr)'
-export const AI_GEN_LABEL = 'AI generation (PRs/hr)'
-export const PR_SIZE_LABEL = 'PR size (LOC, both lanes)'
+export const HUMAN_CODE_WRITTEN_LABEL = 'Human code written (LOC/hr)'
+export const HUMAN_PRS_PER_DAY_LABEL = 'Human PRs per day'
+export const AI_CODE_WRITTEN_LABEL = 'AI code written (LOC/hr)'
 export const REVIEWER_SPEED_LABEL = 'Reviewer speed (LOC/hr, both lanes)'
 export const AI_SKIM_LABEL = 'AI skim multiplier'
 export const THRESHOLD_LABEL = 'Warning threshold'
 
+// Slider presets for the generation model, as { slider label: value } for setSliders. The values
+// come from the plan's "Default arithmetic" and are independent of src. Everything not listed
+// stays at its default.
+// Busy AI: +0.38631 AI pending PR per tick, so 3 PRs pending at 1 s and 115 at 30 s.
+export const BUSY_AI_PRESET = Object.freeze({ [AI_CODE_WRITTEN_LABEL]: 2000 })
+// Exact: the AI lane gains exactly one pending PR per tick, so Pending Review is n after n ticks.
+export const EXACT_AI_PRESET = Object.freeze({
+  [HUMAN_CODE_WRITTEN_LABEL]: 5,
+  [REVIEWER_SPEED_LABEL]: 100,
+  [AI_SKIM_LABEL]: 1,
+  [AI_CODE_WRITTEN_LABEL]: 704,
+})
+// Human backlog: 400 LOC human PRs; the human queue gains one PR every 4 s (6 pending at 24 s).
+export const HUMAN_BACKLOG_PRESET = Object.freeze({
+  [HUMAN_CODE_WRITTEN_LABEL]: 200,
+  [HUMAN_PRS_PER_DAY_LABEL]: 4,
+  [REVIEWER_SPEED_LABEL]: 100,
+})
+
 // Expected values from the plan's reference model (plan, "Default arithmetic" under "Slices").
 // Per tick (0.1 h): a lane gains gen x 0.1 PRs of `size` LOC each, then reviews
 // min(pending LOC, effective speed x 0.1) LOC, taking PRs off the queue in proportion.
-// AI size = round(prSize x 1.51); AI effective speed = reviewer speed x skim.
+// AI size = round(old PR size slider x 1.51); AI effective speed = reviewer speed x skim.
 // Ticks are 0.1 s each, so tick 10 is 1 s. Counts are the displayed (floored) values.
 export const REFERENCE = Object.freeze({
   aiPrSizeAtDefaults: 378, // round(250 x 1.51)
@@ -239,28 +258,28 @@ export const REFERENCE = Object.freeze({
   humanIncidentsAtTick100AfterSizeChangeAtTick10: 53,
   humanIncidentsPerPrAtTick100AfterSizeChangeAtTick10: '6.94',
   humanDefectsCaughtAtPrSize400: '4%',
-  // humanGen 10 for 2 s gives 17 PRs / 4,400 LOC queued; PR size 500 for 1 more second adds
+  // Human generation of 10 PRs per hour for 2 s gives 17 PRs / 4,400 LOC queued; PR size 500 for 1 more second adds
   // 10 x 500 LOC and reviews 300 LOC: 26 PRs / 9,100 LOC.
   humanPendingLocAtTick20WithHumanGen10: '4,400',
   humanPendingAtTick20WithHumanGen10: 17,
   humanDeployedAtTick20WithHumanGen10: 2,
-  aiPendingAtTick20WithHumanGen10: 36, // the AI lane does not depend on humanGen
+  aiPendingAtTick20WithHumanGen10: 36, // the AI lane does not depend on human generation
   humanPendingAtTick30AfterSizeChangeToPrSize500: 26,
   humanPendingLocAtTick30AfterSizeChangeToPrSize500: '9,100',
   // Displayed Pending Review while the AI lane (2 PRs generated per tick, about 0.16 reviewed) and
-  // the Human lane at humanGen 10 (1 PR generated per tick, 0.12 reviewed) fall behind.
+  // the Human lane at 10 PRs per hour (1 PR generated per tick, 0.12 reviewed) fall behind.
   aiPendingAtTick5: 9,
   aiPendingAtTick8: 14,
   aiPendingAtTick9: 16,
   aiPendingAtTick12: 22,
   humanPendingAtTick18WithHumanGen10: 15,
   humanPendingAtTick19WithHumanGen10: 16,
-  // Then humanGen 1 and reviewer speed 1000: each tick adds 0.1 PR and reviews 100 LOC (0.4 PR).
+  // Then 1 PR per hour and reviewer speed 1000: each tick adds 0.1 PR and reviews 100 LOC (0.4 PR).
   humanPendingAtTick25AfterDraining: 16,
   humanPendingAtTick26AfterDraining: 15,
   humanDefectsCaughtWhenDrained: '6%', // PR size 250 at 1000 LOC/hr: 0.8 x 0.7625 x 0.1
   aiDeployedAtTick11WithFasterReview: 2, // reviewer speed 1000, skim 3 -> 3000 LOC/hr
-  // aiGen 40, prSize 300 (AI size 453, 60 LOC reviewed per tick), after 3 s:
+  // AI generation of 40 PRs per hour, PR size 300 (AI size 453, 60 LOC reviewed per tick), after 3 s:
   aiPendingAtTick30WithAiGen40AndPrSize300: 116,
   aiDeployedAtTick30WithAiGen40AndPrSize300: 3,
 })
@@ -286,6 +305,11 @@ export const expectEmptyLanes = async (page) => {
 export const slider = (page, name) => page.getByRole('slider', { name, exact: true })
 
 export const setSlider = (page, name, value) => slider(page, name).fill(String(value))
+
+// Sets several sliders in order: setSliders(page, { 'Human PRs per day': 0.5, ... }) or a preset.
+export const setSliders = async (page, valuesByLabel) => {
+  for (const [label, value] of Object.entries(valuesByLabel)) await setSlider(page, label, value)
+}
 
 // The visible value is a sibling span with id slider-value-<settingKey>; the slider is slider-<settingKey>.
 export const visibleValue = async (sliderLocator) => {
@@ -332,6 +356,20 @@ export const tabTo = async (page, target) => {
     if (await target.evaluate((element) => element === document.activeElement)) return
   }
   throw new Error('Tab never reached the control')
+}
+
+// The elapsed readout in ticks ("3.0 work hours" is 30).
+const elapsedTicks = async (page) => {
+  const readout = await page.getByText(/^\d+\.\d work hours$/).textContent()
+  return Math.round(Number.parseFloat(readout) * TICKS_PER_SECOND)
+}
+
+// For a running simulation: runs the fake clock for `seconds`, then waits until the elapsed readout
+// has advanced by that many ticks, so the render for them has happened before any assertion.
+export const runFor = async (page, seconds) => {
+  const startTick = await elapsedTicks(page)
+  await page.clock.runFor(seconds * SECOND_MS)
+  await expectElapsedAtTick(page, startTick + Math.round(seconds * TICKS_PER_SECOND))
 }
 
 // Runs the fake clock for `seconds`, then waits until the elapsed readout shows `totalSeconds`

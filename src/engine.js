@@ -15,16 +15,12 @@ export const FAROS_MERGE_RATE_MULTIPLIER = 1 + FAROS_MERGE_RATE_INCREASE_PCT / P
 // Numeric lane model. Presentation (labels, icons, classes) lives in laneConfig.js.
 export const LANE_MODELS = Object.freeze({
   [LANE_IDS.human]: Object.freeze({
-    genSetting: 'humanGen',
     locSetting: 'humanLocPerHour',
-    sizeApplies: false,
     sizeMultiplier: 1,
     skimApplies: false,
   }),
   [LANE_IDS.ai]: Object.freeze({
-    genSetting: 'aiGen',
     locSetting: 'aiLocPerHour',
-    sizeApplies: true,
     sizeMultiplier: FAROS_PR_SIZE_MULTIPLIER,
     skimApplies: true,
   }),
@@ -32,9 +28,6 @@ export const LANE_MODELS = Object.freeze({
 
 // Slider table: the single source of defaults and ranges (spec State table).
 export const SLIDERS = Object.freeze({
-  humanGen: Object.freeze({ min: 1, max: 10, step: 1, defaultValue: 1 }),
-  aiGen: Object.freeze({ min: 5, max: 50, step: 1, defaultValue: 20 }),
-  prSize: Object.freeze({ min: 50, max: 1000, step: 10, defaultValue: 250 }),
   humanLocPerHour: Object.freeze({ min: 5, max: 200, step: 5, defaultValue: 30 }),
   humanPrsPerDay: Object.freeze({ min: 0.25, max: 4, step: 0.25, defaultValue: 1 }),
   // 53 = round(30 x FAROS_PR_SIZE_MULTIPLIER x FAROS_MERGE_RATE_MULTIPLIER); a unit test pins it.
@@ -60,12 +53,18 @@ export const DEFAULT_SETTINGS = Object.freeze(
 export const humanPrSize = ({ humanLocPerHour, humanPrsPerDay }) =>
   (humanLocPerHour * WORK_HOURS_PER_DAY) / humanPrsPerDay
 
-// The only place derived lane values come from.
-export const laneParams = (settings, laneModel) => ({
-  gen: settings[laneModel.genSetting],
-  size: Math.round(settings.prSize * laneModel.sizeMultiplier),
-  effSpeed: settings.reviewerSpeed * (laneModel.skimApplies ? settings.skim : 1),
-})
+// The only place derived lane values come from, and the only caller of humanPrSize. Unrounded:
+// `gen` is PRs per work hour, `size` is LOC per PR, `effSpeed` is LOC reviewed per work hour.
+export const laneParams = (settings, laneModel) => {
+  const size = humanPrSize(settings) * laneModel.sizeMultiplier
+  const gen = settings[laneModel.locSetting] / size
+  return {
+    gen,
+    size,
+    effSpeed: settings.reviewerSpeed * (laneModel.skimApplies ? settings.skim : 1),
+    prsPerDay: gen * WORK_HOURS_PER_DAY,
+  }
+}
 
 // --- Tick model ---------------------------------------------------------------
 
@@ -120,15 +119,15 @@ const fallOff = (value, { knee, wall, floor }) => {
   return 1 - (1 - floor) * ((value - knee) / (wall - knee))
 }
 
-export const sizeFactor = (prSizeLoc) =>
-  fallOff(prSizeLoc, { knee: SIZE_KNEE, wall: SIZE_WALL, floor: SIZE_FLOOR })
+export const sizeFactor = (sizeLoc) =>
+  fallOff(sizeLoc, { knee: SIZE_KNEE, wall: SIZE_WALL, floor: SIZE_FLOOR })
 
 export const speedFactor = (locPerHour) =>
   fallOff(locPerHour, { knee: SPEED_KNEE, wall: SPEED_WALL, floor: SPEED_FLOOR })
 
 // Share of a PR's defects that a review catches, from its size and the reviewer's speed.
-export const detection = (prSizeLoc, locPerHour) =>
-  BASE_DETECTION * sizeFactor(prSizeLoc) * speedFactor(locPerHour)
+export const detection = (sizeLoc, locPerHour) =>
+  BASE_DETECTION * sizeFactor(sizeLoc) * speedFactor(locPerHour)
 
 export const formatPct = (share) => `${Math.round(share * 100)}%`
 
