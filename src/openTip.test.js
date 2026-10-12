@@ -141,6 +141,22 @@ describe('openTipReducer, one test per truth-table row', () => {
     ).toEqual(NONE_SHOWN)
   })
 
+  it('forgets both records of a closing press once the tip reopens, so focus can show it again', () => {
+    expect(
+      shownAfter(
+        keyboardFocus(TIP),
+        mouseEnter(TIP),
+        press(TIP),
+        press(TIP),
+        pointerLeave(TIP),
+        mouseEnter(TIP),
+        pointerLeave(TIP),
+        mouseEnter(OTHER_TIP),
+        pointerLeave(OTHER_TIP),
+      ),
+    ).toEqual([TIP])
+  })
+
   it('keeps a hovered tip closed by a press closed when focus leaves another tip', () => {
     expect(
       shownAfter(

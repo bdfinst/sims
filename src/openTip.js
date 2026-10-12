@@ -24,8 +24,9 @@ export const INITIAL_TIP_STATE = Object.freeze({
   focusedKey: null,
   isPinned: false,
   isDismissed: false,
-  // The hovered and the focused tip Escape or a closing press last dismissed, so neither shows again when the other
-  // of pointer and focus leaves. Each is cleared once that tip is hovered or focused afresh.
+  // The hovered and the focused tip that Escape or a closing press last dismissed, so neither
+  // shows again when the other of pointer and focus leaves. Both are cleared once that tip is
+  // hovered, focused, or pressed.
   dismissedHoverKey: null,
   dismissedFocusKey: null,
 })
@@ -75,8 +76,13 @@ const endFocus = (state) =>
     state.dismissedHoverKey,
   )
 
-// Clears a record of a tip's dismissal when that tip is engaged afresh.
-const forget = (dismissedKey, key) => (dismissedKey === key ? null : dismissedKey)
+// Clears both records of `key`'s dismissal when that tip is engaged afresh (hovered, focused, or
+// pressed), so a reopened tip carries no stale dismissal.
+const forgetDismissal = (state, key) => ({
+  ...state,
+  dismissedHoverKey: state.dismissedHoverKey === key ? null : state.dismissedHoverKey,
+  dismissedFocusKey: state.dismissedFocusKey === key ? null : state.dismissedFocusKey,
+})
 
 // Escape and a closing press: dismisses the shown tip and records whether the pointer or focus
 // still holds it, so it does not show again when the other of the two leaves.
@@ -91,11 +97,7 @@ const dismissShown = (state) => {
 }
 
 const pressTip = (state, key) => {
-  const engaged = {
-    ...state,
-    dismissedHoverKey: forget(state.dismissedHoverKey, key),
-    dismissedFocusKey: forget(state.dismissedFocusKey, key),
-  }
+  const engaged = forgetDismissal(state, key)
   if (!isTipShown(state, key)) return { ...activate(engaged, key), isPinned: true }
   return state.isPinned ? dismissShown(engaged) : { ...engaged, isPinned: true }
 }
@@ -104,20 +106,12 @@ export const openTipReducer = (state, event) => {
   switch (event.type) {
     case TIP_EVENT.pointerEnter:
       if (event.pointerType !== HOVER_POINTER_TYPE) return state
-      return {
-        ...activate(state, event.key),
-        hoveredKey: event.key,
-        dismissedHoverKey: forget(state.dismissedHoverKey, event.key),
-      }
+      return { ...activate(forgetDismissal(state, event.key), event.key), hoveredKey: event.key }
     case TIP_EVENT.pointerLeave:
       return event.key === state.hoveredKey ? endHover(state) : state
     case TIP_EVENT.focus:
       if (!event.isFocusVisible) return state
-      return {
-        ...activate(state, event.key),
-        focusedKey: event.key,
-        dismissedFocusKey: forget(state.dismissedFocusKey, event.key),
-      }
+      return { ...activate(forgetDismissal(state, event.key), event.key), focusedKey: event.key }
     case TIP_EVENT.blur:
       return event.key === state.focusedKey ? endFocus(state) : state
     case TIP_EVENT.press:
