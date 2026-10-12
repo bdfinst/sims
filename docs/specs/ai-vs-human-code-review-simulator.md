@@ -130,8 +130,8 @@ Derived lane parameters (read-only, recomputed from the current settings every t
   - at a human PR size ≥ 400 (for example, 50 LOC/hr at 1 PR/day), the human lane shows 4%;
   - at a human PR size of 200 and reviewer speed 900 (speed factor 0.28), the human lane shows 22%.
   *(research brief: 200–400 LOC wall, 500 LOC/hr limit, 70–90% baseline)*
-- AC7c: Changing code written, PRs per day, or reviewer speed while running changes the detection rate and the incident accrual from the next tick. *(§6; research and generation amendments)*
-- AC7d: When AI code written exceeds the AI lane's effective review speed (above 600 LOC/hr at the defaults), the AI queue grows every tick; at 1,000 LOC/hr it passes the default warning threshold. *(generation amendment: presenter raises AI volume)*
+- AC7c: Changing Human code written, Human PRs per day, or reviewer speed while running changes the detection rate and the incident accrual from the next tick (they change PR size or effective speed). Changing AI code written changes only the AI lane's PRs per day and its pending queue, never either lane's PR size or defects caught. *(§6; research and generation amendments)*
+- AC7d: When AI code written exceeds the AI lane's effective review speed (above 600 LOC/hr at the defaults), the AI lane's internal pending LOC grows by (code written − effective speed) × 0.1 every tick; at 1,000 LOC/hr the displayed Pending LOC rises every tick and the queue passes the default warning threshold. *(generation amendment: presenter raises AI volume)*
 - AC8: A queue never shows a negative value, even when the review rate is higher than the generation rate. *(§6 "Queue cannot be negative")*
 - AC9: Deployed never decreases while the simulation runs. *(§4 review phase)*
 
@@ -154,9 +154,9 @@ Derived lane parameters (read-only, recomputed from the current settings every t
 **Info tips**
 
 - AC25: Every slider has an info button directly after its label, with the accessible name "About <slider label>" and an Info icon. *(generation amendment)*
-- AC26: Hovering the info button, or giving it keyboard focus, shows the tip. The tip stays open while the pointer moves onto it. It closes when the pointer and focus both leave, or on Escape, which works without moving the pointer. Opening one tip closes any other. *(generation amendment; WCAG 1.4.13)*
-- AC27: The tip text is the slider's accessible description. It names what the slider controls, its unit, and the lanes it affects, and contains none of the "do not use" wording. *(generation amendment; Research Sources rules)*
-- AC28: With any tip open, the page has no horizontal scroll at 320 px and 375 px, and at 1280 × 720 the closed tips change no layout. *(generation amendment; AC15; projector fit)*
+- AC26: Hovering the info button, or giving it keyboard focus, shows the tip. The tip sits directly against its button (no gap), so the pointer can move onto it and it stays open. Unless pinned by a click, tap, Enter, or Space, it closes when the pointer and focus both leave; Escape always closes it without moving the pointer. Opening one tip closes any other. *(generation amendment; WCAG 1.4.13)*
+- AC27: The tip text is the slider's accessible description. It names what the slider controls, its unit, and the lanes it affects, and contains none of the "do not use" wording ("near zero", "coined", "originated"). *(generation amendment; Research Sources rules)*
+- AC28: With any tip open, the page has no horizontal scroll at 320 px and 375 px, and the open tip lies fully inside the viewport (all four edges). At 1280 × 720 the closed tips change no layout. *(generation amendment; AC15; projector fit)*
 
 ## Glossary
 

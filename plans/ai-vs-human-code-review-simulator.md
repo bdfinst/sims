@@ -49,8 +49,8 @@ From the amended spec:
   - Headline "3.65×".
 - [ ] AC7a: At the defaults, AI incidents per PR is 3×–4× human incidents per PR.
 - [ ] AC7b: Defects caught follows the size and speed factors: 80% at a human PR size ≤ 200 (speed 300); 4% at a human PR size ≥ 400; 22% at a human PR size of 200 and speed 900; AI lane 5% at skim 3× and 18% at skim 1×.
-- [ ] AC7c: Changing code written, PRs per day, or reviewer speed while running changes defects caught and incident accrual from the next tick.
-- [ ] AC7d: When AI code written exceeds the AI lane's effective review speed, the AI queue grows every tick (displayed Pending LOC strictly increases); at 1,000 LOC/hr it passes the default threshold (Pending Review 16 after 15 s). At 600 LOC/hr the queue stays at 0.
+- [ ] AC7c: Changing Human code written, Human PRs per day, or reviewer speed while running changes defects caught and incident accrual from the next tick. Changing AI code written changes only the AI lane's PRs per day and its pending queue, never either lane's PR size or defects caught.
+- [ ] AC7d: When AI code written exceeds the AI lane's effective review speed, the AI lane's internal pending LOC grows by (code written − effective speed) × 0.1 every tick (Vitest); at 1,000 LOC/hr the displayed Pending LOC strictly increases every tick (e2e) and it passes the default threshold (Pending Review 16 after 15 s). At 600 LOC/hr the queue stays at 0.
 - [ ] AC8: A queue never shows a negative value.
 - [ ] AC9: Deployed never decreases while running.
 - [ ] AC10: Every count shows `Math.floor(x + 1e-9)` of its internal value (so 9.9999999999 shows 10, and 0.9 shows 0).
@@ -69,9 +69,9 @@ From the amended spec:
 - [ ] AC23: Each lane shows its derived PR size as read-only text with its basis: Human "PR size 240 LOC (derived)"; AI "PR size 362 LOC (1.51× human)", "1.17 PRs/day (derived)", and "Effective speed 600 LOC/hr" at the defaults. Each updates when a slider it depends on changes.
 - [ ] AC24: AI PR size is always human PR size × 1.51. Changing the human code written or PRs per day changes both lanes' PR sizes. Changing AI code written changes AI PRs per day and leaves both PR sizes unchanged.
 - [ ] AC25: Every slider has an info button directly after its label, with the accessible name "About <slider label>" and an Info icon.
-- [ ] AC26: Hovering the info button, or giving it keyboard focus, shows the tip. The tip stays open while the pointer moves onto it. It closes when the pointer and focus both leave, or on Escape, which works without moving the pointer. Opening one tip closes any other. (Click/tap toggling and reopening follow the truth table in Design decisions.)
-- [ ] AC27: The tip text is the slider's accessible description. It names what the slider controls, its unit, and the lanes it affects, and contains none of the "do not use" wording.
-- [ ] AC28: With any tip open, the page has no horizontal scroll at 320 px and 375 px, and at 1280 × 720 the closed tips change no layout.
+- [ ] AC26: Hovering the info button, or giving it keyboard focus, shows the tip. The tip sits directly against its button (no gap), so the pointer can move onto it and it stays open. Unless pinned by a click, tap, Enter, or Space, it closes when the pointer and focus both leave; Escape always closes it without moving the pointer. Opening one tip closes any other. The open/close truth table in the plan's Design decisions is the full rule.
+- [ ] AC27: The tip text is the slider's accessible description. It names what the slider controls, its unit, and the lanes it affects, and contains none of the "do not use" wording ("near zero", "coined", "originated").
+- [ ] AC28: With any tip open, the page has no horizontal scroll at 320 px and 375 px, and the open tip lies fully inside the viewport (all four edges). At 1280 × 720 the closed tips change no layout.
 
 ## Design decisions (fixed for the build)
 
@@ -167,7 +167,7 @@ Step 1.1 asserts that the icons `User`, `Bot`, `Eye`, `TriangleAlert`, and `Chev
 ### Info tips
 
 - `InfoTip({id, label, text})` renders a native `<button type="button">` (at least 24 × 24 px, WCAG 2.5.8) with `aria-label="About <label>"` and the `info` icon, directly after the slider's `<label>`, plus a tip element with `role="tooltip"` and `id`. The tip is always in the DOM (`hidden` when closed, so it takes no space), and the slider's `<input>` has `aria-describedby={id}`, so the tip text is the slider's accessible description even when no tip is open (AC27).
-- **Look:** `text-base`, light text on a dark surface with at least 4.5:1 contrast, and a visible border. The tip opens **above the label row**, so it never covers the slider it describes; the header's threshold tip, which sits near the top of the page, opens **below its slider** instead. If there is no room above (the tip's top would be above the viewport's top edge, measured when it opens), the tip flips below the label row. It is absolutely positioned and spans the slider column's width (`left-0 right-0`), so it never extends past the viewport at 320 px and moves no other element (AC28).
+- **Look:** `text-base`, light text on a dark surface with at least 4.5:1 contrast, and a visible border. The tip opens **above the label row**, so it never covers the slider it describes; the header's threshold tip, which sits near the top of the page, opens **below its slider** instead. The tip's edge touches its button, with no gap. If there is no room above (the tip's top would be above the viewport's top edge, measured when it opens), the tip flips below the label row; either way it lies fully inside the viewport on all four edges (AC28). It is absolutely positioned and spans the slider column's width (`left-0 right-0`), so it never extends past the viewport at 320 px and moves no other element (AC28).
 - **Open/close truth table** (`openTipReducer`; one tip is shown at a time; a tip K is shown when K is the active tip, K is not dismissed, and K is hovered, keyboard-focused, or pinned):
 
 | Event on tip K | Result |
@@ -1159,7 +1159,7 @@ Feature: Generate code and derive PR size
 
 **Complexity**: standard
 **IMPLEMENT**: Add `e2e/generation.spec.js` for the six Slice 8 scenarios, reusing the fixture helpers. Remove their `@wip` tags here and re-export.
-**TEST**: Playwright: all six Slice 8 scenarios (the AC7d test samples the displayed Pending LOC every tick and asserts each sample is greater than the last). Clears `@wip` on every Slice 8 scenario.
+**TEST**: Playwright: all six Slice 8 scenarios (the AC7d test, at AI code written 1,000 LOC/hr, samples the displayed Pending LOC every tick and asserts each sample is greater than the last; a Vitest in Step 8.7 asserts the internal per-tick growth for values just above capacity, e.g. 601 LOC/hr). Clears `@wip` on every Slice 8 scenario.
 **REFACTOR**: Remove any setup duplicated between `generation.spec.js` and the other specs.
 **Files**: `e2e/fixtures.js`, `e2e/generation.spec.js`, `plans/ai-vs-human-code-review-simulator.md`, `features/ai-vs-human-code-review-simulator/**`
 **Commit**: `test(e2e): scenarios for derived PR size and AI volume`
@@ -1181,7 +1181,7 @@ Feature: Generate code and derive PR size
 - The Faros finding text gains "PR merge rate +16.2%", with +51% and +16.2% taken from the engine's percentage constants.
 - `MODEL_ASSUMPTIONS` gains the human defaults (30 LOC/hr, 1 PR/day) and the Faros multipliers; `assumptionsNote()` produces the Page behavior text, including "The human defaults were chosen to land near" plus the Faros link.
 - Remove the `@wip` tags on the two Slice 7 scenarios here and re-export.
-**TEST**: Vitest: `FINDINGS` texts equal the spec's Panel wording strings exactly (an independent copy in the test); the Faros finding text contains `+${FAROS_PR_SIZE_INCREASE_PCT}%` and `+${FAROS_MERGE_RATE_INCREASE_PCT}%`; the note states every disclosed number as a labelled phrase (20 defects per 1,000 LOC, 0.8, 0.05, 0.1, 200 to 400 LOC, 500 to 1,000 LOC/hr, 30 LOC/hr and 1 PR per day, 1.51×, 1.162×) and is built from the assumptions it is given. Playwright: the two revised Slice 7 scenarios with step titles verbatim. Clears `@wip` on: Expanding shows every finding verbatim with its source; Model assumptions and calibration are stated.
+**TEST**: Vitest: `FINDINGS` texts equal the spec's Panel wording strings exactly (an independent copy in the test); the Faros finding text contains `+${FAROS_PR_SIZE_INCREASE_PCT}%` and `+${FAROS_MERGE_RATE_INCREASE_PCT}%`; the note contains each Slice 7 'Model assumptions…' scenario substring exactly (that list is the oracle, copied into the test); the practitioner finding equals the spec's quoted paraphrase ("AI code is often locally coherent but globally brittle", copied into the test); and `assumptionsNote()` called with a modified assumptions object reflects the modified values (e.g. a 2.25 multiplier appears and 1.51 does not). Playwright: the two revised Slice 7 scenarios with step titles verbatim. Clears `@wip` on: Expanding shows every finding verbatim with its source; Model assumptions and calibration are stated.
 **REFACTOR**: One place for each figure: the engine constants feed the note, the findings, the tips, and the defaults.
 **Files**: `src/research.js`, `src/research.test.js`, `src/engine.js`, `src/engine.test.js`, `e2e/research.spec.js`, `plans/ai-vs-human-code-review-simulator.md`, `features/ai-vs-human-code-review-simulator/**`
 **Commit**: `feat(sim): research note and Faros wording for the generation model`
