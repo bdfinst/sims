@@ -1,5 +1,5 @@
 import { LANE_MODELS, laneParams } from '../engine.js'
-import { COLOR_CLASS, LANE_PRESENTATION } from '../laneConfig.js'
+import { COLOR_CLASS, LANE_PRESENTATION, TILE_CAPACITY, TYPE_CLASS } from '../laneConfig.js'
 import { Icon } from './Icon.jsx'
 import { LaneMetrics } from './LaneMetrics.jsx'
 import { QueueBox } from './QueueBox.jsx'
@@ -7,9 +7,11 @@ import { RateSlider } from './RateSlider.jsx'
 
 function DerivedValue({ children }) {
   return (
-    <p className={`text-base ${COLOR_CLASS.mutedText}`}>
+    <p className={`${TYPE_CLASS.label} ${COLOR_CLASS.mutedText}`}>
       {children}{' '}
-      <span className="rounded bg-white/10 px-1 text-sm uppercase tracking-wide">derived</span>
+      <span className={`rounded bg-white/10 px-1 uppercase tracking-wide ${TYPE_CLASS.label}`}>
+        derived
+      </span>
     </p>
   )
 }
@@ -18,7 +20,8 @@ export function Lane({ laneId, lane, settings, onSettingChange }) {
   const presentation = LANE_PRESENTATION[laneId]
   const model = LANE_MODELS[laneId]
   const params = laneParams(settings, model)
-  const hasDerivedValues = model.skimApplies || model.sizeMultiplier !== 1
+  const hasDerivedSize = model.sizeMultiplier !== 1
+  const hasDerivedSpeed = model.skimApplies
   const renderSlider = (settingKey) => (
     <RateSlider
       key={settingKey}
@@ -38,10 +41,10 @@ export function Lane({ laneId, lane, settings, onSettingChange }) {
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
           <Icon name={presentation.generationIcon} className={presentation.accentTextClass} />
-          <h2 className="text-xl font-semibold">{presentation.label}</h2>
+          <h2 className={TYPE_CLASS.value}>{presentation.label}</h2>
         </div>
         {presentation.generationSliders.map(renderSlider)}
-        {hasDerivedValues && (
+        {hasDerivedSize && (
           <DerivedValue>
             PR size {params.size} LOC (×{model.sizeMultiplier})
           </DerivedValue>
@@ -51,19 +54,18 @@ export function Lane({ laneId, lane, settings, onSettingChange }) {
         laneLabel={presentation.label}
         lane={lane}
         threshold={settings.threshold}
-        tileClass={presentation.accentTileClass}
+        capacity={TILE_CAPACITY}
+        accentClass={presentation.accentTileClass}
       />
       {/* On wide screens this wrapper dissolves, so the controls and the metrics are separate columns. */}
       <div className="flex flex-col gap-2 lg:contents">
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <Icon name={presentation.reviewIcon} className={presentation.accentTextClass} />
-            <p className="text-base">Review</p>
+            <p className={TYPE_CLASS.label}>Review</p>
           </div>
           {presentation.reviewSliders.map(renderSlider)}
-          {hasDerivedValues && (
-            <DerivedValue>Effective speed {params.effSpeed} LOC/hr</DerivedValue>
-          )}
+          {hasDerivedSpeed && <DerivedValue>Effective speed {params.effSpeed} LOC/hr</DerivedValue>}
         </div>
         <LaneMetrics lane={lane} params={params} />
       </div>

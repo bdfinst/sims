@@ -66,9 +66,19 @@ export const SLIDER_PRESENTATION = Object.freeze({
   }),
 })
 
+// Type scale. These are the plan's minimums, so no class here may go smaller.
+export const TYPE_CLASS = Object.freeze({
+  headline: 'text-6xl font-bold',
+  title: 'text-3xl font-bold',
+  count: 'text-4xl font-bold',
+  value: 'text-xl font-semibold',
+  label: 'text-base',
+})
+
 // Colour classes shared by components outside any one lane (complete literals for Tailwind).
 export const COLOR_CLASS = Object.freeze({
-  primaryButton: 'bg-human',
+  // Blue is deliberately the Human accent. Dark text keeps the label above 4.5:1 on that blue.
+  primaryButton: 'bg-human text-gray-950',
   secondaryButtonBorder: 'border-gray-500',
   neutralSliderAccent: 'accent-gray-300',
   warningText: 'text-warning',
@@ -87,7 +97,6 @@ export const QUEUE_STATE_CLASS = Object.freeze({
   [QUEUE_STATE.normal]: COLOR_CLASS.idleBoxBorder,
 })
 
-// Tiles drawn per queue box before "+N more". Tiles are 12px with 4px gaps, so a phone's
-// 263px of box width holds 16 per row: 48 tiles take three rows, and 1280px takes three or fewer.
-// It must be at least 22 (the AI queue after 1.2 s) and at most 98.
+// Tiles drawn per queue box before "+N more": a compact three or four rows of 12px tiles. The
+// phone layout test (375 px and 320 px) guards that they fit. The bounds are in laneConfig.test.js.
 export const TILE_CAPACITY = 48

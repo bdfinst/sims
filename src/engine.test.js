@@ -25,7 +25,6 @@ import {
   tick,
   tileLayout,
 } from './engine.js'
-import { TILE_CAPACITY } from './laneConfig.js'
 import { shownCounts } from './testHelpers.js'
 
 describe('laneParams at the default settings', () => {
@@ -187,7 +186,7 @@ describe('escape accrual at the default settings (10 seconds)', () => {
 })
 
 describe('formatIncidentsPerPr', () => {
-  it('divides AI incidents by internal Deployed: 107.84 / 15.87 gives 6.79', () => {
+  it('divides AI incidents by internal Deployed (unrounded 107.8378 / 15.8730): 6.79', () => {
     expect(formatIncidentsPerPr(afterDefaultRun(LANE_IDS.ai))).toBe('6.79')
   })
 
@@ -456,20 +455,15 @@ describe('tileLayout', () => {
   const CAPACITY = 5
 
   it.each([
-    { displayed: 0, tiles: 0, overflow: 0 },
-    { displayed: CAPACITY - 1, tiles: CAPACITY - 1, overflow: 0 },
-    { displayed: CAPACITY, tiles: CAPACITY, overflow: 0 },
-    { displayed: CAPACITY + 1, tiles: CAPACITY, overflow: 1 },
-    { displayed: 184, tiles: CAPACITY, overflow: 184 - CAPACITY },
+    { displayed: 0, tileCount: 0, overflowCount: 0 },
+    { displayed: CAPACITY - 1, tileCount: CAPACITY - 1, overflowCount: 0 },
+    { displayed: CAPACITY, tileCount: CAPACITY, overflowCount: 0 },
+    { displayed: CAPACITY + 1, tileCount: CAPACITY, overflowCount: 1 },
+    { displayed: 184, tileCount: CAPACITY, overflowCount: 184 - CAPACITY },
   ])(
-    'draws $tiles tiles and $overflow more for $displayed pending PRs at capacity 5',
-    ({ displayed, tiles, overflow }) => {
-      expect(tileLayout(displayed, CAPACITY)).toEqual({ tiles, overflow })
+    'draws $tileCount tiles and $overflowCount more for $displayed pending PRs at capacity 5',
+    ({ displayed, tileCount, overflowCount }) => {
+      expect(tileLayout(displayed, CAPACITY)).toEqual({ tileCount, overflowCount })
     },
   )
-
-  it('uses a real capacity between 22 and 98', () => {
-    expect(TILE_CAPACITY).toBeGreaterThanOrEqual(22)
-    expect(TILE_CAPACITY).toBeLessThanOrEqual(98)
-  })
 })

@@ -1,7 +1,10 @@
 import {
   AI_GEN_LABEL,
   AI_SKIM_LABEL,
+  ALL_LANE_IDS,
+  FULL_RUN_SECONDS,
   HUMAN_GEN_LABEL,
+  PAGE_BACKGROUND,
   PR_SIZE_LABEL,
   REVIEWER_SPEED_LABEL,
   THRESHOLD_LABEL,
@@ -15,7 +18,6 @@ import {
   queueBox,
   slider,
   startAndRunFor,
-  tabTo,
   test,
 } from './fixtures.js'
 
@@ -23,9 +25,12 @@ test.describe.configure({ mode: 'parallel' })
 
 const PROJECTOR = { width: 1280, height: 720 }
 const DESKTOP = { width: 1280, height: 800 }
+const TABLET = { width: 768, height: 1024 }
 const PHONE = { width: 375, height: 667 }
-const FULL_RUN_SECONDS = 10
-const PAGE_BACKGROUND = 'rgb(11, 13, 18)'
+const NARROWEST_PHONE = { width: 320, height: 568 } // WCAG 1.4.10 reflow
+const FOCUS_RING_COLOR = 'rgb(248, 250, 252)' // --color-focus (#f8fafc) in src/index.css
+const MIN_TEXT_CONTRAST = 4.5 // WCAG 1.4.3, normal-size text
+// Plan line 146: the metrics grid keeps one fixed row order in both lanes.
 const METRIC_ROWS_TOP_TO_BOTTOM = [
   'deployed',
   'defectsCaught',
@@ -33,99 +38,162 @@ const METRIC_ROWS_TOP_TO_BOTTOM = [
   'incidentsPerPr',
   'pickupWait',
 ]
-const HUMAN_CONTROLS = {
-  generation: HUMAN_GEN_LABEL,
-  review: REVIEWER_SPEED_LABEL,
+const GENERATION_LABELS = {
+  human: [HUMAN_GEN_LABEL, PR_SIZE_LABEL],
+  ai: [AI_GEN_LABEL],
 }
-const AI_CONTROLS = { generation: AI_GEN_LABEL, review: AI_SKIM_LABEL }
-const CONTROLS_BY_LANE = { human: HUMAN_CONTROLS, ai: AI_CONTROLS }
+const REVIEW_LABELS = { human: REVIEWER_SPEED_LABEL, ai: AI_SKIM_LABEL }
 
-const boxOf = async (locator) => {
+const boxOf = async (locator, label) => {
   const box = await locator.boundingBox()
-  expect(box, 'element has a layout box').not.toBeNull()
+  expect(box, `${label} has a layout box`).not.toBeNull()
   return box
 }
 
 const metricsGrid = (page, laneId) =>
   laneLocator(page, laneId).locator('dl', { has: page.locator('[data-metric="incidents"]') })
 
-const expectInsideViewport = async (locator, viewport) => {
-  const { x, y, width, height } = await boxOf(locator)
-  expect(y).toBeGreaterThanOrEqual(0)
-  expect(y + height).toBeLessThanOrEqual(viewport.height)
-  expect(x).toBeGreaterThanOrEqual(0)
-  expect(x + width).toBeLessThanOrEqual(viewport.width)
+const expectInsideViewport = async (locator, viewport, label) => {
+  const { x, y, width, height } = await boxOf(locator, label)
+  expect(y, `${label} top`).toBeGreaterThanOrEqual(0)
+  expect(y + height, `${label} bottom`).toBeLessThanOrEqual(viewport.height)
+  expect(x, `${label} left`).toBeGreaterThanOrEqual(0)
+  expect(x + width, `${label} right`).toBeLessThanOrEqual(viewport.width)
 }
 
-// The positions of a lane's three groups: inputs, Pending Review box, review side.
+const expectStackedBelow = (upper, lower, label) =>
+  expect(upper.y + upper.height, label).toBeLessThanOrEqual(lower.y)
+
+const expectLeftOf = (left, right, label) =>
+  expect(left.x + left.width, label).toBeLessThanOrEqual(right.x)
+
+const expectNoHorizontalScroll = async (page) => {
+  const scroll = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }))
+  expect(scroll.scrollWidth, 'page scroll width').toBeLessThanOrEqual(scroll.clientWidth)
+}
+
+// The positions of a lane's groups: inputs (every generation slider), Pending Review box, review
+// controls, and metrics grid.
 const laneGroups = async (page, laneId) => {
-  const controls = CONTROLS_BY_LANE[laneId]
+  const inputs = []
+  for (const label of GENERATION_LABELS[laneId]) {
+    inputs.push(await boxOf(slider(page, label), `${laneId} ${label}`))
+  }
   return {
-    inputs: await boxOf(slider(page, controls.generation)),
-    queue: await boxOf(queueBox(page, laneId)),
-    review: await boxOf(slider(page, controls.review)),
-    metrics: await boxOf(metricsGrid(page, laneId)),
+    inputs,
+    queue: await boxOf(queueBox(page, laneId), `${laneId} queue`),
+    review: await boxOf(slider(page, REVIEW_LABELS[laneId]), `${laneId} review slider`),
+    metrics: await boxOf(metricsGrid(page, laneId), `${laneId} metrics`),
   }
 }
 
+// Text and background colours as sRGB bytes. A canvas converts any CSS colour (including the
+// oklch greys Tailwind uses); a transparent background falls back to the nearest opaque ancestor.
+const textColors = (locator) =>
+  locator.evaluate((element) => {
+    const toRgba = (cssColor) => {
+      const canvas = document.createElement('canvas')
+      canvas.width = canvas.height = 1
+      const context = canvas.getContext('2d')
+      context.fillStyle = cssColor
+      context.fillRect(0, 0, 1, 1)
+      return [...context.getImageData(0, 0, 1, 1).data]
+    }
+    let backgroundHolder = element
+    while (toRgba(getComputedStyle(backgroundHolder).backgroundColor)[3] === 0) {
+      backgroundHolder = backgroundHolder.parentElement
+    }
+    return {
+      foreground: toRgba(getComputedStyle(element).color).slice(0, 3),
+      background: toRgba(getComputedStyle(backgroundHolder).backgroundColor).slice(0, 3),
+    }
+  })
+
+// WCAG 2 relative luminance and contrast ratio.
+const luminance = (rgb) => {
+  const [red, green, blue] = rgb.map((byte) => {
+    const channel = byte / 255
+    return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+  })
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+}
+const contrastRatio = ({ foreground, background }) => {
+  const [lighter, darker] = [luminance(foreground), luminance(background)].sort((a, b) => b - a)
+  return (lighter + 0.05) / (darker + 0.05)
+}
+
 test.describe('Pending Review layout', () => {
-  test.describe('on a projector (1280 x 720)', () => {
+  test.describe('on a projector', () => {
     test.use({ viewport: PROJECTOR })
 
-    test('Projector fit: header, headline, counts and metric grids are all on screen', async ({
-      page,
-    }) => {
+    test('Projector fit at 1280 × 720', async ({ page }) => {
       await openSimulator(page)
       await startAndRunFor(page, FULL_RUN_SECONDS)
 
-      await expectInsideViewport(page.getByRole('banner'), PROJECTOR)
-      await expectInsideViewport(headline(page), PROJECTOR)
-      for (const laneId of ['human', 'ai']) {
-        await expectInsideViewport(metric(page, laneId, 'pending'), PROJECTOR)
-        await expectInsideViewport(metricsGrid(page, laneId), PROJECTOR)
-        await expectInsideViewport(laneLocator(page, laneId), PROJECTOR)
+      await expectInsideViewport(page.getByRole('banner'), PROJECTOR, 'header')
+      await expectInsideViewport(headline(page), PROJECTOR, 'headline ratio')
+      for (const laneId of ALL_LANE_IDS) {
+        await expectInsideViewport(metric(page, laneId, 'pending'), PROJECTOR, `${laneId} count`)
+        await expectInsideViewport(metricsGrid(page, laneId), PROJECTOR, `${laneId} metrics`)
+        await expectInsideViewport(laneLocator(page, laneId), PROJECTOR, `${laneId} lane`)
       }
     })
   })
 
-  test.describe('on a desktop (1280 x 800)', () => {
+  test.describe('on a desktop', () => {
     test.use({ viewport: DESKTOP })
 
     test('Metric rows line up across lanes', async ({ page }) => {
       await openSimulator(page)
 
       for (const row of METRIC_ROWS_TOP_TO_BOTTOM) {
-        const human = await boxOf(metric(page, 'human', row))
-        const ai = await boxOf(metric(page, 'ai', row))
-        expect(ai.x, `${row} left edge`).toBe(human.x)
+        const human = await boxOf(metric(page, 'human', row), `human ${row}`)
+        const ai = await boxOf(metric(page, 'ai', row), `ai ${row}`)
+        expect(ai.x, `${row} value left edge`).toBe(human.x)
+      }
+      const humanLabels = metricsGrid(page, 'human').locator('dt')
+      const aiLabels = metricsGrid(page, 'ai').locator('dt')
+      for (let row = 0; row < METRIC_ROWS_TOP_TO_BOTTOM.length; row += 1) {
+        const human = await boxOf(humanLabels.nth(row), `human label ${row}`)
+        const ai = await boxOf(aiLabels.nth(row), `ai label ${row}`)
+        expect(ai.x, `label ${row} left edge`).toBe(human.x)
       }
     })
 
     test('Metric rows keep one fixed order in both lanes', async ({ page }) => {
       await openSimulator(page)
 
-      for (const laneId of ['human', 'ai']) {
+      for (const laneId of ALL_LANE_IDS) {
         const tops = []
         for (const row of METRIC_ROWS_TOP_TO_BOTTOM) {
-          tops.push((await boxOf(metric(page, laneId, row))).y)
+          tops.push((await boxOf(metric(page, laneId, row), `${laneId} ${row}`)).y)
         }
-        expect(tops).toEqual([...tops].sort((a, b) => a - b))
+        expect(
+          tops.slice(1).every((top, index) => top > tops[index]),
+          `${laneId} rows are strictly top to bottom`,
+        ).toBe(true)
       }
     })
 
     test('Wide layout reads left to right', async ({ page }) => {
       await openSimulator(page)
 
-      for (const laneId of ['human', 'ai']) {
-        const { inputs, queue, review } = await laneGroups(page, laneId)
-        expect(inputs.x + inputs.width, `${laneId} inputs end`).toBeLessThanOrEqual(queue.x)
-        expect(queue.x + queue.width, `${laneId} queue ends`).toBeLessThanOrEqual(review.x)
+      for (const laneId of ALL_LANE_IDS) {
+        const { inputs, queue, review, metrics } = await laneGroups(page, laneId)
+        for (const input of inputs) expectLeftOf(input, queue, `${laneId} inputs left of queue`)
+        expectLeftOf(queue, review, `${laneId} queue left of review controls`)
+        expectLeftOf(review, metrics, `${laneId} review controls left of metrics`)
       }
-      const title = await boxOf(page.getByRole('heading', { level: 1 }))
-      const start = await boxOf(buttonNamed(page, 'Start'))
-      const reset = await boxOf(buttonNamed(page, 'Reset'))
-      expect(start.x).toBeGreaterThanOrEqual(title.x + title.width)
-      expect(reset.x).toBeGreaterThanOrEqual(title.x + title.width)
+      const title = await boxOf(page.getByRole('heading', { level: 1 }), 'title')
+      for (const name of ['Start', 'Reset']) {
+        const button = await boxOf(buttonNamed(page, name), name)
+        expect(button.x, `${name} is right of the title`).toBeGreaterThanOrEqual(
+          title.x + title.width,
+        )
+      }
     })
 
     test('Dark theme', async ({ page }) => {
@@ -133,9 +201,48 @@ test.describe('Pending Review layout', () => {
 
       await expect(page.locator('body')).toHaveCSS('background-color', PAGE_BACKGROUND)
     })
+
+    test('Text contrasts with its background (WCAG 1.4.3)', async ({ page }) => {
+      await openSimulator(page)
+      const texts = {
+        'Start button': buttonNamed(page, 'Start'),
+        'Reset button': buttonNamed(page, 'Reset'),
+        'description under the title': page.getByText('Watch AI-speed code generation'),
+        'elapsed caption': page.getByText('1 s = 1 work hour'),
+      }
+
+      for (const [label, locator] of Object.entries(texts)) {
+        const ratio = contrastRatio(await textColors(locator))
+        expect(ratio, `${label} contrast`).toBeGreaterThanOrEqual(MIN_TEXT_CONTRAST)
+      }
+    })
   })
 
-  test.describe('on a phone (375 x 667)', () => {
+  test.describe('on a tablet', () => {
+    test.use({ viewport: TABLET })
+
+    test('Metric values stay inside their lane at the md breakpoint', async ({ page }) => {
+      await openSimulator(page)
+      await startAndRunFor(page, FULL_RUN_SECONDS)
+
+      await expectNoHorizontalScroll(page)
+      for (const laneId of ALL_LANE_IDS) {
+        const lane = await boxOf(laneLocator(page, laneId), `${laneId} lane`)
+        const grid = await boxOf(metricsGrid(page, laneId), `${laneId} metrics`)
+        for (const row of METRIC_ROWS_TOP_TO_BOTTOM) {
+          const value = await boxOf(metric(page, laneId, row), `${laneId} ${row}`)
+          expect(value.x + value.width, `${laneId} ${row} inside metrics grid`).toBeLessThanOrEqual(
+            grid.x + grid.width,
+          )
+          expect(value.x + value.width, `${laneId} ${row} inside lane`).toBeLessThanOrEqual(
+            lane.x + lane.width,
+          )
+        }
+      }
+    })
+  })
+
+  test.describe('on a phone', () => {
     test.use({ viewport: PHONE })
 
     test('No horizontal scroll on a phone, even when overflowing', async ({ page }) => {
@@ -143,55 +250,65 @@ test.describe('Pending Review layout', () => {
       await startAndRunFor(page, FULL_RUN_SECONDS)
 
       await expect(overflowIn(page, 'ai')).toBeVisible()
-      const scroll = await page.evaluate(() => ({
-        scrollWidth: document.documentElement.scrollWidth,
-        clientWidth: document.documentElement.clientWidth,
-      }))
-      expect(scroll.scrollWidth).toBeLessThanOrEqual(scroll.clientWidth)
+      await expectNoHorizontalScroll(page)
 
-      const human = await boxOf(laneLocator(page, 'human'))
-      const ai = await boxOf(laneLocator(page, 'ai'))
-      expect(human.y + human.height, 'lanes are stacked').toBeLessThanOrEqual(ai.y)
+      const human = await boxOf(laneLocator(page, 'human'), 'human lane')
+      const ai = await boxOf(laneLocator(page, 'ai'), 'ai lane')
+      expectStackedBelow(human, ai, 'lanes are stacked')
 
-      for (const laneId of ['human', 'ai']) {
+      for (const laneId of ALL_LANE_IDS) {
         const { inputs, queue, review, metrics } = await laneGroups(page, laneId)
-        expect(inputs.y + inputs.height, `${laneId} inputs above queue`).toBeLessThanOrEqual(
-          queue.y,
-        )
-        expect(queue.y + queue.height, `${laneId} queue above review`).toBeLessThanOrEqual(review.y)
-        expect(review.y + review.height, `${laneId} review above metrics`).toBeLessThanOrEqual(
-          metrics.y,
-        )
+        expectStackedBelow(inputs.at(-1), queue, `${laneId} inputs above queue`)
+        expectStackedBelow(queue, review, `${laneId} queue above review`)
+        expectStackedBelow(review, metrics, `${laneId} review above metrics`)
       }
 
-      await expectInsideViewport(buttonNamed(page, 'Pause'), PHONE)
-      await expectInsideViewport(buttonNamed(page, 'Reset'), PHONE)
+      await expectInsideViewport(buttonNamed(page, 'Pause'), PHONE, 'Start/Pause button')
+      await expectInsideViewport(buttonNamed(page, 'Reset'), PHONE, 'Reset button')
+    })
+  })
+
+  test.describe('on the narrowest phone', () => {
+    test.use({ viewport: NARROWEST_PHONE })
+
+    test('No horizontal scroll at 320 px, even when overflowing', async ({ page }) => {
+      await openSimulator(page)
+      await startAndRunFor(page, FULL_RUN_SECONDS)
+
+      await expect(overflowIn(page, 'ai')).toBeVisible()
+      await expectNoHorizontalScroll(page)
     })
   })
 
   test('Every control is keyboard reachable with a visible focus ring', async ({ page }) => {
     await openSimulator(page)
     const inTabOrder = [
-      buttonNamed(page, 'Start'),
-      buttonNamed(page, 'Reset'),
-      slider(page, THRESHOLD_LABEL),
-      slider(page, HUMAN_GEN_LABEL),
-      slider(page, PR_SIZE_LABEL),
-      slider(page, REVIEWER_SPEED_LABEL),
-      slider(page, AI_GEN_LABEL),
-      slider(page, AI_SKIM_LABEL),
+      ['Start', buttonNamed(page, 'Start')],
+      ['Reset', buttonNamed(page, 'Reset')],
+      [THRESHOLD_LABEL, slider(page, THRESHOLD_LABEL)],
+      [HUMAN_GEN_LABEL, slider(page, HUMAN_GEN_LABEL)],
+      [PR_SIZE_LABEL, slider(page, PR_SIZE_LABEL)],
+      [REVIEWER_SPEED_LABEL, slider(page, REVIEWER_SPEED_LABEL)],
+      [AI_GEN_LABEL, slider(page, AI_GEN_LABEL)],
+      [AI_SKIM_LABEL, slider(page, AI_SKIM_LABEL)],
     ]
 
-    for (const control of inTabOrder) {
-      await tabTo(page, control)
+    for (const [name, control] of inTabOrder) {
+      await page.keyboard.press('Tab')
+      await expect(control, `${name} is next in the Tab order`).toBeFocused()
+      await expect(control).toHaveAccessibleName(name)
+      await expect(control, `${name} focus ring colour`).toHaveCSS(
+        'outline-color',
+        FOCUS_RING_COLOR,
+      )
       const focusRing = await control.evaluate((element) => ({
         isFocusVisible: element.matches(':focus-visible'),
         outlineStyle: getComputedStyle(element).outlineStyle,
         outlineWidth: Number.parseFloat(getComputedStyle(element).outlineWidth),
       }))
-      expect(focusRing.isFocusVisible).toBe(true)
-      expect(focusRing.outlineStyle).not.toBe('none')
-      expect(focusRing.outlineWidth).toBeGreaterThan(0)
+      expect(focusRing.isFocusVisible, `${name} matches :focus-visible`).toBe(true)
+      expect(focusRing.outlineStyle, `${name} outline style`).not.toBe('none')
+      expect(focusRing.outlineWidth, `${name} outline width`).toBeGreaterThan(0)
     }
   })
 })

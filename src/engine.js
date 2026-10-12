@@ -102,8 +102,8 @@ export const displayedPending = (lane) => floorShow(lane.pendingPrs)
 export const displayedDeployed = (lane) => floorShow(lane.deployedPrs)
 // How many tiles to draw for `displayed` pending PRs, and how many PRs they do not cover.
 export const tileLayout = (displayed, capacity) => ({
-  tiles: Math.min(displayed, capacity),
-  overflow: Math.max(0, displayed - capacity),
+  tileCount: Math.min(displayed, capacity),
+  overflowCount: Math.max(0, displayed - capacity),
 })
 
 export const displayedIncidents = (lane) => floorShow(lane.escapedDefects)

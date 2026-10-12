@@ -1,5 +1,5 @@
 import { SLIDERS } from '../engine.js'
-import { COLOR_CLASS, SLIDER_PRESENTATION } from '../laneConfig.js'
+import { COLOR_CLASS, SLIDER_PRESENTATION, TYPE_CLASS } from '../laneConfig.js'
 
 export function RateSlider({
   settingKey,
@@ -12,7 +12,7 @@ export function RateSlider({
   const inputId = `slider-${settingKey}`
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={inputId} className="text-base">
+      <label htmlFor={inputId} className={TYPE_CLASS.label}>
         {label}
       </label>
       <div className="flex items-center gap-3">
@@ -30,7 +30,7 @@ export function RateSlider({
         <span
           id={`slider-value-${settingKey}`}
           aria-hidden="true"
-          className="shrink-0 text-xl font-semibold"
+          className={`shrink-0 ${TYPE_CLASS.value}`}
         >
           {value}
           {unit}

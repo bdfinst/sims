@@ -93,6 +93,13 @@ export const expectPending = (page, laneId, count) =>
   expect(metric(page, laneId, 'pending')).toHaveText(String(count))
 
 const QUEUE_LABEL_BY_LANE = { human: 'Human', ai: 'AI' }
+
+// The red of the warning state: --color-warning (#ef4444) in src/index.css.
+export const WARNING_BORDER_COLOR = 'rgb(239, 68, 68)'
+// The dark page: --color-canvas (#0b0d12) in src/index.css.
+export const PAGE_BACKGROUND = 'rgb(11, 13, 18)'
+
+export const FULL_RUN_SECONDS = 10
 // Declared here on purpose: data-state is a fixed hook, so a rename in the app must fail the tests.
 export const QUEUE_STATE = Object.freeze({ warning: 'warning', normal: 'normal' })
 
@@ -110,7 +117,7 @@ export const expectWarningShown = async (page, laneId) => {
   const box = queueBox(page, laneId)
   await expect(box).toHaveAttribute('data-state', QUEUE_STATE.warning)
   await expect(box.locator('[data-icon="triangle-alert"]')).toBeVisible()
-  await expect(box).toHaveCSS('border-color', 'rgb(239, 68, 68)')
+  await expect(box).toHaveCSS('border-color', WARNING_BORDER_COLOR)
   await expect(laneLocator(page, laneId).getByRole('status')).toHaveText(
     `${QUEUE_LABEL_BY_LANE[laneId]} Pending Review over threshold`,
   )
@@ -127,6 +134,7 @@ export const readTileCapacity = async (page) =>
 export const SECOND_MS = 1000
 export { TICK_MS }
 export const TICKS_PER_SECOND = SECOND_MS / TICK_MS
+export const ticksToSeconds = (ticks) => ticks / TICKS_PER_SECOND
 
 export const HUMAN_GEN_LABEL = 'Human generation (PRs/hr)'
 export const AI_GEN_LABEL = 'AI generation (PRs/hr)'
@@ -156,8 +164,8 @@ export const REFERENCE = Object.freeze({
   aiDeployedAtTick100: 15,
   humanDeployedAtTick100: 10,
   // Incidents = reviewed LOC x 0.02 x (1 - detection). Internal values at 10 s: Human 19.5 escaped
-  // over 10 deployed PRs (1.95 per PR); AI 107.84 over 15.87 deployed PRs (6.79 per PR, not
-  // 107 / 15). The displayed Incidents are those escapes floored: 19 and 107.
+  // over 10 deployed PRs (1.95 per PR); AI 107.8378 over 15.8730 deployed PRs (6.79 per PR, from the
+  // unrounded values, and not 107 / 15). The displayed Incidents are those escapes floored.
   humanIncidentsAtTick100: 19,
   humanIncidentsPerPrAtTick100: '1.95',
   aiIncidentsAtTick100: 107,

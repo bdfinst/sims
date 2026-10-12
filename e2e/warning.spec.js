@@ -19,6 +19,7 @@ import {
   startAndRunFor,
   startSimulation,
   test,
+  ticksToSeconds,
   visibleValue,
 } from './fixtures.js'
 
@@ -44,7 +45,7 @@ const KEPT_THRESHOLD = 30
 
 const SECONDS_TO_AI_PENDING_14 = 0.8
 const SECONDS_TO_AI_PENDING_16 = 0.9
-const SECONDS_TO_AI_PENDING_22 = 1.2
+const AI_PENDING_22_AT_TICK = 12
 const SECONDS_TO_AI_PENDING_9 = 0.5
 const SECONDS_TO_HUMAN_PENDING_15 = 1.8
 const SECONDS_TO_HUMAN_PENDING_16 = 1.9
@@ -141,7 +142,7 @@ test.describe('Pending Review overload warning', () => {
 
   test('Raising the threshold while paused clears the warning', async ({ page }) => {
     await openSimulator(page)
-    await startAndRunFor(page, SECONDS_TO_AI_PENDING_22)
+    await startAndRunFor(page, ticksToSeconds(AI_PENDING_22_AT_TICK))
     await pauseSimulation(page)
     await expectQueueState(page, 'ai', REFERENCE.aiPendingAtTick12, QUEUE_STATE.warning)
 
