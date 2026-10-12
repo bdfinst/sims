@@ -1,7 +1,19 @@
 // Presentation only. Numeric behavior lives in engine.js.
 // Tailwind class strings must stay complete literals so the scanner finds them.
 
-import { LANE_IDS } from './engine.js'
+import { FAROS_PR_SIZE_MULTIPLIER, LANE_IDS, formatPrSize, formatPrsPerDay } from './engine.js'
+
+// Read-only values a lane shows under its sliders, from laneParams: `param` is the laneParams
+// field, `format` renders it, `prefix` (may be empty) precedes it and `note` follows it. Lane
+// renders these with no lane-specific branching.
+const derivedSize = (note) =>
+  Object.freeze({ param: 'size', prefix: 'PR size', format: formatPrSize, note })
+const DERIVED_PRS_PER_DAY = Object.freeze({
+  param: 'prsPerDay',
+  prefix: '',
+  format: formatPrsPerDay,
+  note: '(derived)',
+})
 
 export const LANE_PRESENTATION = Object.freeze({
   [LANE_IDS.human]: Object.freeze({
@@ -15,6 +27,7 @@ export const LANE_PRESENTATION = Object.freeze({
     accentTileClass: 'bg-human',
     generationSliders: ['humanGen', 'prSize'],
     reviewSliders: ['reviewerSpeed'],
+    derivedFields: [derivedSize('(derived)')],
   }),
   [LANE_IDS.ai]: Object.freeze({
     label: 'AI',
@@ -27,6 +40,7 @@ export const LANE_PRESENTATION = Object.freeze({
     accentTileClass: 'bg-ai',
     generationSliders: ['aiGen'],
     reviewSliders: ['skim'],
+    derivedFields: [derivedSize(`(${FAROS_PR_SIZE_MULTIPLIER}× human)`), DERIVED_PRS_PER_DAY],
   }),
 })
 
@@ -48,6 +62,21 @@ export const SLIDER_PRESENTATION = Object.freeze({
     label: 'PR size (LOC, both lanes)',
     unit: ' LOC',
     spokenUnit: 'lines of code',
+  }),
+  humanLocPerHour: Object.freeze({
+    label: 'Human code written (LOC/hr)',
+    unit: ' LOC/hr',
+    spokenUnit: 'lines of code per hour',
+  }),
+  humanPrsPerDay: Object.freeze({
+    label: 'Human PRs per day',
+    unit: ' PRs/day',
+    spokenUnit: 'PRs per day',
+  }),
+  aiLocPerHour: Object.freeze({
+    label: 'AI code written (LOC/hr)',
+    unit: ' LOC/hr',
+    spokenUnit: 'lines of code per hour',
   }),
   reviewerSpeed: Object.freeze({
     label: 'Reviewer speed (LOC/hr, both lanes)',

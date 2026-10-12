@@ -54,6 +54,23 @@ describe('laneParams at the default settings', () => {
   })
 })
 
+describe('laneParams before the cutover', () => {
+  it.each(Object.values(LANE_IDS))(
+    'ignores the code-written and PRs-per-day settings for the %s lane',
+    (laneId) => {
+      const settings = {
+        ...DEFAULT_SETTINGS,
+        humanLocPerHour: 200,
+        humanPrsPerDay: 4,
+        aiLocPerHour: 2000,
+      }
+      expect(laneParams(settings, LANE_MODELS[laneId])).toEqual(
+        laneParams(DEFAULT_SETTINGS, LANE_MODELS[laneId]),
+      )
+    },
+  )
+})
+
 describe('laneParams after settings change', () => {
   it('derives AI size and speed from the new PR size and skim (302 LOC, 900 LOC/hr)', () => {
     const settings = { ...DEFAULT_SETTINGS, prSize: 200, skim: 3 }
@@ -74,6 +91,15 @@ describe('LANE_MODELS', () => {
     expect(LANE_MODELS[LANE_IDS.human]).toMatchObject({ sizeApplies: false, sizeMultiplier: 1 })
     expect(LANE_MODELS[LANE_IDS.ai]).toMatchObject({ sizeApplies: true, sizeMultiplier: 1.51 })
   })
+
+  it('names the code-written setting each lane generates from', () => {
+    expect(LANE_MODELS[LANE_IDS.human].locSetting).toBe('humanLocPerHour')
+    expect(LANE_MODELS[LANE_IDS.ai].locSetting).toBe('aiLocPerHour')
+  })
+
+  it.each(Object.values(LANE_IDS))('points the %s lane at a setting that exists', (laneId) => {
+    expect(Object.keys(SLIDERS)).toContain(LANE_MODELS[laneId].locSetting)
+  })
 })
 
 describe('slider table', () => {
@@ -82,10 +108,27 @@ describe('slider table', () => {
       humanGen: 1,
       aiGen: 20,
       prSize: 250,
+      humanLocPerHour: 30,
+      humanPrsPerDay: 1,
+      aiLocPerHour: 53,
       reviewerSpeed: 300,
       skim: 2,
       threshold: 15,
     })
+  })
+
+  it.each([
+    { key: 'humanLocPerHour', min: 5, max: 200, step: 5, defaultValue: 30 },
+    { key: 'humanPrsPerDay', min: 0.25, max: 4, step: 0.25, defaultValue: 1 },
+    { key: 'aiLocPerHour', min: 5, max: 2000, step: 1, defaultValue: 53 },
+  ])('gives $key the range $min to $max in steps of $step', ({ key, ...slider }) => {
+    expect(SLIDERS[key]).toEqual(slider)
+  })
+
+  it('leaves the old generation sliders as they were until the cutover', () => {
+    expect(SLIDERS.humanGen).toEqual({ min: 1, max: 10, step: 1, defaultValue: 1 })
+    expect(SLIDERS.aiGen).toEqual({ min: 5, max: 50, step: 1, defaultValue: 20 })
+    expect(SLIDERS.prSize).toEqual({ min: 50, max: 1000, step: 10, defaultValue: 250 })
   })
 
   it('keeps every default inside its own range', () => {

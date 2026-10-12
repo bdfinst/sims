@@ -16,12 +16,14 @@ export const FAROS_MERGE_RATE_MULTIPLIER = 1 + FAROS_MERGE_RATE_INCREASE_PCT / P
 export const LANE_MODELS = Object.freeze({
   [LANE_IDS.human]: Object.freeze({
     genSetting: 'humanGen',
+    locSetting: 'humanLocPerHour',
     sizeApplies: false,
     sizeMultiplier: 1,
     skimApplies: false,
   }),
   [LANE_IDS.ai]: Object.freeze({
     genSetting: 'aiGen',
+    locSetting: 'aiLocPerHour',
     sizeApplies: true,
     sizeMultiplier: FAROS_PR_SIZE_MULTIPLIER,
     skimApplies: true,
@@ -33,6 +35,10 @@ export const SLIDERS = Object.freeze({
   humanGen: Object.freeze({ min: 1, max: 10, step: 1, defaultValue: 1 }),
   aiGen: Object.freeze({ min: 5, max: 50, step: 1, defaultValue: 20 }),
   prSize: Object.freeze({ min: 50, max: 1000, step: 10, defaultValue: 250 }),
+  humanLocPerHour: Object.freeze({ min: 5, max: 200, step: 5, defaultValue: 30 }),
+  humanPrsPerDay: Object.freeze({ min: 0.25, max: 4, step: 0.25, defaultValue: 1 }),
+  // 53 = round(30 x FAROS_PR_SIZE_MULTIPLIER x FAROS_MERGE_RATE_MULTIPLIER); a unit test pins it.
+  aiLocPerHour: Object.freeze({ min: 5, max: 2000, step: 1, defaultValue: 53 }),
   reviewerSpeed: Object.freeze({ min: 100, max: 1000, step: 50, defaultValue: 300 }),
   skim: Object.freeze({ min: 1, max: 3, step: 0.5, defaultValue: 2 }),
   threshold: Object.freeze({ min: 5, max: 50, step: 1, defaultValue: 15 }),

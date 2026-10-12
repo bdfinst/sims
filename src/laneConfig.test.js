@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { LANE_MODELS } from './engine.js'
-import { LANE_ORDER, LANE_PRESENTATION, TILE_CAPACITY, tileLayout } from './laneConfig.js'
+import { LANE_IDS, LANE_MODELS, SLIDERS } from './engine.js'
+import {
+  LANE_ORDER,
+  LANE_PRESENTATION,
+  SLIDER_PRESENTATION,
+  TILE_CAPACITY,
+  tileLayout,
+} from './laneConfig.js'
 
 // 22 PRs are queued after 1.2 s (the AI lane) and must each get a tile; 98 is the largest
 // capacity the "exactly at capacity" scenario can reach (n - 1 pending after n ticks, up to tick 99).
@@ -43,4 +49,57 @@ describe('lane presentation agrees with the lane model', () => {
       expect(reviewSliders.includes('skim')).toBe(skimApplies)
     },
   )
+})
+
+describe('slider presentation', () => {
+  it.each(Object.keys(SLIDERS))('has a label, unit, and spoken unit for %s', (settingKey) => {
+    const { label, unit, spokenUnit } = SLIDER_PRESENTATION[settingKey]
+    expect([label, unit, spokenUnit].every((text) => typeof text === 'string' && text !== '')).toBe(
+      true,
+    )
+  })
+
+  it.each([
+    {
+      settingKey: 'humanLocPerHour',
+      label: 'Human code written (LOC/hr)',
+      unit: ' LOC/hr',
+      spokenUnit: 'lines of code per hour',
+    },
+    {
+      settingKey: 'humanPrsPerDay',
+      label: 'Human PRs per day',
+      unit: ' PRs/day',
+      spokenUnit: 'PRs per day',
+    },
+    {
+      settingKey: 'aiLocPerHour',
+      label: 'AI code written (LOC/hr)',
+      unit: ' LOC/hr',
+      spokenUnit: 'lines of code per hour',
+    },
+  ])('words $settingKey as "$label"', ({ settingKey, ...presentation }) => {
+    expect(SLIDER_PRESENTATION[settingKey]).toEqual(presentation)
+  })
+})
+
+describe('lane derived fields', () => {
+  const rendered = ({ prefix, format, note }, value) => `${prefix} ${format(value)} ${note}`.trim()
+
+  it('has the Human lane show its derived PR size', () => {
+    const [sizeField] = LANE_PRESENTATION[LANE_IDS.human].derivedFields
+    expect(rendered(sizeField, 240)).toBe('PR size 240 LOC (derived)')
+  })
+
+  it('has the AI lane show its PR size against the human one, then its PRs per day', () => {
+    const [sizeField, prsPerDayField] = LANE_PRESENTATION[LANE_IDS.ai].derivedFields
+    expect(rendered(sizeField, 362.4)).toBe('PR size 362 LOC (1.51× human)')
+    expect(rendered(prsPerDayField, 1.17)).toBe('1.17 PRs/day (derived)')
+  })
+
+  it('reads each field from the laneParams value it names', () => {
+    expect(
+      LANE_ORDER.map((laneId) => LANE_PRESENTATION[laneId].derivedFields.map(({ param }) => param)),
+    ).toEqual([['size'], ['size', 'prsPerDay']])
+  })
 })

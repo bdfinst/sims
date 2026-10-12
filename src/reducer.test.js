@@ -111,6 +111,37 @@ describe('setSetting', () => {
   })
 
   it.each([
+    { settingKey: 'humanLocPerHour', value: 999, stored: 200 },
+    { settingKey: 'humanLocPerHour', value: 0, stored: 5 },
+    { settingKey: 'humanPrsPerDay', value: 10, stored: 4 },
+    { settingKey: 'humanPrsPerDay', value: 0, stored: 0.25 },
+    { settingKey: 'aiLocPerHour', value: 5000, stored: 2000 },
+    { settingKey: 'aiLocPerHour', value: 2, stored: 5 },
+  ])('clamps the new $settingKey=$value to $stored', ({ settingKey, value, stored }) => {
+    expect(setSetting(initialState, settingKey, value).settings[settingKey]).toBe(stored)
+  })
+
+  it.each([
+    { settingKey: 'humanLocPerHour', value: 32, stored: 30 },
+    { settingKey: 'humanLocPerHour', value: 33, stored: 35 },
+    { settingKey: 'humanPrsPerDay', value: 0.3, stored: 0.25 },
+    { settingKey: 'humanPrsPerDay', value: 0.4, stored: 0.5 },
+    { settingKey: 'humanPrsPerDay', value: 0.75, stored: 0.75 },
+    { settingKey: 'aiLocPerHour', value: 53.4, stored: 53 },
+    { settingKey: 'aiLocPerHour', value: 53.6, stored: 54 },
+  ])('snaps the new $settingKey=$value to its step: $stored', ({ settingKey, value, stored }) => {
+    expect(setSetting(initialState, settingKey, value).settings[settingKey]).toBe(stored)
+  })
+
+  it.each(['humanLocPerHour', 'humanPrsPerDay', 'aiLocPerHour'])(
+    'ignores a non-numeric value for the new %s',
+    (settingKey) => {
+      expect(setSetting(initialState, settingKey, NaN)).toBe(initialState)
+      expect(setSetting(initialState, settingKey, '40')).toBe(initialState)
+    },
+  )
+
+  it.each([
     { settingKey: 'prSize', value: 254, stored: 250 },
     { settingKey: 'prSize', value: 256, stored: 260 },
     { settingKey: 'skim', value: 2.2, stored: 2 },
@@ -301,6 +332,23 @@ describe('reset', () => {
     const before = runningWithCustomSettings()
     expect(before.settings.aiGen).toBe(40)
     expect(dispatchAll(before, ACTION.reset).settings.aiGen).toBe(40)
+  })
+
+  it('keeps customised code-written and PRs-per-day settings alongside the old ones', () => {
+    const customised = [
+      ['humanLocPerHour', 50],
+      ['humanPrsPerDay', 0.5],
+      ['aiLocPerHour', 1000],
+      ['aiGen', 40],
+    ].reduce((state, [key, value]) => setSetting(state, key, value), initialState)
+
+    expect(dispatchAll(customised, ACTION.reset).settings).toEqual({
+      ...DEFAULT_SETTINGS,
+      humanLocPerHour: 50,
+      humanPrsPerDay: 0.5,
+      aiLocPerHour: 1000,
+      aiGen: 40,
+    })
   })
 
   it('clears a paused run too', () => {
