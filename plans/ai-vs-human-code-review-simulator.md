@@ -591,13 +591,11 @@ Feature: Reset the simulation
 ```gherkin
 Feature: Review quality metrics
 
-  @wip
   Scenario: Defects caught and pending LOC at rest
     Given I open the simulator
     Then the Human lane shows Defects caught 65% and Pending LOC 0
     And the AI lane shows Defects caught 15% and Pending LOC 0
 
-  @wip
   Scenario Outline: Defects caught follows PR size
     Given I set "Human code written (LOC/hr)" to <loc> and "Human PRs per day" to <perDay>
     Then the Human lane shows "PR size <size> LOC (derived)" and Defects caught <caught>
@@ -610,7 +608,6 @@ Feature: Review quality metrics
       | 50  | 1      | 400   | 4%     |
       | 125 | 1      | 1,000 | 4%     |
 
-  @wip
   Scenario Outline: Defects caught follows reviewer speed
     Given I set "Human code written (LOC/hr)" to 25 and "Reviewer speed (LOC/hr, both lanes)" to <speed>
     Then the Human lane shows Defects caught <caught>
@@ -622,12 +619,10 @@ Feature: Review quality metrics
       | 900   | 22%    |
       | 1000  | 8%     |
 
-  @wip
   Scenario: Skimming harder lowers AI defects caught
     Given I set "AI skim multiplier" to 3
     Then the AI lane shows Defects caught 5%
 
-  @wip
   Scenario: Reviewing AI code at human pace restores some catching
     Given I set "AI skim multiplier" to 1
     Then the AI lane shows Defects caught 18%
@@ -637,7 +632,6 @@ Feature: Review quality metrics
     Then both lanes show Incidents 0, Incidents per PR "—", and Pickup wait 0.0 h
     And the headline ratio shows "—"
 
-  @wip
   Scenario: Default metrics after 10 seconds
     Given I open the simulator
     When I press Start and 10 seconds pass
@@ -645,12 +639,10 @@ Feature: Review quality metrics
     And the AI lane shows Incidents 9, Incidents per PR 6.16, Pickup wait 0.0 h, Pending LOC 0
     And the headline ratio shows "3.65×"
 
-  @wip
   Scenario: The research effect emerges at the defaults
     Given the simulation is running and has run for 10 seconds with defaults
     Then the headline ratio is between 3 and 4
 
-  @wip
   Scenario: Incidents per PR waits for a whole deployed PR
     Given I open the simulator
     When I press Start and 7.9 seconds pass
@@ -659,13 +651,11 @@ Feature: Review quality metrics
     When 0.1 more seconds pass
     Then the Human lane shows Deployed 1 and Incidents per PR 1.69
 
-  @wip
   Scenario: Larger PRs accrue more incidents
     Given I set "Human code written (LOC/hr)" to 50
     When I press Start and 10 seconds pass
     Then the Human lane shows Pending Review 0, Deployed 1, Incidents 9, and Incidents per PR 7.68
 
-  @wip
   Scenario: A size change while running changes defects caught and accrual on the next tick
     Given the simulation is running and has run for 1 second with defaults
     When I set "Human code written (LOC/hr)" to 50
@@ -674,7 +664,6 @@ Feature: Review quality metrics
     When 8.9 more seconds pass
     Then the Human lane shows Incidents 8 and Incidents per PR 7.08
 
-  @wip
   Scenario: A PR-frequency change while running changes defects caught and accrual on the next tick
     Given the simulation is running and has run for 1 second with defaults
     When I set "Human PRs per day" to 0.25
@@ -683,7 +672,6 @@ Feature: Review quality metrics
     When 8.9 more seconds pass
     Then the Human lane shows Incidents 5, Deployed 0, and Incidents per PR "—"
 
-  @wip
   Scenario: A reviewer-speed change while running changes defects caught and accrual on the next tick
     Given the simulation is running and has run for 1 second with defaults
     When I set "Reviewer speed (LOC/hr, both lanes)" to 900
@@ -692,7 +680,6 @@ Feature: Review quality metrics
     When 8.9 more seconds pass
     Then the Human lane shows Incidents 4 and Incidents per PR 3.71
 
-  @wip
   Scenario: Queued PRs keep their size when PR size changes
     Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 2 seconds
     And the AI lane shows Pending Review 7 and Pending LOC 2,800
@@ -700,19 +687,16 @@ Feature: Review quality metrics
     And 1 second passes
     Then the AI lane shows Pending Review 9 and Pending LOC 4,200
 
-  @wip
   Scenario: A drained queue shows no wait
     Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 2 seconds
     When I set "AI code written (LOC/hr)" to 5 and "Reviewer speed (LOC/hr, both lanes)" to 1000
     And 6 seconds pass
     Then the AI lane shows Pending Review 0, Pickup wait 0.0 h, and Defects caught 2%
 
-  @wip
   Scenario: Incidents never decrease while running
     Given I set "AI code written (LOC/hr)" to 2000 and press Start
     Then each lane's Incidents count, sampled every tick for 10 seconds, never decreases
 
-  @wip
   Scenario: Reset clears the metrics
     Given the simulation is running and has run for 10 seconds
     When I press Reset
@@ -757,7 +741,6 @@ Feature: Review quality metrics
 ```gherkin
 Feature: Pending Review overload warning
 
-  @wip
   Scenario: AI queue turns red once it exceeds the default threshold
     Given I set "AI code written (LOC/hr)" to 2000
     When I press Start and 3.8 seconds pass
@@ -768,7 +751,6 @@ Feature: Pending Review overload warning
     And a status message announces "AI Pending Review over threshold"
     And the Human lane is not in the warning state
 
-  @wip
   Scenario: Displayed value at the threshold is not a warning even if the internal value is above it
     Given I set "AI code written (LOC/hr)" to 2000
     When I press Start and 3.9 seconds pass
@@ -776,7 +758,6 @@ Feature: Pending Review overload warning
     When 0.3 more seconds pass
     Then the AI lane shows Pending Review 16 and is in the warning state
 
-  @wip
   Scenario: A custom threshold applies to both lanes
     Given I set "Human code written (LOC/hr)" to 200, "Human PRs per day" to 4, "Reviewer speed (LOC/hr, both lanes)" to 100, and "AI code written (LOC/hr)" to 2000, and the simulation ran for 24 seconds and was paused
     And the Human lane shows Pending Review 6 and the AI lane shows Pending Review 71
@@ -785,27 +766,23 @@ Feature: Pending Review overload warning
     When I set "Warning threshold" to 5
     Then both lanes are in the warning state
 
-  @wip
   Scenario: Exactly at a custom threshold is not a warning
     Given I set "Warning threshold" to 38 and "AI code written (LOC/hr)" to 2000
     When I press Start and 10 seconds pass
     Then the AI lane shows Pending Review 38 and is not in the warning state
 
-  @wip
   Scenario: Raising the threshold while paused clears the warning
     Given I set "AI code written (LOC/hr)" to 2000 and the simulation ran for 6 seconds and was paused
     And the AI lane shows Pending Review 23 and is in the warning state
     When I set "Warning threshold" to 25
     Then the AI lane is not in the warning state
 
-  @wip
   Scenario: Lowering the threshold while running applies immediately
     Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 2 seconds
     And the AI lane shows Pending Review 7 and is not in the warning state
     When I set "Warning threshold" to 5
     Then the AI lane is in the warning state
 
-  @wip
   Scenario: Warning clears when the queue drains to the threshold
     Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 5 seconds
     And the AI lane shows Pending Review 19 and is in the warning state
@@ -1545,7 +1522,7 @@ Your decisions (recorded in the spec's Ambiguity Log):
   - [x] Step 8.1: Derived generation parameters and formatters in the engine
   - [x] Step 8.2: New slider keys, lane-model fields, and reducer handling (additive)
   - [x] Step 8.3: Cut over the model and the UI to the new sliders
-  - [ ] Step 8.4: Revised run, pause, reset, and controls scenarios
+  - [x] Step 8.4: Revised run, pause, reset, and controls scenarios
   - [ ] Step 8.5: Revised metrics and warning scenarios
   - [ ] Step 8.6: Revised tile and layout scenarios
   - [ ] Step 8.7: Generation scenarios

@@ -1,41 +1,44 @@
 import {
+  AI_DRAIN_SETTINGS,
   AI_SKIM_LABEL,
   ALL_LANE_IDS,
+  BUSY_AI_PRESET,
+  HUMAN_CODE_WRITTEN_LABEL,
+  HUMAN_PRS_PER_DAY_LABEL,
+  NEXT_TICK_SECONDS,
   NO_VALUE,
   REFERENCE,
   REVIEWER_SPEED_LABEL,
-  SECOND_MS,
   TICKS_PER_SECOND,
-  TICK_MS,
   buttonNamed,
   expect,
   expectCounts,
-  expectElapsedAtTick,
+  expectDeployed,
   expectNeverDecreases,
+  expectPending,
   headline,
   laneLocator,
   metric,
   metricValues,
   openSimulator,
   pauseSimulation,
+  runFor,
   sampleEachTick,
-  setSlider,
+  setSliders,
   startAndRunFor,
   startSimulation,
   test,
   FULL_RUN_SECONDS,
-  BUSY_HUMAN_GEN,
-  FAST_REVIEWER_SPEED,
   DRAIN_SECONDS,
-  QUIET_HUMAN_GEN,
 } from './fixtures.js'
 
+// Plan, Slice 4 outlines: Human code written and PRs per day set the derived PR size.
 const SIZE_CASES = [
-  { size: 50, caught: '80%' },
-  { size: 200, caught: '80%' },
-  { size: 300, caught: '42%' },
-  { size: 400, caught: '4%' },
-  { size: 1000, caught: '4%' },
+  { loc: 25, perDay: 4, size: '50', caught: '80%' },
+  { loc: 25, perDay: 1, size: '200', caught: '80%' },
+  { loc: 75, perDay: 2, size: '300', caught: '42%' },
+  { loc: 50, perDay: 1, size: '400', caught: '4%' },
+  { loc: 125, perDay: 1, size: '1,000', caught: '4%' },
 ]
 
 const SPEED_CASES = [
@@ -45,27 +48,75 @@ const SPEED_CASES = [
   { speed: 1000, caught: '8%' },
 ]
 
-const SIZE_AT_DETECTION_KNEE = 200
+// 25 LOC/hr at 1 PR per day is a 200 LOC PR, the knee of the size curve.
+const CODE_WRITTEN_AT_SIZE_KNEE = 25
 const HUMAN_CAUGHT_AT_REST = '65%'
 const AI_CAUGHT_AT_REST = '15%'
-const AI_CAUGHT_AT_MAX_SKIM = '3%'
-const AI_CAUGHT_AT_HUMAN_PACE = '12%'
+const AI_CAUGHT_AT_MAX_SKIM = '5%'
+const AI_CAUGHT_AT_HUMAN_PACE = '18%'
 const MAX_SKIM = 3
 const HUMAN_PACE_SKIM = 1
 
 const NO_WAIT = '0.0 h'
-const SIZE_CHANGE_AT_SECONDS = 1
-const OVERSIZED_PR = 400
+const CHANGE_AT_SECONDS = 1
+const LARGE_PR_CODE_WRITTEN = 50
+const RARE_PRS_PER_DAY = 0.25
+const MID_RUN_REVIEWER_SPEED = 900
 const QUEUE_BUILDING_SECONDS = 2
-const RESIZED_QUEUE_PR_SIZE = 500
+const HALVED_PRS_PER_DAY = 0.5
 const RESIZED_QUEUE_SECONDS = 1
 const RESEARCH_RATIO_FLOOR = 3
 const RESEARCH_RATIO_CEILING = 4
-const NEARLY_A_PR_SECONDS = 0.9
-const LAST_TENTH_SECONDS = 0.1
-const FIRST_PR_DEPLOYED = 1
-const TICK_AFTER_SIZE_CHANGE = 11
+const NEARLY_A_PR_SECONDS = 7.9
+const REST_OF_RUN_SECONDS = 8.9
 const UNAVAILABLE_TEXT = 'Not yet available'
+
+// AC7c: from the defaults at 1 s, one Human-side change shows in Defects caught on the next tick
+// and in the Human lane's metrics at 10 s.
+const MID_RUN_CHANGES = [
+  {
+    scenario: 'A size change while running changes defects caught and accrual on the next tick',
+    control: HUMAN_CODE_WRITTEN_LABEL,
+    value: LARGE_PR_CODE_WRITTEN,
+    caughtNextTick: REFERENCE.humanDefectsCaughtAfterCodeWritten50,
+    atTenSeconds: {
+      step: 'Then the Human lane shows Incidents 8 and Incidents per PR 7.08',
+      shown: {
+        incidents: REFERENCE.humanIncidentsAtTick100AfterCodeWritten50,
+        incidentsPerPr: REFERENCE.humanIncidentsPerPrAtTick100AfterCodeWritten50,
+      },
+    },
+  },
+  {
+    scenario:
+      'A PR-frequency change while running changes defects caught and accrual on the next tick',
+    control: HUMAN_PRS_PER_DAY_LABEL,
+    value: RARE_PRS_PER_DAY,
+    caughtNextTick: REFERENCE.humanDefectsCaughtAfterPrsPerDay025,
+    atTenSeconds: {
+      step: 'Then the Human lane shows Incidents 5, Deployed 0, and Incidents per PR "—"',
+      shown: {
+        incidents: REFERENCE.humanIncidentsAtTick100AfterPrsPerDay025,
+        deployed: REFERENCE.humanDeployedAtTick100AfterPrsPerDay025,
+        incidentsPerPr: NO_VALUE,
+      },
+    },
+  },
+  {
+    scenario:
+      'A reviewer-speed change while running changes defects caught and accrual on the next tick',
+    control: REVIEWER_SPEED_LABEL,
+    value: MID_RUN_REVIEWER_SPEED,
+    caughtNextTick: REFERENCE.humanDefectsCaughtAfterReviewerSpeed900,
+    atTenSeconds: {
+      step: 'Then the Human lane shows Incidents 4 and Incidents per PR 3.71',
+      shown: {
+        incidents: REFERENCE.humanIncidentsAtTick100AfterReviewerSpeed900,
+        incidentsPerPr: REFERENCE.humanIncidentsPerPrAtTick100AfterReviewerSpeed900,
+      },
+    },
+  },
+]
 
 const pendingReviewList = (page, laneId) =>
   laneLocator(page, laneId).locator('dl', { has: page.locator('[data-metric="pending"]') })
@@ -107,33 +158,37 @@ test.describe('Review quality metrics', () => {
     })
   })
 
-  for (const { size, caught } of SIZE_CASES) {
-    // @wip: Step 8.5
-    test.fixme(`Defects caught follows PR size: ${size} LOC gives ${caught}`, async ({ page }) => {
-      const PR_SIZE_LABEL = 'PR size (LOC, both lanes)'
-
-      await test.step(`Given I set "PR size (LOC, both lanes)" to ${size}`, async () => {
+  for (const { loc, perDay, size, caught } of SIZE_CASES) {
+    test(`Defects caught follows PR size: ${loc} LOC/hr at ${perDay} PRs per day gives ${caught}`, async ({
+      page,
+    }) => {
+      await test.step(`Given I set "Human code written (LOC/hr)" to ${loc} and "Human PRs per day" to ${perDay}`, async () => {
         await openSimulator(page)
-        await setSlider(page, PR_SIZE_LABEL, size)
+        await setSliders(page, {
+          [HUMAN_CODE_WRITTEN_LABEL]: loc,
+          [HUMAN_PRS_PER_DAY_LABEL]: perDay,
+        })
       })
 
-      await test.step(`Then the Human lane shows Defects caught ${caught}`, async () => {
+      await test.step(`Then the Human lane shows "PR size ${size} LOC (derived)" and Defects caught ${caught}`, async () => {
+        await expect(
+          laneLocator(page, 'human').getByText(`PR size ${size} LOC (derived)`),
+        ).toBeVisible()
         await expectDefectsCaught(page, 'human', caught)
       })
     })
   }
 
   for (const { speed, caught } of SPEED_CASES) {
-    // @wip: Step 8.5
-    test.fixme(`Defects caught follows reviewer speed: ${speed} LOC/hr gives ${caught}`, async ({
+    test(`Defects caught follows reviewer speed: ${speed} LOC/hr gives ${caught}`, async ({
       page,
     }) => {
-      const PR_SIZE_LABEL = 'PR size (LOC, both lanes)'
-
-      await test.step(`Given I set "PR size (LOC, both lanes)" to ${SIZE_AT_DETECTION_KNEE} and "Reviewer speed (LOC/hr, both lanes)" to ${speed}`, async () => {
+      await test.step(`Given I set "Human code written (LOC/hr)" to ${CODE_WRITTEN_AT_SIZE_KNEE} and "Reviewer speed (LOC/hr, both lanes)" to ${speed}`, async () => {
         await openSimulator(page)
-        await setSlider(page, PR_SIZE_LABEL, SIZE_AT_DETECTION_KNEE)
-        await setSlider(page, REVIEWER_SPEED_LABEL, speed)
+        await setSliders(page, {
+          [HUMAN_CODE_WRITTEN_LABEL]: CODE_WRITTEN_AT_SIZE_KNEE,
+          [REVIEWER_SPEED_LABEL]: speed,
+        })
       })
 
       await test.step(`Then the Human lane shows Defects caught ${caught}`, async () => {
@@ -142,26 +197,24 @@ test.describe('Review quality metrics', () => {
     })
   }
 
-  // @wip: Step 8.5
-  test.fixme('Skimming harder lowers AI defects caught', async ({ page }) => {
+  test('Skimming harder lowers AI defects caught', async ({ page }) => {
     await test.step('Given I set "AI skim multiplier" to 3', async () => {
       await openSimulator(page)
-      await setSlider(page, AI_SKIM_LABEL, MAX_SKIM)
+      await setSliders(page, { [AI_SKIM_LABEL]: MAX_SKIM })
     })
 
-    await test.step('Then the AI lane shows Defects caught 3%', async () => {
+    await test.step('Then the AI lane shows Defects caught 5%', async () => {
       await expectDefectsCaught(page, 'ai', AI_CAUGHT_AT_MAX_SKIM)
     })
   })
 
-  // @wip: Step 8.5
-  test.fixme('Reviewing AI code at human pace restores some catching', async ({ page }) => {
+  test('Reviewing AI code at human pace restores some catching', async ({ page }) => {
     await test.step('Given I set "AI skim multiplier" to 1', async () => {
       await openSimulator(page)
-      await setSlider(page, AI_SKIM_LABEL, HUMAN_PACE_SKIM)
+      await setSliders(page, { [AI_SKIM_LABEL]: HUMAN_PACE_SKIM })
     })
 
-    await test.step('Then the AI lane shows Defects caught 12%', async () => {
+    await test.step('Then the AI lane shows Defects caught 18%', async () => {
       await expectDefectsCaught(page, 'ai', AI_CAUGHT_AT_HUMAN_PACE)
     })
   })
@@ -228,8 +281,7 @@ test.describe('Review quality metrics', () => {
     })
   })
 
-  // @wip: Step 8.5
-  test.fixme('Default metrics after 10 seconds', async ({ page }) => {
+  test('Default metrics after 10 seconds', async ({ page }) => {
     await test.step('Given I open the simulator', async () => {
       await openSimulator(page)
     })
@@ -238,26 +290,26 @@ test.describe('Review quality metrics', () => {
       await startAndRunFor(page, FULL_RUN_SECONDS)
     })
 
-    await test.step('Then the Human lane shows Incidents 19, Incidents per PR 1.95, Pickup wait 0.0 h', async () => {
-      await expectMetric(page, 'human', 'incidents', REFERENCE.humanIncidentsAtTick100)
-      await expectMetric(page, 'human', 'incidentsPerPr', REFERENCE.humanIncidentsPerPrAtTick100)
+    await test.step('Then the Human lane shows Incidents 2, Incidents per PR 1.69, Pickup wait 0.0 h', async () => {
+      await expectMetric(page, 'human', 'incidents', REFERENCE.defaultHumanIncidentsAtTick100)
+      await expectMetric(page, 'human', 'incidentsPerPr', REFERENCE.defaultHumanIncidentsPerPr)
       await expectMetric(page, 'human', 'pickupWait', NO_WAIT)
     })
 
-    await test.step('And the AI lane shows Incidents 107, Incidents per PR 6.79, Pickup wait 116.0 h, Pending LOC 69,600', async () => {
-      await expectMetric(page, 'ai', 'incidents', REFERENCE.aiIncidentsAtTick100)
-      await expectMetric(page, 'ai', 'incidentsPerPr', REFERENCE.aiIncidentsPerPrAtTick100)
-      await expectMetric(page, 'ai', 'pickupWait', REFERENCE.aiPickupWaitAtTick100)
-      await expectMetric(page, 'ai', 'pendingLoc', REFERENCE.aiPendingLocAtTick100)
+    await test.step('And the AI lane shows Incidents 9, Incidents per PR 6.16, Pickup wait 0.0 h, Pending LOC 0', async () => {
+      await expectMetric(page, 'ai', 'incidents', REFERENCE.defaultAiIncidentsAtTick100)
+      await expectMetric(page, 'ai', 'incidentsPerPr', REFERENCE.defaultAiIncidentsPerPr)
+      await expectMetric(page, 'ai', 'pickupWait', NO_WAIT)
+      await expectMetric(page, 'ai', 'pendingLoc', 0)
     })
 
-    await test.step('And the headline ratio shows "3.48×"', async () => {
-      await expect(headline(page)).toHaveText(REFERENCE.headlineRatioAtTick100)
+    await test.step('And the headline ratio shows "3.65×"', async () => {
+      await expect(headline(page)).toHaveText(REFERENCE.defaultHeadlineRatio)
     })
   })
 
   test('The research effect emerges at the defaults', async ({ page }) => {
-    await test.step('Given the simulation has run for 10 seconds with defaults', async () => {
+    await test.step('Given the simulation is running and has run for 10 seconds with defaults', async () => {
       await openSimulator(page)
       await startAndRunFor(page, FULL_RUN_SECONDS)
     })
@@ -269,20 +321,17 @@ test.describe('Review quality metrics', () => {
     })
   })
 
-  // @wip: Step 8.5
-  test.fixme('Incidents per PR waits for a whole deployed PR', async ({ page }) => {
+  test('Incidents per PR waits for a whole deployed PR', async ({ page }) => {
     await test.step('Given I open the simulator', async () => {
       await openSimulator(page)
     })
 
-    await test.step('When I press Start and 0.9 seconds pass', async () => {
-      await startSimulation(page)
-      await page.clock.runFor(NEARLY_A_PR_SECONDS * SECOND_MS)
-      await expectElapsedAtTick(page, NEARLY_A_PR_SECONDS * TICKS_PER_SECOND)
+    await test.step('When I press Start and 7.9 seconds pass', async () => {
+      await startAndRunFor(page, NEARLY_A_PR_SECONDS)
     })
 
     await test.step('Then the Human lane shows Deployed 0 and Incidents per PR "—"', async () => {
-      await expectMetric(page, 'human', 'deployed', REFERENCE.humanDeployedAtTick9)
+      await expectDeployed(page, 'human', REFERENCE.defaultHumanDeployedAtTick79)
       await expectMetric(page, 'human', 'incidentsPerPr', NO_VALUE)
     })
 
@@ -291,170 +340,130 @@ test.describe('Review quality metrics', () => {
     })
 
     await test.step('When 0.1 more seconds pass', async () => {
-      await page.clock.runFor(LAST_TENTH_SECONDS * SECOND_MS)
+      await runFor(page, NEXT_TICK_SECONDS)
     })
 
-    await test.step('Then the Human lane shows Deployed 1 and Incidents per PR 1.95', async () => {
-      await expectMetric(page, 'human', 'deployed', FIRST_PR_DEPLOYED)
-      await expectMetric(page, 'human', 'incidentsPerPr', REFERENCE.humanIncidentsPerPrAtTick10)
+    await test.step('Then the Human lane shows Deployed 1 and Incidents per PR 1.69', async () => {
+      await expectDeployed(page, 'human', REFERENCE.defaultHumanDeployedAtTick80)
+      await expectMetric(page, 'human', 'incidentsPerPr', REFERENCE.defaultHumanIncidentsPerPr)
     })
   })
 
-  // @wip: Step 8.5
-  test.fixme('Larger PRs accrue more incidents', async ({ page }) => {
-    const PR_SIZE_LABEL = 'PR size (LOC, both lanes)'
-
-    await test.step('Given I set "PR size (LOC, both lanes)" to 400', async () => {
+  test('Larger PRs accrue more incidents', async ({ page }) => {
+    await test.step('Given I set "Human code written (LOC/hr)" to 50', async () => {
       await openSimulator(page)
-      await setSlider(page, PR_SIZE_LABEL, OVERSIZED_PR)
+      await setSliders(page, { [HUMAN_CODE_WRITTEN_LABEL]: LARGE_PR_CODE_WRITTEN })
     })
 
     await test.step('When I press Start and 10 seconds pass', async () => {
       await startAndRunFor(page, FULL_RUN_SECONDS)
     })
 
-    await test.step('Then the Human lane shows Pending Review 2, Deployed 7, Incidents 57, and Incidents per PR 7.68', async () => {
+    await test.step('Then the Human lane shows Pending Review 0, Deployed 1, Incidents 9, and Incidents per PR 7.68', async () => {
       await expectCounts(page, 'human', {
-        pending: REFERENCE.humanPendingAtTick100WithPrSize400,
-        deployed: REFERENCE.humanDeployedAtTick100WithPrSize400,
+        pending: REFERENCE.largeHumanPrPendingAtTick100,
+        deployed: REFERENCE.largeHumanPrDeployedAtTick100,
       })
-      await expectMetric(page, 'human', 'incidents', REFERENCE.humanIncidentsAtTick100WithPrSize400)
+      await expectMetric(page, 'human', 'incidents', REFERENCE.largeHumanPrIncidentsAtTick100)
       await expectMetric(
         page,
         'human',
         'incidentsPerPr',
-        REFERENCE.humanIncidentsPerPrAtTick100WithPrSize400,
+        REFERENCE.largeHumanPrIncidentsPerPrAtTick100,
       )
     })
   })
 
-  // @wip: Step 8.5
-  test.fixme('A size change while running changes defects caught and accrual on the next tick', async ({
-    page,
-  }) => {
-    const PR_SIZE_LABEL = 'PR size (LOC, both lanes)'
+  for (const { scenario, control, value, caughtNextTick, atTenSeconds } of MID_RUN_CHANGES) {
+    test(scenario, async ({ page }) => {
+      await test.step('Given the simulation is running and has run for 1 second with defaults', async () => {
+        await openSimulator(page)
+        await startAndRunFor(page, CHANGE_AT_SECONDS)
+      })
 
-    await test.step('Given the simulation has run for 1 second with defaults', async () => {
+      await test.step(`When I set "${control}" to ${value}`, async () => {
+        await setSliders(page, { [control]: value })
+      })
+
+      await test.step('And 0.1 seconds pass', async () => {
+        await runFor(page, NEXT_TICK_SECONDS)
+      })
+
+      await test.step(`Then the Human lane shows Defects caught ${caughtNextTick}`, async () => {
+        await expectDefectsCaught(page, 'human', caughtNextTick)
+      })
+
+      await test.step('When 8.9 more seconds pass', async () => {
+        await runFor(page, REST_OF_RUN_SECONDS)
+      })
+
+      await test.step(atTenSeconds.step, async () => {
+        for (const [name, shown] of Object.entries(atTenSeconds.shown)) {
+          await expectMetric(page, 'human', name, shown)
+        }
+      })
+    })
+  }
+
+  test('Queued PRs keep their size when PR size changes', async ({ page }) => {
+    await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 2 seconds', async () => {
       await openSimulator(page)
-      await startAndRunFor(page, SIZE_CHANGE_AT_SECONDS)
-    })
-
-    await test.step('When I set "PR size (LOC, both lanes)" to 400', async () => {
-      await setSlider(page, PR_SIZE_LABEL, OVERSIZED_PR)
-      await expectMetric(page, 'human', 'defectsCaught', REFERENCE.humanDefectsCaughtAtPrSize400)
-    })
-
-    await test.step('And 0.1 seconds pass', async () => {
-      await page.clock.runFor(TICK_MS)
-      await expectElapsedAtTick(page, TICK_AFTER_SIZE_CHANGE)
-    })
-
-    await test.step('Then the Human lane shows Defects caught 4%', async () => {
-      await expectMetric(page, 'human', 'defectsCaught', REFERENCE.humanDefectsCaughtAtPrSize400)
-    })
-
-    await test.step('When 8.9 more seconds pass', async () => {
-      await page.clock.runFor((FULL_RUN_SECONDS - SIZE_CHANGE_AT_SECONDS) * SECOND_MS - TICK_MS)
-      await expectElapsedAtTick(page, FULL_RUN_SECONDS * TICKS_PER_SECOND)
-    })
-
-    await test.step('Then the Human lane shows Incidents 53 and Incidents per PR 6.94', async () => {
-      await expectMetric(
-        page,
-        'human',
-        'incidents',
-        REFERENCE.humanIncidentsAtTick100AfterSizeChangeAtTick10,
-      )
-      await expectMetric(
-        page,
-        'human',
-        'incidentsPerPr',
-        REFERENCE.humanIncidentsPerPrAtTick100AfterSizeChangeAtTick10,
-      )
-    })
-  })
-
-  // @wip: Step 8.5
-  test.fixme('Queued PRs keep their size when PR size changes', async ({ page }) => {
-    const HUMAN_GEN_LABEL = 'Human generation (PRs/hr)'
-    const PR_SIZE_LABEL = 'PR size (LOC, both lanes)'
-
-    await test.step('Given I set "Human generation (PRs/hr)" to 10 and the simulation has run for 2 seconds', async () => {
-      await openSimulator(page)
-      await setSlider(page, HUMAN_GEN_LABEL, BUSY_HUMAN_GEN)
+      await setSliders(page, BUSY_AI_PRESET)
       await startAndRunFor(page, QUEUE_BUILDING_SECONDS)
     })
 
-    await test.step('And the Human lane shows Pending Review 17 and Pending LOC 4,400', async () => {
-      await expectMetric(page, 'human', 'pending', REFERENCE.humanPendingAtTick20WithHumanGen10)
-      await expectMetric(
-        page,
-        'human',
-        'pendingLoc',
-        REFERENCE.humanPendingLocAtTick20WithHumanGen10,
-      )
+    await test.step('And the AI lane shows Pending Review 7 and Pending LOC 2,800', async () => {
+      await expectPending(page, 'ai', REFERENCE.busyAiPendingAtTick20)
+      await expectMetric(page, 'ai', 'pendingLoc', REFERENCE.busyAiPendingLocAtTick20)
     })
 
-    await test.step('When I pause, set "PR size (LOC, both lanes)" to 500, and press Start', async () => {
+    await test.step('When I pause, set "Human PRs per day" to 0.5, and press Start', async () => {
       await pauseSimulation(page)
-      await setSlider(page, PR_SIZE_LABEL, RESIZED_QUEUE_PR_SIZE)
+      await setSliders(page, { [HUMAN_PRS_PER_DAY_LABEL]: HALVED_PRS_PER_DAY })
       await startSimulation(page)
     })
 
     await test.step('And 1 second passes', async () => {
-      await page.clock.runFor(RESIZED_QUEUE_SECONDS * SECOND_MS)
-      await expectElapsedAtTick(
-        page,
-        (QUEUE_BUILDING_SECONDS + RESIZED_QUEUE_SECONDS) * TICKS_PER_SECOND,
-      )
+      await runFor(page, RESIZED_QUEUE_SECONDS)
     })
 
-    await test.step('Then the Human lane shows Pending Review 26 and Pending LOC 9,100', async () => {
+    await test.step('Then the AI lane shows Pending Review 9 and Pending LOC 4,200', async () => {
+      await expectPending(page, 'ai', REFERENCE.busyAiPendingAtTick30AfterHumanPrsPerDay05)
       await expectMetric(
         page,
-        'human',
-        'pending',
-        REFERENCE.humanPendingAtTick30AfterSizeChangeToPrSize500,
-      )
-      await expectMetric(
-        page,
-        'human',
+        'ai',
         'pendingLoc',
-        REFERENCE.humanPendingLocAtTick30AfterSizeChangeToPrSize500,
+        REFERENCE.busyAiPendingLocAtTick30AfterHumanPrsPerDay05,
       )
     })
   })
 
-  // @wip: Step 8.5
-  test.fixme('A drained queue shows no wait', async ({ page }) => {
-    const HUMAN_GEN_LABEL = 'Human generation (PRs/hr)'
-
-    await test.step('Given I set "Human generation (PRs/hr)" to 10 and the simulation has run for 2 seconds', async () => {
+  test('A drained queue shows no wait', async ({ page }) => {
+    await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 2 seconds', async () => {
       await openSimulator(page)
-      await setSlider(page, HUMAN_GEN_LABEL, BUSY_HUMAN_GEN)
+      await setSliders(page, BUSY_AI_PRESET)
       await startAndRunFor(page, QUEUE_BUILDING_SECONDS)
     })
 
-    await test.step('When I set "Human generation (PRs/hr)" to 1 and "Reviewer speed (LOC/hr, both lanes)" to 1000', async () => {
-      await setSlider(page, HUMAN_GEN_LABEL, QUIET_HUMAN_GEN)
-      await setSlider(page, REVIEWER_SPEED_LABEL, FAST_REVIEWER_SPEED)
+    await test.step('When I set "AI code written (LOC/hr)" to 5 and "Reviewer speed (LOC/hr, both lanes)" to 1000', async () => {
+      await setSliders(page, AI_DRAIN_SETTINGS)
     })
 
     await test.step('And 6 seconds pass', async () => {
-      await page.clock.runFor(DRAIN_SECONDS * SECOND_MS)
-      await expectElapsedAtTick(page, (QUEUE_BUILDING_SECONDS + DRAIN_SECONDS) * TICKS_PER_SECOND)
+      await runFor(page, DRAIN_SECONDS)
     })
 
-    await test.step('Then the Human lane shows Pending Review 0, Pickup wait 0.0 h, and Defects caught 6%', async () => {
-      await expectMetric(page, 'human', 'pending', 0)
-      await expectMetric(page, 'human', 'pickupWait', NO_WAIT)
-      await expectMetric(page, 'human', 'defectsCaught', REFERENCE.humanDefectsCaughtWhenDrained)
+    await test.step('Then the AI lane shows Pending Review 0, Pickup wait 0.0 h, and Defects caught 2%', async () => {
+      await expectPending(page, 'ai', 0)
+      await expectMetric(page, 'ai', 'pickupWait', NO_WAIT)
+      await expectDefectsCaught(page, 'ai', REFERENCE.drainedAiDefectsCaught)
     })
   })
 
   test('Incidents never decrease while running', async ({ page }) => {
-    await test.step('Given I press Start', async () => {
+    await test.step('Given I set "AI code written (LOC/hr)" to 2000 and press Start', async () => {
       await openSimulator(page)
+      await setSliders(page, BUSY_AI_PRESET)
       await startSimulation(page)
     })
 
@@ -470,12 +479,11 @@ test.describe('Review quality metrics', () => {
     })
   })
 
-  // @wip: Step 8.5
-  test.fixme('Reset clears the metrics', async ({ page }) => {
-    await test.step('Given the simulation has run for 10 seconds', async () => {
+  test('Reset clears the metrics', async ({ page }) => {
+    await test.step('Given the simulation is running and has run for 10 seconds', async () => {
       await openSimulator(page)
       await startAndRunFor(page, FULL_RUN_SECONDS)
-      await expect(headline(page)).toHaveText(REFERENCE.headlineRatioAtTick100)
+      await expect(headline(page)).toHaveText(REFERENCE.defaultHeadlineRatio)
     })
 
     await test.step('When I press Reset', async () => {

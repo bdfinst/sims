@@ -149,9 +149,8 @@ export const PAGE_BACKGROUND = 'rgb(11, 13, 18)'
 export const FULL_RUN_SECONDS = 10
 // Setting values and run lengths several specs share (e2e-only; the unit tests keep their own).
 export const BUSY_HUMAN_GEN = 10
-export const QUIET_HUMAN_GEN = 1
-export const FAST_REVIEWER_SPEED = 1000
 export const DRAIN_SECONDS = 6
+export const NEXT_TICK_SECONDS = 0.1
 // Declared here on purpose: data-state is a fixed hook, so a rename in the app must fail the tests.
 export const QUEUE_STATE = Object.freeze({ warning: 'warning', normal: 'normal' })
 
@@ -231,14 +230,19 @@ export const HUMAN_BACKLOG_PRESET = Object.freeze({
   [HUMAN_PRS_PER_DAY_LABEL]: 4,
   [REVIEWER_SPEED_LABEL]: 100,
 })
+// Drain: the settings the drain scenarios switch a busy AI lane to (AI effective speed 2000 LOC/hr).
+export const AI_DRAIN_SETTINGS = Object.freeze({
+  [AI_CODE_WRITTEN_LABEL]: 5,
+  [REVIEWER_SPEED_LABEL]: 1000,
+})
 
 // Expected values from the plan's reference model (plan, "Default arithmetic" under "Slices").
 // Per tick (0.1 h): a lane gains gen x 0.1 PRs of `size` LOC each, then reviews
 // min(pending LOC, effective speed x 0.1) LOC, taking PRs off the queue in proportion.
 // AI effective speed = reviewer speed x skim. Ticks are 0.1 s each, so tick 10 is 1 s. Counts are
-// the displayed (floored) values. The pre-cutover oracles below the generation-model ones come from
-// the removed generation and PR size sliders, so only test.fixme bodies use them until Steps 8.5
-// and 8.6 replace them with Default arithmetic values.
+// the displayed (floored) values. The pre-cutover oracles at the end come from the removed
+// generation and PR size sliders, so only Step 8.6's test.fixme bodies use them until it replaces
+// them with Default arithmetic values.
 export const REFERENCE = Object.freeze({
   // Generation model (plan, "Default arithmetic"). Internal values in brackets.
   // Defaults: both queues stay empty; a human PR is 240 LOC, reviewed at 3 LOC per tick.
@@ -248,64 +252,69 @@ export const REFERENCE = Object.freeze({
   defaultHumanDeployedAtTick100: 1, // (1.25)
   defaultAiPendingAtTick100: 0,
   defaultAiDeployedAtTick100: 1, // (1.4625)
+  // Incidents = reviewed LOC x 0.02 x (1 - detection). Detection is fixed at the defaults, so
+  // incidents per PR are too: Human 240 x 0.02 x 0.352 = 1.6896, AI 362.4 x 0.02 x 0.85004 = 6.161.
+  defaultHumanIncidentsAtTick100: 2, // (2.112)
+  defaultAiIncidentsAtTick100: 9, // (9.010)
+  defaultHumanIncidentsPerPr: '1.69',
+  defaultAiIncidentsPerPr: '6.16',
+  defaultHeadlineRatio: '3.65×', // 6.161 / 1.6896
+  // Human code written 50 (PR size 400, detection 4%) from the start: 1.25 deployed, 9.6 incidents.
+  largeHumanPrPendingAtTick100: 0,
+  largeHumanPrDeployedAtTick100: 1,
+  largeHumanPrIncidentsAtTick100: 9,
+  largeHumanPrIncidentsPerPrAtTick100: '7.68',
+  // Defaults for 1 s, then one Human change (AC7c): Defects caught on the next tick, then the
+  // Human lane at 10 s.
+  // Human code written 50: PR size 400.
+  humanDefectsCaughtAfterCodeWritten50: '4%',
+  humanIncidentsAtTick100AfterCodeWritten50: 8, // (8.851)
+  humanIncidentsPerPrAtTick100AfterCodeWritten50: '7.08',
+  // Human PRs per day 0.25: PR size 960, so no whole PR is deployed by 10 s.
+  humanDefectsCaughtAfterPrsPerDay025: '4%',
+  humanIncidentsAtTick100AfterPrsPerDay025: 5, // (5.395)
+  humanDeployedAtTick100AfterPrsPerDay025: 0, // (0.406)
+  // Reviewer speed 900: 0.8 x 0.81 x 0.28 = 0.181.
+  humanDefectsCaughtAfterReviewerSpeed900: '18%',
+  humanIncidentsAtTick100AfterReviewerSpeed900: 4, // (4.631)
+  humanIncidentsPerPrAtTick100AfterReviewerSpeed900: '3.71',
   // Busy-AI preset (AI code written 2000): 0.55188 PR generated and 0.16556 PR reviewed per tick,
   // so +0.38631 pending PR per tick; the Human lane runs at its defaults.
   busyAiPendingAtTick10: 3, // (3.863)
   busyAiDeployedAtTick10: 1, // (1.656)
   busyAiPendingAtTick20: 7, // (7.726)
+  busyAiPendingLocAtTick20: '2,800', // 20 ticks x (200 generated - 60 reviewed) LOC
   busyAiPendingAtTick30: 11, // (11.589)
   busyAiDeployedAtTick30: 4, // (4.967)
+  busyAiPendingAtTick38: 14, // (14.680)
+  busyAiPendingAtTick39: 15, // (15.066)
   busyAiPendingAtTick40: 15, // between 3.9 s (15.066) and 4.2 s (16.225)
   busyAiDeployedAtTick40: 6, // 40 x 0.16556 (6.622)
+  busyAiPendingAtTick42: 16, // (16.225)
+  busyAiPendingAtTick50: 19, // (19.316)
+  busyAiPendingAtTick60: 23, // (23.179)
+  busyAiPendingAtTick100: 38, // (38.631)
   busyAiDeployedAtTick100: 16, // 100 x 0.16556 (16.556)
   // Plan, Slice 2 check: from the busy-AI state at 1 s, one more tick with reviewer speed 1000 and
   // skim 3 reviews 300 LOC (AI deployed 2.483); with reviewer speed 100, pending reaches 4.360.
   busyAiDeployedAtTick11WithFasterReview: 2,
   busyAiPendingAtTick11WithSlowReview: 4,
+  // Plan, Slice 4: paused at 2 s, Human PRs per day set to 0.5 (AI PR size 724.8), then 1 s more.
+  // The 2,800 queued LOC keep their size; 10 more ticks add 140 LOC each.
+  busyAiPendingAtTick30AfterHumanPrsPerDay05: 9,
+  busyAiPendingLocAtTick30AfterHumanPrsPerDay05: '4,200',
+  // Plan, Slice 5 check: from 5 s, AI_DRAIN_SETTINGS remove 0.551 PR per tick (16.01 at 5.6 s,
+  // 15.46 at 5.7 s); from 2 s they empty the queue well within 6 s.
+  busyAiPendingAtTick56AfterDraining: 16,
+  busyAiPendingAtTick57AfterDraining: 15,
+  drainedAiDefectsCaught: '2%', // PR size 362.4 at 2000 LOC/hr: 0.8 x 0.2286 x 0.1 = 0.018
+  // Human backlog preset plus AI code written 2000, at 24 s.
+  humanBacklogPendingAtTick240: 6,
+  humanBacklogAiPendingAtTick240: 71,
   // Pre-cutover oracles (see above).
-  aiPendingAtTick10: 18,
   aiPendingAtTick100: 184,
-  // Incidents = reviewed LOC x 0.02 x (1 - detection). Internal values at 10 s: Human 19.5 escaped
-  // over 10 deployed PRs (1.95 per PR); AI 107.8378 over 15.8730 deployed PRs (6.79 per PR, from the
-  // unrounded values, and not 107 / 15). The displayed Incidents are those escapes floored.
-  humanIncidentsAtTick100: 19,
-  humanIncidentsPerPrAtTick100: '1.95',
-  aiIncidentsAtTick100: 107,
-  aiIncidentsPerPrAtTick100: '6.79',
-  aiPendingLocAtTick100: '69,600', // 100 ticks x (756 generated - 60 reviewed) LOC
-  aiPickupWaitAtTick100: '116.0 h', // 69,600 LOC / 600 LOC/hr
-  headlineRatioAtTick100: '3.48×', // 6.79 / 1.95 from the internal values
-  humanDeployedAtTick9: 0,
-  humanIncidentsPerPrAtTick10: '1.95',
-  // PR size 400, 10 s: detection falls to 4%, so each reviewed LOC escapes far more often.
-  humanPendingAtTick100WithPrSize400: 2,
-  humanDeployedAtTick100WithPrSize400: 7,
-  humanIncidentsAtTick100WithPrSize400: 57,
-  humanIncidentsPerPrAtTick100WithPrSize400: '7.68',
-  // Defaults for 1 s, then PR size 400 for the remaining 9 s: only the later reviews escape more.
-  humanIncidentsAtTick100AfterSizeChangeAtTick10: 53,
-  humanIncidentsPerPrAtTick100AfterSizeChangeAtTick10: '6.94',
-  humanDefectsCaughtAtPrSize400: '4%',
-  // Human generation of 10 PRs per hour for 2 s gives 17 PRs / 4,400 LOC queued; PR size 500 for 1 more second adds
-  // 10 x 500 LOC and reviews 300 LOC: 26 PRs / 9,100 LOC.
-  humanPendingLocAtTick20WithHumanGen10: '4,400',
-  humanPendingAtTick20WithHumanGen10: 17,
-  aiPendingAtTick20WithHumanGen10: 36, // the AI lane does not depend on human generation
-  humanPendingAtTick30AfterSizeChangeToPrSize500: 26,
-  humanPendingLocAtTick30AfterSizeChangeToPrSize500: '9,100',
-  // Displayed Pending Review while the AI lane (2 PRs generated per tick, about 0.16 reviewed) and
-  // the Human lane at 10 PRs per hour (1 PR generated per tick, 0.12 reviewed) fall behind.
-  aiPendingAtTick5: 9,
-  aiPendingAtTick8: 14,
-  aiPendingAtTick9: 16,
   aiPendingAtTick12: 22,
   aiTickWithPending22: 12,
-  humanPendingAtTick18WithHumanGen10: 15,
-  humanPendingAtTick19WithHumanGen10: 16,
-  // Then 1 PR per hour and reviewer speed 1000: each tick adds 0.1 PR and reviews 100 LOC (0.4 PR).
-  humanPendingAtTick25AfterDraining: 16,
-  humanPendingAtTick26AfterDraining: 15,
-  humanDefectsCaughtWhenDrained: '6%', // PR size 240 at 1000 LOC/hr: 0.8 x 0.81 x 0.1 = 0.0648
 })
 
 export const headline = (page) => page.locator('[data-metric="headlineRatio"]')

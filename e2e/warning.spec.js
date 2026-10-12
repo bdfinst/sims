@@ -1,7 +1,10 @@
 import {
+  AI_DRAIN_SETTINGS,
+  BUSY_AI_PRESET,
+  HUMAN_BACKLOG_PRESET,
+  NEXT_TICK_SECONDS,
   QUEUE_STATE,
   REFERENCE,
-  REVIEWER_SPEED_LABEL,
   THRESHOLD_LABEL,
   runFor,
   buttonNamed,
@@ -15,15 +18,11 @@ import {
   pauseSimulation,
   queueBox,
   setSlider,
+  setSliders,
   slider,
   startAndRunFor,
-  startSimulation,
   test,
-  ticksToSeconds,
   visibleValue,
-  BUSY_HUMAN_GEN,
-  QUIET_HUMAN_GEN,
-  FAST_REVIEWER_SPEED,
 } from './fixtures.js'
 
 test.describe.configure({ mode: 'parallel' })
@@ -34,21 +33,22 @@ const MIN_THRESHOLD = 5
 const MAX_THRESHOLD = 50
 const THRESHOLD_STEP = 1
 
-// Thresholds derived from the displayed queues they are meant to straddle.
-const HUMAN_PENDING = REFERENCE.humanPendingAtTick20WithHumanGen10 // 17, with the AI lane at 36
-const THRESHOLD_BETWEEN_LANES = HUMAN_PENDING
-const THRESHOLD_BELOW_BOTH_LANES = HUMAN_PENDING - 1
-const THRESHOLD_AT_AI_PENDING = REFERENCE.aiPendingAtTick10
-const RAISED_THRESHOLD = REFERENCE.aiPendingAtTick12 + 3
+// Thresholds the scenarios set, each relative to the displayed queues it is meant to straddle.
+const THRESHOLD_AT_HUMAN_BACKLOG = 6 // Human 6 is not above it; AI 71 is
+const THRESHOLD_AT_BUSY_AI_10_SECONDS = 38 // the busy AI queue at 10 s
+const RAISED_THRESHOLD = 25 // above the busy AI queue at 6 s (23)
 const KEPT_THRESHOLD = 30
 
-const SECONDS_TO_AI_PENDING_14 = 0.8
-const SECONDS_TO_AI_PENDING_9 = 0.5
-const SECONDS_TO_HUMAN_PENDING_15 = 1.8
-const SECONDS_TO_BUILD_BACKLOG = 2
-const SECONDS_TO_AI_PENDING_18 = 1
-const HALF_SECOND = 0.5
-const TENTH_SECOND = 0.1
+const SECONDS_TO_AI_PENDING_14 = 3.8
+const SECONDS_TO_AI_PENDING_15 = 3.9
+const SECONDS_FROM_14_TO_16 = 0.4
+const SECONDS_FROM_15_TO_16 = 0.3
+const HUMAN_BACKLOG_SECONDS = 24
+const BUSY_AI_FULL_RUN_SECONDS = 10
+const SECONDS_TO_AI_PENDING_23 = 6
+const SECONDS_TO_AI_PENDING_7 = 2
+const SECONDS_TO_AI_PENDING_19 = 5
+const SECONDS_TO_DRAIN_TO_16 = 0.6
 
 // Waits for the slider's own shown value, so later checks cannot pass on the old threshold.
 const setThreshold = async (page, value) => {
@@ -56,28 +56,33 @@ const setThreshold = async (page, value) => {
   await expect(await visibleValue(slider(page, THRESHOLD_LABEL))).toHaveText(`${value} PRs`)
 }
 
+const expectLaneStates = async (page, statesByLane) => {
+  for (const [laneId, state] of Object.entries(statesByLane)) {
+    await expect(queueBox(page, laneId)).toHaveAttribute('data-state', state)
+  }
+}
+
 test.describe('Pending Review overload warning', () => {
-  // @wip: Step 8.5
-  test.fixme('AI queue turns red once it exceeds the default threshold', async ({ page }) => {
-    await test.step('Given I open the simulator', async () => {
+  test('AI queue turns red once it exceeds the default threshold', async ({ page }) => {
+    await test.step('Given I set "AI code written (LOC/hr)" to 2000', async () => {
       await openSimulator(page)
+      await setSliders(page, BUSY_AI_PRESET)
     })
 
-    await test.step('When I press Start and 0.8 seconds pass', async () => {
-      await startSimulation(page)
-      await runFor(page, SECONDS_TO_AI_PENDING_14)
+    await test.step('When I press Start and 3.8 seconds pass', async () => {
+      await startAndRunFor(page, SECONDS_TO_AI_PENDING_14)
     })
 
     await test.step('Then the AI lane shows Pending Review 14 and is not in the warning state', async () => {
-      await expectQueueState(page, 'ai', REFERENCE.aiPendingAtTick8, QUEUE_STATE.normal)
+      await expectQueueState(page, 'ai', REFERENCE.busyAiPendingAtTick38, QUEUE_STATE.normal)
     })
 
-    await test.step('When 0.1 more seconds pass', async () => {
-      await runFor(page, TENTH_SECOND)
+    await test.step('When 0.4 more seconds pass', async () => {
+      await runFor(page, SECONDS_FROM_14_TO_16)
     })
 
     await test.step('Then the AI lane shows Pending Review 16 and is in the warning state', async () => {
-      await expectQueueState(page, 'ai', REFERENCE.aiPendingAtTick9, QUEUE_STATE.warning)
+      await expectQueueState(page, 'ai', REFERENCE.busyAiPendingAtTick42, QUEUE_STATE.warning)
     })
 
     await test.step('And the AI queue box shows a "triangle-alert" icon and a red border', async () => {
@@ -106,102 +111,87 @@ test.describe('Pending Review overload warning', () => {
     await expect(page.locator('[aria-live]')).toHaveCount(0)
   })
 
-  // @wip: Step 8.5
-  test.fixme('Displayed value at the threshold is not a warning even if the internal value is above it', async ({
+  test('Displayed value at the threshold is not a warning even if the internal value is above it', async ({
     page,
   }) => {
-    await test.step('Given I set "Human generation (PRs/hr)" to 10', async () => {
+    await test.step('Given I set "AI code written (LOC/hr)" to 2000', async () => {
       await openSimulator(page)
-      await setSlider(page, 'Human generation (PRs/hr)', BUSY_HUMAN_GEN)
+      await setSliders(page, BUSY_AI_PRESET)
     })
 
-    await test.step('When I press Start and 1.8 seconds pass', async () => {
-      await startSimulation(page)
-      await runFor(page, SECONDS_TO_HUMAN_PENDING_15)
+    await test.step('When I press Start and 3.9 seconds pass', async () => {
+      await startAndRunFor(page, SECONDS_TO_AI_PENDING_15)
     })
 
-    await test.step('Then the Human lane shows Pending Review 15 and is not in the warning state', async () => {
-      await expectQueueState(
-        page,
-        'human',
-        REFERENCE.humanPendingAtTick18WithHumanGen10,
-        QUEUE_STATE.normal,
-      )
+    await test.step('Then the AI lane shows Pending Review 15 and is not in the warning state', async () => {
+      await expectQueueState(page, 'ai', REFERENCE.busyAiPendingAtTick39, QUEUE_STATE.normal)
     })
 
-    await test.step('When 0.1 more seconds pass', async () => {
-      await runFor(page, TENTH_SECOND)
+    await test.step('When 0.3 more seconds pass', async () => {
+      await runFor(page, SECONDS_FROM_15_TO_16)
     })
 
-    await test.step('Then the Human lane shows Pending Review 16 and is in the warning state', async () => {
-      await expectQueueState(
-        page,
-        'human',
-        REFERENCE.humanPendingAtTick19WithHumanGen10,
-        QUEUE_STATE.warning,
-      )
+    await test.step('Then the AI lane shows Pending Review 16 and is in the warning state', async () => {
+      await expectQueueState(page, 'ai', REFERENCE.busyAiPendingAtTick42, QUEUE_STATE.warning)
     })
   })
 
-  // @wip: Step 8.5
-  test.fixme('A custom threshold applies to both lanes', async ({ page }) => {
-    await test.step('Given I set "Human generation (PRs/hr)" to 10 and the simulation ran for 2 seconds and was paused', async () => {
+  test('A custom threshold applies to both lanes', async ({ page }) => {
+    await test.step('Given I set "Human code written (LOC/hr)" to 200, "Human PRs per day" to 4, "Reviewer speed (LOC/hr, both lanes)" to 100, and "AI code written (LOC/hr)" to 2000, and the simulation ran for 24 seconds and was paused', async () => {
       await openSimulator(page)
-      await setSlider(page, 'Human generation (PRs/hr)', BUSY_HUMAN_GEN)
-      await startAndRunFor(page, SECONDS_TO_BUILD_BACKLOG)
+      await setSliders(page, { ...HUMAN_BACKLOG_PRESET, ...BUSY_AI_PRESET })
+      await startAndRunFor(page, HUMAN_BACKLOG_SECONDS)
       await pauseSimulation(page)
     })
 
-    await test.step('And the Human lane shows Pending Review 17 and the AI lane shows Pending Review 36', async () => {
-      await expectPending(page, 'human', REFERENCE.humanPendingAtTick20WithHumanGen10)
-      await expectPending(page, 'ai', REFERENCE.aiPendingAtTick20WithHumanGen10)
+    await test.step('And the Human lane shows Pending Review 6 and the AI lane shows Pending Review 71', async () => {
+      await expectPending(page, 'human', REFERENCE.humanBacklogPendingAtTick240)
+      await expectPending(page, 'ai', REFERENCE.humanBacklogAiPendingAtTick240)
     })
 
-    await test.step('When I set "Warning threshold" to 17', async () => {
-      await setThreshold(page, THRESHOLD_BETWEEN_LANES)
+    await test.step('When I set "Warning threshold" to 6', async () => {
+      await setThreshold(page, THRESHOLD_AT_HUMAN_BACKLOG)
     })
 
     await test.step('Then the Human lane is not in the warning state and the AI lane is in the warning state', async () => {
-      await expect(queueBox(page, 'human')).toHaveAttribute('data-state', QUEUE_STATE.normal)
-      await expect(queueBox(page, 'ai')).toHaveAttribute('data-state', QUEUE_STATE.warning)
+      await expectLaneStates(page, { human: QUEUE_STATE.normal, ai: QUEUE_STATE.warning })
     })
 
-    await test.step('When I set "Warning threshold" to 16', async () => {
-      await setThreshold(page, THRESHOLD_BELOW_BOTH_LANES)
+    await test.step('When I set "Warning threshold" to 5', async () => {
+      await setThreshold(page, MIN_THRESHOLD)
     })
 
     await test.step('Then both lanes are in the warning state', async () => {
-      await expect(queueBox(page, 'human')).toHaveAttribute('data-state', QUEUE_STATE.warning)
-      await expect(queueBox(page, 'ai')).toHaveAttribute('data-state', QUEUE_STATE.warning)
+      await expectLaneStates(page, { human: QUEUE_STATE.warning, ai: QUEUE_STATE.warning })
     })
   })
 
-  // @wip: Step 8.5
-  test.fixme('Exactly at a custom threshold is not a warning', async ({ page }) => {
-    await test.step('Given I set "Warning threshold" to 18', async () => {
+  test('Exactly at a custom threshold is not a warning', async ({ page }) => {
+    await test.step('Given I set "Warning threshold" to 38 and "AI code written (LOC/hr)" to 2000', async () => {
       await openSimulator(page)
-      await setThreshold(page, THRESHOLD_AT_AI_PENDING)
+      await setThreshold(page, THRESHOLD_AT_BUSY_AI_10_SECONDS)
+      await setSliders(page, BUSY_AI_PRESET)
     })
 
-    await test.step('When I press Start and 1 second passes', async () => {
-      await startAndRunFor(page, SECONDS_TO_AI_PENDING_18)
+    await test.step('When I press Start and 10 seconds pass', async () => {
+      await startAndRunFor(page, BUSY_AI_FULL_RUN_SECONDS)
     })
 
-    await test.step('Then the AI lane shows Pending Review 18 and is not in the warning state', async () => {
-      await expectQueueState(page, 'ai', REFERENCE.aiPendingAtTick10, QUEUE_STATE.normal)
+    await test.step('Then the AI lane shows Pending Review 38 and is not in the warning state', async () => {
+      await expectQueueState(page, 'ai', REFERENCE.busyAiPendingAtTick100, QUEUE_STATE.normal)
     })
   })
 
-  // @wip: Step 8.5
-  test.fixme('Raising the threshold while paused clears the warning', async ({ page }) => {
-    await test.step('Given the simulation ran for 1.2 seconds and was paused', async () => {
+  test('Raising the threshold while paused clears the warning', async ({ page }) => {
+    await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation ran for 6 seconds and was paused', async () => {
       await openSimulator(page)
-      await startAndRunFor(page, ticksToSeconds(REFERENCE.aiTickWithPending22))
+      await setSliders(page, BUSY_AI_PRESET)
+      await startAndRunFor(page, SECONDS_TO_AI_PENDING_23)
       await pauseSimulation(page)
     })
 
-    await test.step('And the AI lane shows Pending Review 22 and is in the warning state', async () => {
-      await expectQueueState(page, 'ai', REFERENCE.aiPendingAtTick12, QUEUE_STATE.warning)
+    await test.step('And the AI lane shows Pending Review 23 and is in the warning state', async () => {
+      await expectQueueState(page, 'ai', REFERENCE.busyAiPendingAtTick60, QUEUE_STATE.warning)
     })
 
     await test.step('When I set "Warning threshold" to 25', async () => {
@@ -209,19 +199,19 @@ test.describe('Pending Review overload warning', () => {
     })
 
     await test.step('Then the AI lane is not in the warning state', async () => {
-      await expectQueueState(page, 'ai', REFERENCE.aiPendingAtTick12, QUEUE_STATE.normal)
+      await expectQueueState(page, 'ai', REFERENCE.busyAiPendingAtTick60, QUEUE_STATE.normal)
     })
   })
 
-  // @wip: Step 8.5
-  test.fixme('Lowering the threshold while running applies immediately', async ({ page }) => {
-    await test.step('Given the simulation has run for 0.5 seconds', async () => {
+  test('Lowering the threshold while running applies immediately', async ({ page }) => {
+    await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 2 seconds', async () => {
       await openSimulator(page)
-      await startAndRunFor(page, SECONDS_TO_AI_PENDING_9)
+      await setSliders(page, BUSY_AI_PRESET)
+      await startAndRunFor(page, SECONDS_TO_AI_PENDING_7)
     })
 
-    await test.step('And the AI lane shows Pending Review 9 and is not in the warning state', async () => {
-      await expectQueueState(page, 'ai', REFERENCE.aiPendingAtTick5, QUEUE_STATE.normal)
+    await test.step('And the AI lane shows Pending Review 7 and is not in the warning state', async () => {
+      await expectQueueState(page, 'ai', REFERENCE.busyAiPendingAtTick20, QUEUE_STATE.normal)
     })
 
     await test.step('When I set "Warning threshold" to 5', async () => {
@@ -229,55 +219,48 @@ test.describe('Pending Review overload warning', () => {
     })
 
     await test.step('Then the AI lane is in the warning state', async () => {
-      await expectQueueState(page, 'ai', REFERENCE.aiPendingAtTick5, QUEUE_STATE.warning)
+      await expectQueueState(page, 'ai', REFERENCE.busyAiPendingAtTick20, QUEUE_STATE.warning)
       await expect(buttonNamed(page, 'Pause')).toBeVisible()
     })
   })
 
-  // @wip: Step 8.5
-  test.fixme('Warning clears when the queue drains to the threshold', async ({ page }) => {
-    await test.step('Given I set "Human generation (PRs/hr)" to 10 and the simulation has run for 2 seconds', async () => {
+  test('Warning clears when the queue drains to the threshold', async ({ page }) => {
+    await test.step('Given I set "AI code written (LOC/hr)" to 2000 and the simulation is running and has run for 5 seconds', async () => {
       await openSimulator(page)
-      await setSlider(page, 'Human generation (PRs/hr)', BUSY_HUMAN_GEN)
-      await startAndRunFor(page, SECONDS_TO_BUILD_BACKLOG)
+      await setSliders(page, BUSY_AI_PRESET)
+      await startAndRunFor(page, SECONDS_TO_AI_PENDING_19)
     })
 
-    await test.step('And the Human lane shows Pending Review 17 and is in the warning state', async () => {
+    await test.step('And the AI lane shows Pending Review 19 and is in the warning state', async () => {
+      await expectQueueState(page, 'ai', REFERENCE.busyAiPendingAtTick50, QUEUE_STATE.warning)
+    })
+
+    await test.step('When I set "AI code written (LOC/hr)" to 5 and "Reviewer speed (LOC/hr, both lanes)" to 1000', async () => {
+      await setSliders(page, AI_DRAIN_SETTINGS)
+    })
+
+    await test.step('And 0.6 seconds pass', async () => {
+      await runFor(page, SECONDS_TO_DRAIN_TO_16)
+    })
+
+    await test.step('Then the AI lane shows Pending Review 16 and is in the warning state', async () => {
       await expectQueueState(
         page,
-        'human',
-        REFERENCE.humanPendingAtTick20WithHumanGen10,
-        QUEUE_STATE.warning,
-      )
-    })
-
-    await test.step('When I set "Human generation (PRs/hr)" to 1 and "Reviewer speed (LOC/hr, both lanes)" to 1000', async () => {
-      await setSlider(page, 'Human generation (PRs/hr)', QUIET_HUMAN_GEN)
-      await setSlider(page, REVIEWER_SPEED_LABEL, FAST_REVIEWER_SPEED)
-    })
-
-    await test.step('And 0.5 seconds pass', async () => {
-      await runFor(page, HALF_SECOND)
-    })
-
-    await test.step('Then the Human lane shows Pending Review 16 and is in the warning state', async () => {
-      await expectQueueState(
-        page,
-        'human',
-        REFERENCE.humanPendingAtTick25AfterDraining,
+        'ai',
+        REFERENCE.busyAiPendingAtTick56AfterDraining,
         QUEUE_STATE.warning,
       )
     })
 
     await test.step('When 0.1 more seconds pass', async () => {
-      await runFor(page, TENTH_SECOND)
+      await runFor(page, NEXT_TICK_SECONDS)
     })
 
-    await test.step('Then the Human lane shows Pending Review 15 and is not in the warning state', async () => {
+    await test.step('Then the AI lane shows Pending Review 15 and is not in the warning state', async () => {
       await expectQueueState(
         page,
-        'human',
-        REFERENCE.humanPendingAtTick26AfterDraining,
+        'ai',
+        REFERENCE.busyAiPendingAtTick57AfterDraining,
         QUEUE_STATE.normal,
       )
     })
