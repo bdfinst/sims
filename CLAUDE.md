@@ -28,7 +28,7 @@ On screen, top to bottom:
 
 Two lanes (human-authored vs. AI-authored code) run side by side; generation outpaces review in the AI lane, so its queue overflows and more defects escape. One simulated second is one work hour. The model math, defaults, and ranges live in the spec; expected values in tests come from the "Default arithmetic" section of `plans/ai-vs-human-code-review-simulator.md`, so don't change a test's expected number to make it pass.
 
-- `src/engine.js` — pure model, display helpers, formatters, and constants. ESLint forbids importing React, `lucide-react`, `./components/*`, or `./laneConfig*` here and in `reducer.js`. Those rules run only in `npm run lint:deep` (not in the git hooks), so run it after touching either file.
+- `src/engine.js` — pure model, display helpers, formatters, and constants. ESLint forbids importing React, `lucide-react`, `./components/*`, or `./laneConfig*` here and in `reducer.js`. Those rules run only in `npm run lint:deep`, which the pre-push hook runs; run it yourself after touching either file.
 - `src/reducer.js` — pure state transitions (tick, start, pause, reset, setSetting).
 - `src/laneConfig.js` — presentation only: labels, icons, colour/type class tokens, tile layout.
 - `src/research.js` — data for the collapsible research panel (findings, URLs, assumptions note). The assumption figures in the note come from `engine.MODEL_ASSUMPTIONS`, so change those constants in `engine.js`, never in `research.js`.
@@ -38,15 +38,21 @@ Two lanes (human-authored vs. AI-authored code) run side by side; generation out
 - Unit tests sit next to their source (`src/**/*.test.js`); `src/testHelpers.js` holds their shared helpers.
 - `docs/specs/`, `plans/` — the spec and the implementation plan.
 
+Test rules:
+
+- Spec values that e2e tests check against (tick period, defaults, expected numbers) are declared in `e2e/fixtures.js` or the `*.spec.js` file that uses them, never imported from `src/`. A test that imports the value it checks can't catch that value being wrong.
+- A test's actions must match its Gherkin scenario's When steps exactly: the same keys, controls, and press counts. Change the scenario in the plan (and re-export it) before changing what the test does.
+
 ## Commands
 
 - Setup: `npm install` (its `prepare` script installs the husky hooks), then `npx playwright install chromium`.
 - `npm run dev` — Vite dev server.
 - `npm run build` — produces one self-contained `dist/index.html` (all JS and CSS inlined).
 - `npm test` — Vitest unit tests. One test: `npx vitest run src/engine.test.js -t "<name>"`.
+- `npm run test:coverage` — unit tests with V8 coverage. It counts only files the unit tests import; components are covered by the e2e suite.
 - `npm run test:e2e` — Playwright; builds and previews on port 4173 first. One file: `npx playwright test e2e/<file>`.
 - `npm run lint` (oxlint), `npm run lint:deep` (ESLint, includes the import-boundary rules), `npm run format:check` (Prettier).
-- Husky: pre-commit runs lint-staged (Prettier, oxlint --fix); pre-push runs `npm test` and `npm run test:e2e`.
+- Husky: pre-commit runs lint-staged (Prettier, oxlint --fix); pre-push runs `npm run lint:deep`, `npm test`, and `npm run test:e2e`.
 
 ## Before presenting
 

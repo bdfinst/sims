@@ -35,16 +35,16 @@ Thumbs.db
 *.log
 npm-debug.log*
 
-# dev-team plugin: shared human-invoked report output (/review-agent,
-# /code-review, /triage) — local-only, regenerated per run. Anchored
-# deny-all + re-included tracked exception for /test-improve's
-# git-tracked report data/ sibling directory (issue #1412). The
-# re-include must stay directory-level (test-improve/), not narrowed to
-# e.g. */data/ — git never re-includes a path whose parent directory is
-# itself excluded, so a narrower exception would silently match nothing.
+# dev-team plugin reports (/review-agent, /code-review, /triage) are
+# regenerated on every run, so they stay local. The exception is
+# /test-improve's report data, which is meant to be committed. Keep that
+# exception at the directory level (test-improve/): git never re-includes a
+# path whose parent directory is excluded, so a narrower pattern such as
+# */data/ would silently match nothing.
 /.dev-team-reports/*
 !/.dev-team-reports/test-improve/
 
-# dev-team hygiene — machine-specific MCP config (absolute-path pollution — issues #1376, #1416)
+# MCP server config holds absolute paths for this machine; committing it
+# would break the setup for anyone else.
 .mcp.json
 .claude/memory/
