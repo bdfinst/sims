@@ -18,8 +18,8 @@ export function ResearchPanel() {
         <h2 className="inline">{RESEARCH_TITLE}</h2>
       </summary>
       <ul className="mt-3 flex flex-col gap-3">
-        {FINDINGS.map(({ id, text, source }) => (
-          <li key={id} className={TYPE_CLASS.label}>
+        {FINDINGS.map(({ id, kind, text, source }) => (
+          <li key={id} data-kind={kind} className={TYPE_CLASS.label}>
             <p>{text}</p>
             <NewTabLink href={source.url}>{source.label}</NewTabLink>
           </li>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MODEL_ASSUMPTIONS } from './engine.js'
-import { FINDINGS, assumptionsNote } from './research.js'
+import { FINDINGS, FINDING_KIND, assumptionsNote } from './research.js'
 
 const FORBIDDEN_PHRASES = ['near zero', 'coined', 'originated']
 const FAROS_URL = 'https://faros.ai/research/ai-acceleration-whiplash'
@@ -44,6 +44,12 @@ describe('research data', () => {
   it('shares one Faros figure between the finding and the calibration', () => {
     const faros = FINDINGS.find(({ source }) => source.url === FAROS_URL)
     expect(faros.text).toContain('(+242.7%)')
+  })
+
+  it('marks exactly one finding as a practitioner observation, and says so in its text', () => {
+    const practitioner = FINDINGS.filter(({ kind }) => kind === FINDING_KIND.practitioner)
+    expect(practitioner).toHaveLength(1)
+    expect(practitioner[0].text).toContain('practitioner observation')
   })
 
   it('never uses the unsupported or misattributing wording', () => {

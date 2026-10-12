@@ -10,9 +10,13 @@ export const RESEARCH_TITLE = 'Research behind this simulation'
 const FAROS_URL = 'https://faros.ai/research/ai-acceleration-whiplash'
 const FAROS_INCIDENTS_INCREASE = '+242.7%'
 
+// Whether a finding is published research or a practitioner observation (never attributed to a source).
+export const FINDING_KIND = Object.freeze({ research: 'research', practitioner: 'practitioner' })
+
 export const FINDINGS = Object.freeze([
   Object.freeze({
     id: 'cisco-study',
+    kind: FINDING_KIND.research,
     text: '2,500 reviews of 3.2 million lines of code over 10 months',
     source: Object.freeze({
       label: 'SmartBear, Cisco Systems / Collaborator case study',
@@ -21,6 +25,7 @@ export const FINDINGS = Object.freeze([
   }),
   Object.freeze({
     id: 'review-limits',
+    kind: FINDING_KIND.research,
     text: 'Review no more than 200–400 LOC at a time; beyond 400 LOC the ability to find defects diminishes. 200–400 LOC over 60–90 minutes yields 70–90% defect discovery. Defect discovery drops significantly faster than 500 LOC/hour.',
     source: Object.freeze({
       label: 'SmartBear, Best Practices for Code Review',
@@ -29,6 +34,7 @@ export const FINDINGS = Object.freeze([
   }),
   Object.freeze({
     id: 'faros-incidents',
+    kind: FINDING_KIND.research,
     text: `Across 22,000 developers in 4,000 teams, high AI adoption saw PR size +51% and 3× incidents per PR (${FAROS_INCIDENTS_INCREASE}), compared with low adoption.`,
     source: Object.freeze({
       label: 'Faros AI, AI Engineering Report Q2 2026: The Acceleration Whiplash',
@@ -37,6 +43,7 @@ export const FINDINGS = Object.freeze([
   }),
   Object.freeze({
     id: 'linearb-wait',
+    kind: FINDING_KIND.research,
     text: 'AI PRs wait 4.6× longer before review, but are reviewed 2× faster once picked up (8.1M+ PRs, 4,800+ orgs).',
     source: Object.freeze({
       label: 'LinearB, 2026 Software Engineering Benchmarks Report',
@@ -45,6 +52,7 @@ export const FINDINGS = Object.freeze([
   }),
   Object.freeze({
     id: 'local-vs-global',
+    kind: FINDING_KIND.practitioner,
     text: 'A practitioner observation, not a research finding: "AI code is often locally coherent but globally brittle."',
     source: Object.freeze({
       label: 'Example: Tian Pan, The AI Code Review Inversion',

@@ -31,11 +31,11 @@ Two lanes (human-authored vs. AI-authored code) run side by side; generation out
 - `src/engine.js` — pure model, display helpers, formatters, and constants. ESLint forbids importing React, `lucide-react`, `./components/*`, or `./laneConfig*` here and in `reducer.js`. Those rules run only in `npm run lint:deep` (not in the git hooks), so run it after touching either file.
 - `src/reducer.js` — pure state transitions (tick, start, pause, reset, setSetting).
 - `src/laneConfig.js` — presentation only: labels, icons, colour/type class tokens, tile layout.
-- `src/research.js` — data for the collapsible research panel (findings, URLs, assumptions note).
+- `src/research.js` — data for the collapsible research panel (findings, URLs, assumptions note). The assumption figures in the note come from `engine.MODEL_ASSUMPTIONS`, so change those constants in `engine.js`, never in `research.js`.
 - `src/components/` — React components; `src/App.jsx` owns the reducer and the 100 ms tick loop.
 - `e2e/` — Playwright specs plus `fixtures.js` (shared helpers and a request guard that fails any test that makes an external request). Specs run in parallel and use `page.clock` for time.
 - `features/ai-vs-human-code-review-simulator/slice-N-*.feature` — Gherkin scenarios exported from the plan, one file per slice. Tests that implement a scenario use its title.
-- Unit tests sit next to their source (`src/*.test.js`).
+- Unit tests sit next to their source (`src/**/*.test.js`); `src/testHelpers.js` holds their shared helpers.
 - `docs/specs/`, `plans/` — the spec and the implementation plan.
 
 ## Commands
