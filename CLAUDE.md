@@ -16,6 +16,7 @@ A collection of diagram and presentation assets about software delivery flow (Th
 - `sim.spec.md` — Original input spec for the simulator. Superseded by `docs/specs/ai-vs-human-code-review-simulator.md`, which is the model spec.
 - `docs/specs/ai-vs-human-code-review-simulator.md` — The simulator's spec: architecture, acceptance criteria, glossary, and the Research Sources table. Read it before changing model behavior or the research panel.
 - `index.html`, `src/`, `e2e/`, `features/`, `plans/`, `tools/`, and the root config files (`vite.config.js`, `vitest.config.js`, `playwright.config.js`, `eslint.config.js`, `.oxlintrc.json`, `prettier.config.js`) make up the simulator. See "Simulator app".
+- `metrics/verify-log.jsonl` — Append-only log of per-slice verification runs, written by the dev-team build workflow. Not part of the app; don't edit it by hand.
 
 ## Simulator app
 
@@ -24,18 +25,22 @@ On screen, top to bottom:
 - The header: title, description, Start/Pause, Reset, the Running/Paused status, the elapsed work hours, and the warning-threshold slider.
 - The headline band: the AI ÷ Human incidents-per-PR ratio.
 - The Human lane above the AI lane. Each reads left to right: generation inputs → Pending Review box (PR tiles, "+N more" overflow) → review controls → metrics grid. Below the `md` breakpoint each lane stacks vertically.
+  - Generation inputs: Human has code written (LOC/hr) and PRs per day; AI has code written (LOC/hr). The Human PR size is derived: LOC/hr × 8 (`WORK_HOURS_PER_DAY`) ÷ PRs per day. The AI PR size is the human size × the Faros multiplier, and AI PRs per day are derived and read-only.
+  - Review controls: Reviewer speed (Human lane, applies to both) and the AI skim multiplier (AI lane). With the header's threshold slider, that is six sliders.
 - The collapsible research panel below the lanes, collapsed by default.
 
 Two lanes (human-authored vs. AI-authored code) run side by side; generation outpaces review in the AI lane, so its queue overflows and more defects escape. One simulated second is one work hour. The model math, defaults, and ranges live in the spec; expected values in tests come from the "Default arithmetic" section of `plans/ai-vs-human-code-review-simulator.md`, so don't change a test's expected number to make it pass.
 
-- `src/engine.js` — pure model, display helpers, formatters, and constants. ESLint forbids importing React, `lucide-react`, `./components/*`, or `./laneConfig*` here and in `reducer.js`. Those rules run only in `npm run lint:deep`, which the pre-push hook runs; run it yourself after touching either file.
+- `src/engine.js` — pure model, display helpers, formatters, and constants. ESLint forbids importing React, `lucide-react`, `./components/*`, or `./laneConfig*` here and in `reducer.js` and `openTip.js`. Those rules run only in `npm run lint:deep`, which the pre-push hook runs; run it yourself after touching any of the three files.
+- The Faros figures (+51% PR size, +16.2% PR merge rate, +242.7% incidents per PR) are constants in `engine.js`. The lane text, the AI code-written default, the info tips, and the research note all derive from them, so change them only there.
 - `src/reducer.js` — pure state transitions (tick, start, pause, reset, setSetting).
-- `src/laneConfig.js` — presentation only: labels, icons, colour/type class tokens, tile layout.
+- `src/laneConfig.js` — presentation only: labels, icons, colour/type class tokens, tile layout, and each slider's label and info-tip text (`SLIDER_PRESENTATION`).
+- Info tips: every slider has an info button ("About <label>") whose tip is also the slider's accessible description. `src/openTip.js` is the pure open/close reducer for the plan's truth table. `useOpenTip` (hook over it) and `InfoTip` live in `src/components/`.
 - `src/research.js` — data for the collapsible research panel (findings, URLs, assumptions note). The assumption figures in the note come from `engine.MODEL_ASSUMPTIONS`, so change those constants in `engine.js`, never in `research.js`.
 - `src/components/` — React components; `src/App.jsx` owns the reducer and the 100 ms tick loop.
-- `e2e/` — Playwright specs plus `fixtures.js` (shared helpers and a request guard that fails any test that makes an external request). Specs run in parallel and use `page.clock` for time.
+- `e2e/` — Playwright specs plus `fixtures.js` (shared helpers and a request guard that fails any test that makes an external request). Specs run in parallel and use `page.clock` for time. `generation.spec.js` covers the generation model and `info-tips.spec.js` the info tips.
 - `features/ai-vs-human-code-review-simulator/slice-N-*.feature` — Gherkin scenarios exported from the plan, one file per slice. Tests that implement a scenario use its title (outline tests append `: <row>`).
-- `tools/gherkin-sync/` — a Playwright reporter (wired in `playwright.config.js`) that fails the e2e run when a scenario test's top-level `test.step` titles differ from the scenario's step lines (keyword plus text, Background first, outline values filled in). Missing scenarios and Examples rows are reported only on a full, unfiltered run. `npx playwright test --list` checks just that every scenario has a test.
+- `tools/gherkin-sync/` — a Playwright reporter (wired in `playwright.config.js`) that fails the e2e run when a scenario test's top-level `test.step` titles differ from the scenario's step lines (keyword plus text, Background first, outline values filled in). Missing scenarios and Examples rows are reported only on a full, unfiltered run. `npx playwright test --list` checks just that every scenario has a test. Scenarios tagged `@wip` are skipped and counted; `GHERKIN_SYNC_STRICT=1` fails the run while any remain. A step may tag scenarios `@wip` in the plan and mark their tests `test.fixme` with `// @wip: Step N.M`. Before a PR there must be zero `@wip` and no `test.fixme`.
 - Unit tests sit next to their source (`src/**/*.test.js`); `src/testHelpers.js` holds their shared helpers.
 - `docs/specs/`, `plans/` — the spec and the implementation plan.
 

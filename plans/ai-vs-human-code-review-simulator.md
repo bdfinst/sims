@@ -1510,7 +1510,7 @@ Your decisions (recorded in the spec's Ambiguity Log):
 
 #### Wave 10
 
-- [ ] Slice 9: Slider info tips
+- [x] Slice 9: Slider info tips
   - [x] Step 9.1: Info buttons and tips for every slider
-  - [ ] Step 9.2: Tab order through info buttons
-  - [ ] Step 9.3: Document the generation model, info tips, and @wip in CLAUDE.md
+  - [x] Step 9.2: Tab order through info buttons
+  - [x] Step 9.3: Document the generation model, info tips, and @wip in CLAUDE.md
