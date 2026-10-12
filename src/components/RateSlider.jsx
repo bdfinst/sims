@@ -22,7 +22,7 @@ export function RateSlider({ settingKey, value, onChange, accentClass }) {
           onChange={(event) => onChange(settingKey, event.target.valueAsNumber)}
           className={`w-full ${accentClass}`}
         />
-        <output htmlFor={inputId} className="shrink-0 text-xl font-semibold">
+        <output htmlFor={inputId} aria-live="off" className="shrink-0 text-xl font-semibold">
           {value}
           {unit}
         </output>

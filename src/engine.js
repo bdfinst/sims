@@ -68,21 +68,21 @@ const detection = (_avgSize, _effSpeed) => 0
 
 export const tick = (lane, { gen, size, effSpeed }) => {
   const generatedPrs = gen * TICK_HOURS
-  const pendingPrs = lane.pendingPrs + generatedPrs
-  const pendingLoc = lane.pendingLoc + generatedPrs * size
+  const queuedPrs = lane.pendingPrs + generatedPrs
+  const queuedLoc = lane.pendingLoc + generatedPrs * size
 
-  const avgSize = pendingPrs > EMPTY_QUEUE_EPSILON ? pendingLoc / pendingPrs : size
+  const avgSize = queuedPrs > EMPTY_QUEUE_EPSILON ? queuedLoc / queuedPrs : size
   const detectionRate = detection(avgSize, effSpeed)
 
-  const reviewedLoc = Math.min(pendingLoc, effSpeed * TICK_HOURS)
-  const hasPendingWork = pendingLoc > EMPTY_QUEUE_EPSILON
-  // Plan's evaluation order: (PRs x reviewed LOC) / pending LOC. Float rounding can leave the
-  // result a hair above pendingPrs, which is why the queue is clamped below.
-  const reviewedPrs = hasPendingWork ? (pendingPrs * reviewedLoc) / pendingLoc : 0
+  const reviewedLoc = Math.min(queuedLoc, effSpeed * TICK_HOURS)
+  const hasQueuedWork = queuedLoc > EMPTY_QUEUE_EPSILON
+  // Plan's evaluation order: (queued PRs x reviewed LOC) / queued LOC. Float rounding can leave the
+  // result a hair above queuedPrs, which is why the queue is clamped below.
+  const reviewedPrs = hasQueuedWork ? (queuedPrs * reviewedLoc) / queuedLoc : 0
 
   return {
-    pendingPrs: Math.max(0, pendingPrs - reviewedPrs),
-    pendingLoc: Math.max(0, pendingLoc - reviewedLoc),
+    pendingPrs: Math.max(0, queuedPrs - reviewedPrs),
+    pendingLoc: Math.max(0, queuedLoc - reviewedLoc),
     deployedPrs: lane.deployedPrs + reviewedPrs,
     deployedLoc: lane.deployedLoc + reviewedLoc,
     escapedDefects: lane.escapedDefects + reviewedLoc * DEFECTS_PER_LOC * (1 - detectionRate),

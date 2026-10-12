@@ -1,7 +1,7 @@
 import { test as base, expect } from '@playwright/test'
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1'])
-const INLINE_PROTOCOLS = new Set(['data:', 'blob:'])
+export const INLINE_PROTOCOLS = new Set(['data:', 'blob:'])
 const FILE_PROTOCOL = 'file:'
 
 // The page may only talk to the local server. A file:// page may only load its own
@@ -29,13 +29,15 @@ export const test = base.extend({
   requestGuard: [
     async ({ context }, use) => {
       const disallowedUrls = []
-      const record = (url, isMainDocument) => {
+      const recordIfDisallowed = (url, isMainDocument) => {
         if (!isAllowedRequest({ url, isMainDocument })) disallowedUrls.push(url)
       }
       const watchSockets = (watchedPage) =>
-        watchedPage.on('websocket', (socket) => record(socket.url(), false))
+        watchedPage.on('websocket', (socket) => recordIfDisallowed(socket.url(), false))
 
-      context.on('request', (request) => record(request.url(), isMainDocumentRequest(request)))
+      context.on('request', (request) =>
+        recordIfDisallowed(request.url(), isMainDocumentRequest(request)),
+      )
       context.pages().forEach(watchSockets)
       context.on('page', watchSockets)
       await use()
@@ -80,6 +82,60 @@ export const pauseSimulation = async (page) => {
 export const expectCounts = async (page, laneId, { pending, deployed }) => {
   await expect(metric(page, laneId, 'pending')).toHaveText(String(pending))
   await expect(metric(page, laneId, 'deployed')).toHaveText(String(deployed))
+}
+
+export const SECOND_MS = 1000
+export const TICK_MS = 100
+export const TICKS_PER_SECOND = SECOND_MS / TICK_MS
+
+// Expected values from the plan's reference implementation (scratchpad/check.py, check2.py).
+// Ticks are 0.1 s each, so tick 10 is 1 s.
+export const REFERENCE = Object.freeze({
+  aiPrSizeAtDefaults: 378, // round(250 x 1.51)
+  aiPrSizeAtPrSize200: 302, // round(200 x 1.51)
+  aiPendingAtTick10: 18,
+  aiPendingAtTick11WithAiGen50: 23,
+  aiPendingAtTick30: 55,
+  aiDeployedAtTick30: 4,
+  aiPendingAtTick40: 73,
+  aiDeployedAtTick40: 6,
+  aiPendingAtTick100: 184,
+  aiDeployedAtTick100: 15,
+  humanDeployedAtTick100: 10,
+})
+
+export const slider = (page, name) => page.getByRole('slider', { name, exact: true })
+
+export const setSlider = (page, name, value) => slider(page, name).fill(String(value))
+
+export const visibleValue = (sliderLocator) => sliderLocator.locator('xpath=..').locator('output')
+
+// The shown values of one metric, [human, ai], read in a single round trip.
+export const metricValues = (page, name) =>
+  page.evaluate(
+    (metricName) =>
+      [...document.querySelectorAll(`[data-metric="${metricName}"]`)].map((element) =>
+        Number(element.textContent),
+      ),
+    name,
+  )
+
+// Lanes and the elapsed readout come from one React state, so they commit together.
+// Waiting for the readout therefore tells us the lanes are current, with no clock-dependent waits.
+const expectElapsedAtTick = (page, tick) =>
+  expect(
+    page.getByText(`${(tick / TICKS_PER_SECOND).toFixed(1)} work hours`, { exact: true }),
+  ).toBeVisible()
+
+// Advances the fake clock one tick at a time, reading only after that tick has rendered.
+export const sampleEachTick = async (page, { startTick, tickCount, read }) => {
+  const samples = []
+  for (let tickNumber = startTick + 1; tickNumber <= startTick + tickCount; tickNumber += 1) {
+    await page.clock.runFor(TICK_MS)
+    await expectElapsedAtTick(page, tickNumber)
+    samples.push(await read())
+  }
+  return samples
 }
 
 export { expect }

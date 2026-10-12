@@ -37,19 +37,19 @@ export function Lane({ laneId, lane, settings, onSettingChange }) {
           <Icon name={presentation.generationIcon} className={presentation.accentTextClass} />
           <h2 className="text-xl font-semibold">{presentation.label}</h2>
         </div>
-        {presentation.inputSliders.map(renderSlider)}
+        {presentation.generationSliders.map(renderSlider)}
         {presentation.showsDerivedValues && (
           <DerivedValue>
             PR size {params.size} LOC (×{model.sizeMultiplier})
           </DerivedValue>
         )}
       </div>
-      <div className="rounded border border-gray-600 p-4">
-        <p className="text-base">Pending Review</p>
-        <p data-metric="pending" className="text-4xl font-bold">
+      <dl className="rounded border border-gray-600 p-4">
+        <dt className="text-base">Pending Review</dt>
+        <dd data-metric="pending" className="text-4xl font-bold">
           {floorShow(lane.pendingPrs)}
-        </p>
-      </div>
+        </dd>
+      </dl>
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <Icon name={presentation.reviewIcon} className={presentation.accentTextClass} />
@@ -59,12 +59,12 @@ export function Lane({ laneId, lane, settings, onSettingChange }) {
         {presentation.showsDerivedValues && (
           <DerivedValue>Effective speed {params.effSpeed} LOC/hr</DerivedValue>
         )}
-        <div>
-          <p className="text-base">Deployed</p>
-          <p data-metric="deployed" className="text-4xl font-bold text-deployed">
+        <dl>
+          <dt className="text-base">Deployed</dt>
+          <dd data-metric="deployed" className="text-4xl font-bold text-deployed">
             {floorShow(lane.deployedPrs)}
-          </p>
-        </div>
+          </dd>
+        </dl>
       </div>
     </section>
   )

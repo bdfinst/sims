@@ -39,7 +39,9 @@ function App() {
             laneId={laneId}
             lane={state.lanes[laneId]}
             settings={state.settings}
-            onSettingChange={(key, value) => dispatch({ type: 'setSetting', key, value })}
+            onSettingChange={(settingKey, value) =>
+              dispatch({ type: 'setSetting', settingKey, value })
+            }
           />
         ))}
       </main>

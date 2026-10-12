@@ -6,7 +6,8 @@ import { shownCounts } from './testHelpers.js'
 const dispatchAll = (state, ...types) =>
   types.reduce((current, type) => reducer(current, { type }), state)
 
-const setSetting = (state, key, value) => reducer(state, { type: 'setSetting', key, value })
+const setSetting = (state, settingKey, value) =>
+  reducer(state, { type: 'setSetting', settingKey, value })
 
 const repeat = (type, count) => Array.from({ length: count }, () => type)
 
@@ -66,9 +67,12 @@ describe('tick', () => {
   })
 
   it('does not mutate the previous state', () => {
-    const running = dispatchAll(initialState, 'start')
-    const next = reducer(running, { type: 'tick' })
-    expect([next === running, running.ticks]).toEqual([false, 0])
+    const running = dispatchAll(initialState, 'start', ...repeat('tick', 3))
+    const snapshot = structuredClone(running)
+
+    reducer(running, { type: 'tick' })
+
+    expect(running).toEqual(snapshot)
   })
 })
 
@@ -79,28 +83,28 @@ describe('setSetting', () => {
   })
 
   it.each([
-    { key: 'aiGen', value: 999, stored: 50 },
-    { key: 'aiGen', value: 0, stored: 5 },
-    { key: 'reviewerSpeed', value: -300, stored: 100 },
-    { key: 'skim', value: 7, stored: 3 },
-  ])('clamps $key=$value to $stored', ({ key, value, stored }) => {
-    expect(setSetting(initialState, key, value).settings[key]).toBe(stored)
+    { settingKey: 'aiGen', value: 999, stored: 50 },
+    { settingKey: 'aiGen', value: 0, stored: 5 },
+    { settingKey: 'reviewerSpeed', value: -300, stored: 100 },
+    { settingKey: 'skim', value: 7, stored: 3 },
+  ])('clamps $settingKey=$value to $stored', ({ settingKey, value, stored }) => {
+    expect(setSetting(initialState, settingKey, value).settings[settingKey]).toBe(stored)
   })
 
   it.each([
-    { key: 'prSize', value: 254, stored: 250 },
-    { key: 'prSize', value: 256, stored: 260 },
-    { key: 'skim', value: 2.2, stored: 2 },
-    { key: 'skim', value: 2.3, stored: 2.5 },
-    { key: 'reviewerSpeed', value: 320, stored: 300 },
-  ])('snaps $key=$value to its step: $stored', ({ key, value, stored }) => {
-    expect(setSetting(initialState, key, value).settings[key]).toBe(stored)
+    { settingKey: 'prSize', value: 254, stored: 250 },
+    { settingKey: 'prSize', value: 256, stored: 260 },
+    { settingKey: 'skim', value: 2.2, stored: 2 },
+    { settingKey: 'skim', value: 2.3, stored: 2.5 },
+    { settingKey: 'reviewerSpeed', value: 320, stored: 300 },
+  ])('snaps $settingKey=$value to its step: $stored', ({ settingKey, value, stored }) => {
+    expect(setSetting(initialState, settingKey, value).settings[settingKey]).toBe(stored)
   })
 
   it.each(['nope', 'toString', 'constructor', '__proto__'])(
-    'ignores the unknown key "%s"',
-    (key) => {
-      expect(setSetting(initialState, key, 5)).toBe(initialState)
+    'ignores the unknown settingKey "%s"',
+    (settingKey) => {
+      expect(setSetting(initialState, settingKey, 5)).toBe(initialState)
     },
   )
 
@@ -149,13 +153,12 @@ describe('changing settings mid-run', () => {
     expect(shownCounts(atTwoSeconds.lanes.human)[0]).toBe(17)
 
     const draining = setSetting(setSetting(atTwoSeconds, 'humanGen', 1), 'reviewerSpeed', 1000)
-    const pendingEachTick = Array.from({ length: 60 }).reduce(
-      (acc) => {
-        const next = reducer(acc.state, { type: 'tick' })
-        return { state: next, shown: [...acc.shown, next.lanes.human.pendingPrs] }
-      },
-      { state: draining, shown: [] },
-    ).shown
+    const pendingEachTick = []
+    let state = draining
+    for (let tickIndex = 0; tickIndex < 60; tickIndex += 1) {
+      state = reducer(state, { type: 'tick' })
+      pendingEachTick.push(state.lanes.human.pendingPrs)
+    }
 
     expect(Math.min(...pendingEachTick)).toBeGreaterThanOrEqual(0)
     expect(floorShow(pendingEachTick.at(-1))).toBe(0)

@@ -24,10 +24,13 @@ const tickLanes = (state) =>
     ]),
   )
 
-const setSetting = (state, { key, value }) => {
-  const isValidChange = Object.hasOwn(SLIDERS, key) && Number.isFinite(value)
+const setSetting = (state, { settingKey, value }) => {
+  const isValidChange = Object.hasOwn(SLIDERS, settingKey) && Number.isFinite(value)
   if (!isValidChange) return state
-  return { ...state, settings: { ...state.settings, [key]: snapToSlider(key, value) } }
+  return {
+    ...state,
+    settings: { ...state.settings, [settingKey]: snapToSlider(settingKey, value) },
+  }
 }
 
 const HANDLERS = {

@@ -1,18 +1,23 @@
 import {
+  REFERENCE,
+  SECOND_MS,
+  TICK_MS,
   expect,
   expectCounts,
   laneLocator,
   metric,
+  metricValues,
   openSimulator,
   pauseSimulation,
+  sampleEachTick,
+  setSlider,
+  slider,
   startSimulation,
   test,
   toggleButton,
+  visibleValue,
 } from './fixtures.js'
 
-const SECOND_MS = 1000
-const TICK_MS = 100
-const KEY_PRESSES_TO_REACH_BOUND = 200
 const MAX_TABS_TO_REACH_A_CONTROL = 15
 
 const HUMAN_GEN = 'Human generation (PRs/hr)'
@@ -20,12 +25,6 @@ const AI_GEN = 'AI generation (PRs/hr)'
 const PR_SIZE = 'PR size (LOC, both lanes)'
 const REVIEWER_SPEED = 'Reviewer speed (LOC/hr, both lanes)'
 const AI_SKIM = 'AI skim multiplier'
-
-const slider = (page, name) => page.getByRole('slider', { name, exact: true })
-const setSlider = (page, name, value) => slider(page, name).fill(String(value))
-const visibleValue = (sliderLocator) => sliderLocator.locator('xpath=..').locator('output')
-const pendingCount = async (page, laneId) =>
-  Number(await metric(page, laneId, 'pending').textContent())
 
 const tabTo = async (page, target) => {
   for (let presses = 0; presses < MAX_TABS_TO_REACH_A_CONTROL; presses += 1) {
@@ -70,15 +69,16 @@ const DEFAULT_CONTROLS = [
     max: 1000,
     step: 50,
     shown: '300 LOC/hr',
+    spoken: '300 lines of code per hour',
   },
   { control: AI_SKIM, defaultValue: 2, min: 1, max: 3, step: 0.5, shown: '2×', spoken: '2 times' },
 ]
 
 const BOUNDS = [
-  { control: AI_GEN, key: 'ArrowRight', bound: 50 },
-  { control: AI_GEN, key: 'ArrowLeft', bound: 5 },
-  { control: REVIEWER_SPEED, key: 'ArrowLeft', bound: 100 },
-  { control: AI_SKIM, key: 'ArrowRight', bound: 3 },
+  { control: AI_GEN, key: 'End', bound: 50 },
+  { control: AI_GEN, key: 'Home', bound: 5 },
+  { control: REVIEWER_SPEED, key: 'Home', bound: 100 },
+  { control: AI_SKIM, key: 'End', bound: 3 },
 ]
 
 test.describe('Adjust the model live', () => {
@@ -86,13 +86,13 @@ test.describe('Adjust the model live', () => {
     test(`Controls start at their defaults with units: ${control}`, async ({ page }) => {
       await openSimulator(page)
 
-      const control_ = slider(page, control)
-      await expect(control_).toHaveValue(String(defaultValue))
-      await expect(control_).toHaveAttribute('min', String(min))
-      await expect(control_).toHaveAttribute('max', String(max))
-      await expect(control_).toHaveAttribute('step', String(step))
-      await expect(visibleValue(control_)).toHaveText(shown)
-      await expect(control_).toHaveAttribute('aria-valuetext', spoken)
+      const sliderLocator = slider(page, control)
+      await expect(sliderLocator).toHaveValue(String(defaultValue))
+      await expect(sliderLocator).toHaveAttribute('min', String(min))
+      await expect(sliderLocator).toHaveAttribute('max', String(max))
+      await expect(sliderLocator).toHaveAttribute('step', String(step))
+      await expect(visibleValue(sliderLocator)).toHaveText(shown)
+      await expect(sliderLocator).toHaveAttribute('aria-valuetext', spoken)
     })
   }
 
@@ -100,7 +100,9 @@ test.describe('Adjust the model live', () => {
     await openSimulator(page)
     const aiLane = laneLocator(page, 'ai')
 
-    const derivedSize = aiLane.locator('p', { hasText: 'PR size 378 LOC' })
+    const derivedSize = aiLane.locator('p', {
+      hasText: `PR size ${REFERENCE.aiPrSizeAtDefaults} LOC`,
+    })
     const derivedSpeed = aiLane.locator('p', { hasText: 'Effective speed 600 LOC/hr' })
     await expect(derivedSize).toContainText('derived')
     await expect(derivedSpeed).toContainText('derived')
@@ -111,21 +113,21 @@ test.describe('Adjust the model live', () => {
     await setSlider(page, PR_SIZE, 200)
     await setSlider(page, AI_SKIM, 3)
 
-    await expect(aiLane.locator('p', { hasText: 'PR size 302 LOC' })).toBeVisible()
+    await expect(
+      aiLane.locator('p', { hasText: `PR size ${REFERENCE.aiPrSizeAtPrSize200} LOC` }),
+    ).toBeVisible()
     await expect(aiLane.locator('p', { hasText: 'Effective speed 900 LOC/hr' })).toBeVisible()
   })
 
   for (const { control, key, bound } of BOUNDS) {
     test(`Sliders stop at their bounds: ${key} on ${control}`, async ({ page }) => {
       await openSimulator(page)
-      const control_ = slider(page, control)
+      const sliderLocator = slider(page, control)
 
-      await control_.focus()
-      for (let presses = 0; presses < KEY_PRESSES_TO_REACH_BOUND; presses += 1) {
-        await control_.press(key)
-      }
+      await sliderLocator.focus()
+      await sliderLocator.press(key)
 
-      await expect(control_).toHaveValue(String(bound))
+      await expect(sliderLocator).toHaveValue(String(bound))
     })
   }
 
@@ -148,14 +150,16 @@ test.describe('Adjust the model live', () => {
     await startSimulation(page)
     await page.clock.runFor(1 * SECOND_MS)
     await pauseSimulation(page)
-    await expect(metric(page, 'ai', 'pending')).toHaveText('18')
+    await expect(metric(page, 'ai', 'pending')).toHaveText(String(REFERENCE.aiPendingAtTick10))
 
     await setSlider(page, AI_GEN, 50)
-    await expect(metric(page, 'ai', 'pending')).toHaveText('18')
+    await expect(metric(page, 'ai', 'pending')).toHaveText(String(REFERENCE.aiPendingAtTick10))
 
     await startSimulation(page)
     await page.clock.runFor(TICK_MS)
-    await expect(metric(page, 'ai', 'pending')).toHaveText('23')
+    await expect(metric(page, 'ai', 'pending')).toHaveText(
+      String(REFERENCE.aiPendingAtTick11WithAiGen50),
+    )
   })
 
   test('A backlog drains to zero and never below', async ({ page }) => {
@@ -167,11 +171,11 @@ test.describe('Adjust the model live', () => {
 
     await setSlider(page, HUMAN_GEN, 1)
     await setSlider(page, REVIEWER_SPEED, 1000)
-    const sampledPending = []
-    for (let tickIndex = 0; tickIndex < (6 * SECOND_MS) / TICK_MS; tickIndex += 1) {
-      await page.clock.runFor(TICK_MS)
-      sampledPending.push(await pendingCount(page, 'human'))
-    }
+    const sampledPending = await sampleEachTick(page, {
+      startTick: 20,
+      tickCount: (6 * SECOND_MS) / TICK_MS,
+      read: async () => (await metricValues(page, 'pending'))[0],
+    })
 
     await expect(metric(page, 'human', 'pending')).toHaveText('0')
     expect(Math.min(...sampledPending)).toBeGreaterThanOrEqual(0)
@@ -179,12 +183,12 @@ test.describe('Adjust the model live', () => {
 
   test('Sliders are keyboard operable', async ({ page }) => {
     await openSimulator(page)
-    const speed = slider(page, REVIEWER_SPEED)
+    const reviewerSpeedSlider = slider(page, REVIEWER_SPEED)
 
-    await tabTo(page, speed)
+    await tabTo(page, reviewerSpeedSlider)
     await page.keyboard.press('ArrowRight')
 
-    await expect(speed).toHaveValue('350')
-    await expect(visibleValue(speed)).toHaveText('350 LOC/hr')
+    await expect(reviewerSpeedSlider).toHaveValue('350')
+    await expect(visibleValue(reviewerSpeedSlider)).toHaveText('350 LOC/hr')
   })
 })

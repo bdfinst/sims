@@ -27,7 +27,9 @@ export function Header({ isRunning, ticks, onToggleRunning }) {
           >
             Reset
           </button>
-          <span className="text-base text-gray-300">{isRunning ? 'Running' : 'Paused'}</span>
+          <span role="status" className="text-base text-gray-300">
+            {isRunning ? 'Running' : 'Paused'}
+          </span>
         </div>
         <p className="text-base">
           <span className="text-xl font-semibold">{formatElapsedHours(ticks)} work hours</span>{' '}

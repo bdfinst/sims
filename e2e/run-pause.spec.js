@@ -1,22 +1,26 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
+  INLINE_PROTOCOLS,
+  REFERENCE,
+  SECOND_MS,
   SIMULATOR_TITLE as TITLE,
+  TICKS_PER_SECOND,
+  TICK_MS,
   expect,
   expectCounts,
   laneLocator,
   metric,
+  metricValues,
   openSimulator,
   pauseSimulation,
+  sampleEachTick,
   startSimulation,
   test,
   toggleButton,
 } from './fixtures.js'
 
 const DIST_DIR = fileURLToPath(new URL('../dist/', import.meta.url))
-const SECOND_MS = 1000
-const TICK_MS = 100
-const TICKS_PER_SECOND = SECOND_MS / TICK_MS
 const DESCRIPTION =
   'Watch AI-speed code generation swamp human reviewers and push more defects into production.'
 const HUMAN_BLUE = 'rgb(59, 130, 246)'
@@ -112,8 +116,11 @@ test.describe('Run and pause the simulation', () => {
     await startSimulation(page)
     await page.clock.runFor(10 * SECOND_MS)
 
-    await expectCounts(page, 'human', { pending: 0, deployed: 10 })
-    await expectCounts(page, 'ai', { pending: 184, deployed: 15 })
+    await expectCounts(page, 'human', { pending: 0, deployed: REFERENCE.humanDeployedAtTick100 })
+    await expectCounts(page, 'ai', {
+      pending: REFERENCE.aiPendingAtTick100,
+      deployed: REFERENCE.aiDeployedAtTick100,
+    })
     await expect(page.getByText('10.0 work hours', { exact: true })).toBeVisible()
   })
 
@@ -136,7 +143,10 @@ test.describe('Run and pause the simulation', () => {
     await pauseSimulation(page)
     await page.clock.runFor(5 * SECOND_MS)
 
-    await expectCounts(page, 'ai', { pending: 55, deployed: 4 })
+    await expectCounts(page, 'ai', {
+      pending: REFERENCE.aiPendingAtTick30,
+      deployed: REFERENCE.aiDeployedAtTick30,
+    })
     await expect(page.getByText('3.0 work hours', { exact: true })).toBeVisible()
   })
 
@@ -149,24 +159,25 @@ test.describe('Run and pause the simulation', () => {
     await startSimulation(page)
     await page.clock.runFor(1 * SECOND_MS)
 
-    await expectCounts(page, 'ai', { pending: 73, deployed: 6 })
+    await expectCounts(page, 'ai', {
+      pending: REFERENCE.aiPendingAtTick40,
+      deployed: REFERENCE.aiDeployedAtTick40,
+    })
   })
 
   test('Deployed never decreases while running', async ({ page }) => {
     await openSimulator(page)
     await startSimulation(page)
-    const readDeployed = () =>
-      page.evaluate(() =>
-        [...document.querySelectorAll('[data-metric="deployed"]')].map((el) =>
-          Number(el.textContent),
-        ),
-      )
+    const readDeployed = () => metricValues(page, 'deployed')
 
-    const samples = [await readDeployed()]
-    for (let tickIndex = 0; tickIndex < 10 * TICKS_PER_SECOND; tickIndex += 1) {
-      await page.clock.runFor(TICK_MS)
-      samples.push(await readDeployed())
-    }
+    const samples = [
+      await readDeployed(),
+      ...(await sampleEachTick(page, {
+        startTick: 0,
+        tickCount: 10 * TICKS_PER_SECOND,
+        read: readDeployed,
+      })),
+    ]
 
     const decreases = samples
       .slice(1)
@@ -174,7 +185,9 @@ test.describe('Run and pause the simulation', () => {
         current.some((count, laneIndex) => count < samples[sampleIndex][laneIndex]),
       )
     expect(decreases).toEqual([])
-    await expect.poll(readDeployed).toEqual([10, 15])
+    await expect
+      .poll(readDeployed)
+      .toEqual([REFERENCE.humanDeployedAtTick100, REFERENCE.aiDeployedAtTick100])
   })
 
   test('Hiding the tab auto-pauses', async ({ page }) => {
@@ -187,7 +200,7 @@ test.describe('Run and pause the simulation', () => {
     await page.clock.runFor(3 * SECOND_MS)
 
     await expect(page.getByText('Paused', { exact: true })).toBeVisible()
-    await expect(metric(page, 'ai', 'pending')).toHaveText('18')
+    await expect(metric(page, 'ai', 'pending')).toHaveText(String(REFERENCE.aiPendingAtTick10))
   })
 
   test('Showing the tab again stays paused', async ({ page }) => {
@@ -201,7 +214,7 @@ test.describe('Run and pause the simulation', () => {
     await page.clock.runFor(2 * SECOND_MS)
 
     await expect(page.getByText('Paused', { exact: true })).toBeVisible()
-    await expect(metric(page, 'ai', 'pending')).toHaveText('18')
+    await expect(metric(page, 'ai', 'pending')).toHaveText(String(REFERENCE.aiPendingAtTick10))
   })
 
   test('Hiding the tab while paused changes nothing', async ({ page }) => {
@@ -222,8 +235,10 @@ test.describe('Run and pause the simulation', () => {
     await startSimulation(page)
     await page.clock.runFor(1 * SECOND_MS)
 
-    await expect(metric(page, 'ai', 'pending')).toHaveText('18')
-    const nonInlineRequests = requestedUrls.filter((url) => !/^(data|blob):/.test(url))
+    await expect(metric(page, 'ai', 'pending')).toHaveText(String(REFERENCE.aiPendingAtTick10))
+    const nonInlineRequests = requestedUrls.filter(
+      (url) => !INLINE_PROTOCOLS.has(new URL(url).protocol),
+    )
     expect(nonInlineRequests).toEqual([documentUrl])
   })
 
