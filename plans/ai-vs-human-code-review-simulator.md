@@ -1,28 +1,36 @@
 # Plan: AI vs. Human Code Review Simulator
 
-**Created**: 2026-10-12 (rewritten after the research amendment; revised after plan review)
-**Branch**: `main` (no commits yet; build on `feat/ai-review-sim`, see Preconditions)
+**Created**: 2026-10-12 (rewritten after the research amendment; revised after plan review; revised for Vite build)
+**Branch**: `feat/ai-review-sim`
 **Status**: approved
 **Gherkin persistence**: features
 **Spec**: `docs/specs/ai-vs-human-code-review-simulator.md` (amended 2026-10-12)
 
 ## Goal
 
-Build `ai-review-sim.html`, a single self-contained page that simulates a human lane and an AI lane of code review. The rules come from published research. PRs have a size in LOC. Human reviewers read at a set speed (LOC per work hour), and skim AI code faster. Defect catching falls past 200 LOC and past 500 LOC/hr. Escaped defects become incidents. With the defaults, the AI lane's queue explodes. A live headline readout shows AI incidents per PR at about 3.5× the human lane's. That ratio is an outcome of the model, not a hard-coded label. A collapsible panel presents the verified research with citations and states the modeling assumptions plainly. Playwright tests, a dev-only dependency, verify every behavior.
+Build a Vite + React app whose `npm run build` output is one self-contained offline file, `dist/index.html`, that simulates a human lane and an AI lane of code review. The rules come from published research. PRs have a size in LOC. Human reviewers read at a set speed (LOC per work hour), and skim AI code faster. Defect catching falls past 200 LOC and past 500 LOC/hr. Escaped defects become incidents. With the defaults, the AI lane's queue explodes. A live headline readout shows AI incidents per PR at about 3.5× the human lane's. That ratio is an outcome of the model, not a hard-coded label. A collapsible panel presents the verified research with citations and states the modeling assumptions plainly. Vitest unit tests cover the pure engine. Playwright tests cover every user-visible behavior against the built page.
 
 **Approach stances** (from `knowledge/decision-defaults.md`):
 
-- **Scope:** create `ai-review-sim.html`, `package.json`, `playwright.config.js`, `.gitignore`, and `tests/`. Edit `CLAUDE.md` only to add the page, the test commands, and a pre-talk check note. Do not touch `crt.html`, the `.mermaid` files, or `sim.spec.md`.
-- **Integration:** commit locally on `feat/ai-review-sim`. Use a PR with auto-merge once a remote exists. Never merge directly to `main` without being asked.
-- **Replace vs. merge:** every file is new except `CLAUDE.md`, which is changed in place.
+- **Scope:**
+  - Create `src/engine.js`, `src/research.js`, `src/components/**`, and `e2e/*.spec.js`.
+  - Replace the Vite demo (`src/App.jsx`, `src/App.css`, `src/assets/**`, `public/icons.svg`, the `src/index.js` starter and its test, `e2e/example.spec.js`).
+  - Edit `vite.config.js`, `index.html`, `src/index.css`, `src/main.jsx`, `package.json` (feature dependencies only), and `CLAUDE.md` (page, commands, and talk note).
+  - Do not touch `crt.html`, the `.mermaid` files, `sim.spec.md`, or the toolchain configs from project-init.
+- **Integration:** commit on `feat/ai-review-sim`. Use a PR with auto-merge once a remote exists. Never merge directly to `main` without being asked.
+- **Replace vs. merge:** the Vite demo files are scaffold placeholders and are replaced. Every other existing file is edited in place.
 
-**Out of scope:** charts and history graphs, saving settings, backend, auth, offline CDN fallback (beyond the loading message and the icon-less degrade), per-lane thresholds, separate reviewer pools per lane, hard-coding any research ratio (3×, 4.6×) into the math, and correcting tick timing for elapsed time.
+**Out of scope:** charts and history graphs, saving settings, backend, auth, runtime CDN loading of any kind, TypeScript, per-lane thresholds, separate reviewer pools per lane, hard-coding any research ratio (3×, 4.6×) into the math, and correcting tick timing for elapsed time.
 
 ## Preconditions (entry gate for `/build`)
 
-- [x] `git init` (done by you; branch `main`, no remote).
-- [ ] A baseline commit of the existing files on `main`. A `.gitignore` excludes `.claude/metrics/` and `.ruff_cache/`. Then create `feat/ai-review-sim`.
-- [ ] `node` ≥ 18 is installed. `npm i` and `npx playwright install chromium` run successfully.
+- [x] `git init`, baseline commit `df30ed1` on `main`, branch `feat/ai-review-sim`.
+- [x] Toolchain scaffolded by project-init (`83dbb30`). It provides:
+  - Vite 8 and React 19.
+  - oxlint, ESLint 9 (`lint:deep`), and Prettier.
+  - Vitest, plus Playwright 1.64 with Chromium.
+  - Husky with lint-staged.
+  - All of `lint`, `lint:deep`, `format:check`, `test`, and `test:e2e` pass.
 
 ## Acceptance Criteria
 
@@ -32,39 +40,55 @@ From the amended spec:
 - [ ] AC2: Start begins the simulation. The button then reads Pause, and pressing it stops all count changes.
 - [ ] AC3: Reset sets all counts and metrics to 0 and pauses. Slider values do not change.
 - [ ] AC4: Each slider shows its value with units and uses the default, range, and step from the State table.
-- [ ] AC5: Slider changes while running take effect on the next tick, without a pause.
+- [ ] AC5: After a slider change while running, the next tick's displayed counts reflect the new value, and the simulation keeps running.
 - [ ] AC6: The warning-threshold slider (5–50, default 15) applies to both lanes.
 - [ ] AC7: With the defaults, after 10 s:
   - Human: 0 pending, 10 deployed, 61%, 19 incidents, 1.95 per PR.
   - AI: 184 pending, 15 deployed, 10%, 107 incidents, 6.79 per PR, 116.0 h wait.
 - [ ] AC7a: At the defaults, AI incidents per PR is 3×–4× human incidents per PR.
-- [ ] AC7b: Defects caught follows the size and speed factors.
+- [ ] AC7b: Defects caught follows the size and speed factors: 80% at PR size ≤ 200 (speed 300); 4% at PR size ≥ 400; 22% at PR size 200 and speed 900; AI lane 3% at skim 3×.
 - [ ] AC7c: Changing PR size or reviewer speed while running changes defects caught and incident accrual from the next tick.
 - [ ] AC8: A queue never shows a negative value.
 - [ ] AC9: Deployed never decreases while running.
-- [ ] AC10: Counts show `Math.floor(x + 1e-9)` of the internal value.
+- [ ] AC10: Every count shows `Math.floor(x + 1e-9)` of its internal value (so 9.9999999999 shows 10, and 0.9 shows 0).
 - [ ] AC11: A queue box warns when its displayed pending PRs are greater than the threshold, and clears at or below it. This applies to both lanes.
-- [ ] AC12: The queue box shows one tile per pending PR, and "+N more" beyond its tile capacity.
-- [ ] AC13: Lane colors, icons, and left-to-right layout match the spec.
-- [ ] AC14: The header shows the title, a one-sentence description, and the buttons on the right.
-- [ ] AC15: Dark theme; no horizontal scroll at 375px; lanes stack on narrow screens.
+- [ ] AC12: The queue box shows `min(displayed, C)` tiles. C is exposed as `data-capacity`, between 22 and 98. When displayed > C, the box shows "+N more" with N = displayed − C.
+- [ ] AC13: The Human lane has a blue `#3b82f6` accent, green Deployed, and `user`/`eye` icons. The AI lane has a purple `#a855f7` accent and `bot`/`eye` icons. The warning state is red `#ef4444`. At md (≥ 768px) and wider, each lane reads inputs → Pending Review → review side, left to right.
+- [ ] AC14: The header shows "AI vs. Human Code Review Simulator" and "Watch AI-speed code generation swamp human reviewers and push more defects into production." At md and wider, the Start/Pause and Reset buttons sit to the right of the title. Below md, they sit on their own row.
+- [ ] AC15: Page background `rgb(11, 13, 18)`. At 375 × 667 (below md = 768px), there is no horizontal scroll, the lanes stack, and Start/Pause and Reset are visible without scrolling. At 1280 × 720, the header, the headline, and both lanes' counts and metric grids are visible without scrolling.
 - [ ] AC16: Sliders have visible labels, and every control works with the keyboard.
 - [ ] AC17: Each lane shows pending LOC, "Defects caught" %, incidents, incidents per PR, and pickup wait.
-- [ ] AC18: A collapsible research panel (collapsed by default) shows the verified findings, worded and cited per Research Sources.
+- [ ] AC18: A collapsible research panel (collapsed by default) shows the five findings from the spec's Research Sources table. It uses the Panel wording column verbatim, except the practitioner-observation finding, which uses its quoted paraphrase. It links each source URL and never contains "near zero", "coined", or "originated".
 - [ ] AC19: Hiding the tab while running auto-pauses the simulation.
-- [ ] AC20: If scripts fail to load, a loading/network message shows instead of a blank page.
-- [ ] AC21: A headline readout shows the live AI ÷ Human incidents-per-PR ratio, or "—" until both lanes have deployed a PR.
+- [ ] AC20 (revised): `npm run build` produces `dist/index.html` with no `<script src>`, no `<link rel="stylesheet">`, no `modulepreload`, and no `<link rel="icon">` pointing at a file. Opened from `file://`, it renders and runs and makes no request other than the document itself (`data:` URIs allowed). No page in any e2e spec requests an external host.
+- [ ] AC21: A headline readout shows the live AI ÷ Human incidents-per-PR ratio (`toFixed(2)` + "×"), or "—" until both lanes *display* Deployed ≥ 1.
 - [ ] AC22: An elapsed work-hours readout with a "1 s = 1 work hour" note, reset to 0.0 by Reset.
 
 ## Design decisions (fixed for the build)
 
-### File structure
+### File structure and build
 
-`ai-review-sim.html` stays one file but has clearly marked `<script>` regions, in this order:
+| Module | Contents |
+|---|---|
+| `src/engine.js` | Pure, with no React or DOM: constants, the numeric lane model (`sizeMultiplier`, `skimApplies`), the slider table (min/max/step/default), `sizeFactor`, `speedFactor`, `detection`, `laneParams`, `tick`, `isOverThreshold`, `emptyLane`, and the formatters. Unit-tested by `src/engine.test.js` (Vitest). An ESLint `no-restricted-imports` override forbids it from importing `react`, `lucide-react`, or `./components/*`. |
+| `src/reducer.js` | Pure `reducer(state, action)` and `initialState`: `tick`, `start`, `pause`, `reset`, `setSetting`. Unit-tested by `src/reducer.test.js` (Vitest). |
+| `src/laneConfig.js` | Presentation only: labels, icon names, and complete Tailwind class-string literals per lane. |
+| `src/research.js` | The findings array and the assumptions text (data only). |
+| `src/components/` | `Header`, `HeadlineBand`, `Lane`, `QueueBox`, `LaneMetrics`, `RateSlider`, `ResearchPanel`, and `Icon`. `Icon` maps an explicit set of five names (`user`, `bot`, `eye`, `triangle-alert`, `chevron-down`) to named `lucide-react` imports, never `icons[name]`, so tree-shaking keeps the bundle small. It adds the `data-icon` hook. |
+| `src/App.jsx` | `useReducer(reducer, initialState)`, the interval and visibility effects, and the layout. |
+| `src/main.jsx` | Mounts `App` and imports `index.css`, which holds the Tailwind 4 `@import "tailwindcss"` and the palette `@theme` tokens. |
 
-1. **`engine`**: constants, `sizeFactor`, `speedFactor`, `detection`, `laneParams`, `tick`, `isOverThreshold`, and formatters. Pure code: it never touches the DOM, React, or `window` except for one `window.SimEngine` namespace export.
-2. **`research-data`**: the findings array and the assumptions text.
-3. **`ui`**: `Icon`, the components, the reducer, `App`, and the mount.
+**Build:**
+- `vite.config.js` adds `@tailwindcss/vite` and `vite-plugin-singlefile`, so `npm run build` emits one `dist/index.html` with inlined JS and CSS.
+- `index.html` gets the title "AI vs. Human Code Review Simulator". The `<link rel="icon" href="/favicon.svg">` is removed, and `public/` (favicon and icon sprites) is deleted, because nothing may be fetched besides the document.
+- `playwright.config.js`: `reuseExistingServer: false`, so every e2e run builds fresh.
+- `e2e/fixtures.js`: a shared Playwright `test` fixture that records every request on the page. After each test it asserts there were no external-host requests. For `file://` pages, the only allowed requests are the document URL plus `data:` and `blob:` URIs. Every spec imports `test`/`expect` from it.
+
+**Feature dependencies** (exact versions recorded by `npm install` in `package-lock.json`):
+- runtime: `lucide-react`
+- dev: `tailwindcss` 4, `@tailwindcss/vite`, `vite-plugin-singlefile`
+
+Step 1.1 asserts that the icons `User`, `Bot`, `Eye`, `TriangleAlert`, and `ChevronDown` exist in the installed `lucide-react`.
 
 ### State and engine
 
@@ -100,20 +124,6 @@ From the amended spec:
 - **Headline:** `(aiEsc/aiDp) ÷ (humanEsc/humanDp)` from internal values, `toFixed(2)` + "×". Shows "—" until both lanes display Deployed ≥ 1.
 - **Elapsed:** `(ticks × 0.1).toFixed(1)` + " work hours", with the caption "1 s = 1 work hour".
 - **Warning:** the number, the tiles, and `isOverThreshold(displayed, threshold)` all use one `displayed` pending-PR value.
-
-### CDN and libraries
-
-**CDN pins**, with `integrity` and `crossorigin="anonymous"` on every script except Tailwind:
-
-| Library | Version | Note |
-| --- | --- | --- |
-| React, ReactDOM | 18.3.1 UMD | |
-| htm | 3.1.1 | |
-| Lucide UMD | 0.468.0 | Step 1.1 asserts that `User`, `Bot`, `Eye`, `TriangleAlert`, and `ChevronDown` exist. If one is missing, pick the nearest version that has all five and record it. |
-| Tailwind Play CDN | 3.4.17 | Play CDN has no SRI support. |
-
-- **Degrade:** if Lucide is missing, `Icon` renders nothing and the simulator still works. If React, ReactDOM, or htm is missing, the root keeps its loading message.
-- **Playwright:** `@playwright/test` pinned to 1.48.2. `page.clock` needs ≥ 1.45.
 
 ### Layout
 
@@ -168,7 +178,6 @@ At 1280 × 720 with the panel collapsed, the header, the headline band, and both
 ### Page behavior
 
 - **Auto-pause:** a `visibilitychange` event with `visibilityState === 'hidden'` dispatches `pause`. Becoming visible again does nothing.
-- **Loading message:** `<div id="root">Loading simulator… if this stays, check your network</div>`.
 - **Research panel:** a `<details>`/`<summary>` element, collapsed by default.
   - Its text comes verbatim from the spec's Research Sources "Panel wording" column, with links to the five URLs (`target="_blank" rel="noopener"`).
   - It includes a "Model assumptions" note: defect density 20/KLOC, the 0.05 and 0.1 detection floors, the curve knees and walls, and the 1.51 size multiplier are modeling choices, calibrated so the defaults land near Faros's +242.7% incidents per PR.
@@ -176,15 +185,16 @@ At 1280 × 720 with the panel collapsed, the header, the headline band, and both
 
 ## Slices
 
-Every slice edits `ai-review-sim.html`, so the slices run in sequence.
+Every slice edits `src/App.jsx` and `src/components/**`, so the slices run in sequence.
 
 **Test approach (all slices):**
 
-1. Call `page.clock.install()` before `goto`.
-2. Wait for the header title to be visible.
-3. Call `page.clock.pauseAt(now)`. Time then advances only through `runFor`; one tick is `runFor(100)`.
-
-Tests find elements by role and accessible name, scoped by `data-lane`. They read visible text, ARIA attributes, the test hooks above, or computed style. Slider labels below are the accessible names.
+- **Engine (Vitest, `src/engine.test.js`):** every numeric scenario is first pinned as a pure-function test of `tick`, `detection`, and the formatters. This is fast and has no browser.
+- **UI (Playwright, `e2e/*.spec.js`):**
+  - Playwright's `webServer` builds and serves `dist/` (`vite preview`).
+  - Each test calls `page.clock.install()` before `goto('/')`, waits for the header title, then calls `page.clock.pauseAt(now)`. Time then advances only through `runFor`; one tick is `runFor(100)`.
+  - Tests find elements by role and accessible name, scoped by `data-lane`. They read visible text, ARIA attributes, the test hooks, or computed style.
+- Slider labels below are the accessible names.
 
 **Default arithmetic:**
 
@@ -196,7 +206,7 @@ The reference implementation is `scratchpad/check.py` and `check2.py`. Every num
 ### Slice 1: Two lanes that run and pause
 
 **Depends-on:** none
-**Files:** `package.json`, `playwright.config.js`, `.gitignore`, `ai-review-sim.html`, `tests/run-pause.spec.js`
+**Files:** `vite.config.js`, `index.html`, `package.json`, `package-lock.json`, `playwright.config.js`, `eslint.config.js`, `public/**`, `src/**`, `e2e/fixtures.js`, `e2e/run-pause.spec.js`, `e2e/example.spec.js`
 
 **Behavior:**
 
@@ -279,49 +289,56 @@ Feature: Run and pause the simulation
     When the page becomes hidden
     Then the status reads "Paused" and all counts show 0
 
-  Scenario Outline: A failed script leaves a usable page or a clear message
-    Given requests for <library> fail
-    When I open the simulator
-    Then <outcome>
+  Scenario: The build is one self-contained file
+    Given the project is built
+    Then dist/index.html exists
+    And it has no script element with a src attribute, no stylesheet link, no modulepreload link, and no icon link to a file
+    And dist contains no other JS or CSS files
 
-    Examples:
-      | library  | outcome                                                                        |
-      | React    | the page shows "Loading simulator… if this stays, check your network"          |
-      | ReactDOM | the page shows "Loading simulator… if this stays, check your network"          |
-      | htm      | the page shows "Loading simulator… if this stays, check your network"          |
-      | Lucide   | the simulator renders with no icons, and pressing Start changes the AI count   |
-      | Tailwind | the simulator renders, and pressing Start changes the AI count                 |
+  Scenario: The built file runs from disk with no other requests
+    Given the project is built
+    When I open dist/index.html from the file system
+    Then the header title is visible
+    When I press Start and 1 second passes
+    Then the AI lane shows Pending Review 18
+    And the only request made was for the document itself
 ```
 
 **Steps:**
 
-#### Step 1.1: Harness, script regions, loading message, and styled static shell
+#### Step 1.1: Replace the Vite demo with the styled static shell and offline single-file build
 
 **Complexity**: standard
 **IMPLEMENT**:
-
-- `package.json` (`@playwright/test` 1.48.2, `"test": "playwright test"`).
-- `playwright.config.js` (Chromium).
-- `.gitignore` (`node_modules/`, `test-results/`, `playwright-report/`, `.claude/metrics/`, `.ruff_cache/`).
-- `ai-review-sim.html` with the three script regions, the pinned CDNs with SRI, the root loading text, and the guarded `Icon`.
-- The header (title, exact description, Start/Pause, Reset, status, elapsed), the headline band showing "—", and two config-driven lanes with test hooks.
-- Confirm that the fake clock works with the CDN-loaded React and Tailwind.
-**TEST**: Page loads paused, header, lane identity, nothing moves while paused, and the failed-script outline (`page.route` aborts each host's path).
-**REFACTOR**: Keep lane config (labels, icons, complete Tailwind class strings, `sizeMultiplier`, `skimApplies`, slider config) in one constant.
-**Files**: `package.json`, `playwright.config.js`, `.gitignore`, `ai-review-sim.html`, `tests/run-pause.spec.js`
-**Commit**: `feat(sim): styled page shell with paused lanes and Playwright harness`
+- Remove the Vite demo and the starter placeholders: `src/App.css`, `src/assets/**`, `public/icons.svg`, `src/index.js`, `src/index.test.js`, and `e2e/example.spec.js`.
+- Add `lucide-react`, `tailwindcss` 4, `@tailwindcss/vite`, and `vite-plugin-singlefile`. Configure `vite.config.js`.
+- `src/index.css`: `@import "tailwindcss"` plus the palette `@theme` tokens. `index.html` gets the title.
+- `src/engine.js`: lane config and `laneParams` only.
+- Components: `Header` (title, exact description, Start/Pause, Reset, status, elapsed), `HeadlineBand` showing "—", two config-driven `Lane`s with test hooks, and `Icon` wrapping `lucide-react` with `data-icon`.
+**TEST**:
+- Vitest: `laneParams` at the defaults (human 250/300, AI 378/600).
+- Playwright: page loads paused, header, lane identity, nothing moves while paused, and "the build is one self-contained file". The file is parsed for element attributes, not text-scanned for "http", which would false-fail on SVG `xmlns` and React strings. Add the shared `e2e/fixtures.js` external-request guard.
+**REFACTOR**: Keep the numeric lane model and slider table in `src/engine.js`, and presentation config in `src/laneConfig.js`. The ESLint `no-restricted-imports` override keeps the engine pure.
+**Files**: `vite.config.js`, `index.html`, `package.json`, `package-lock.json`, `playwright.config.js`, `eslint.config.js`, `public/**`, `src/**`, `e2e/fixtures.js`, `e2e/run-pause.spec.js`, `e2e/example.spec.js`
+**Commit**: `feat(sim): offline single-file shell with paused lanes`
 
 #### Step 1.2: Reducer, LOC-based tick, Start/Pause, and elapsed hours
 
 **Complexity**: standard
 **IMPLEMENT**:
 
-- The reducer, default settings, and `laneParams`.
+- `src/reducer.js` (`initialState`, `start`/`pause`/`tick`) and the default settings (`laneParams` exists from Step 1.1).
 - The pure `tick` with the full order above: generation, the avg-size guard, proportional review, and the clamp. Escape accrual is stubbed to `d = 0` until Step 4.2.
 - The interval tied to `isRunning`, the Start/Pause toggle and status, `ticks`, and the elapsed readout.
-**TEST**: Start→Pause, default flow at 10 s, partial PR, pause freeze, resume, deployed never decreases.
+**TEST**:
+- Vitest:
+  - `tick` default flow at 10 s (184/15, 0/10).
+  - Partial PR asserted through `floorShow` after 9 and 10 accumulated ticks (0 and 1).
+  - Clamp and empty-queue guard.
+  - `reducer` start, pause, and tick (and ticks not advancing while paused).
+- Playwright: Start→Pause, default flow at 10 s, partial PR, pause freeze, resume, deployed never decreases, and "the built file runs from disk with no other requests".
 **REFACTOR**: Clear the interval on pause and on unmount. Keep the reducer cases small.
-**Files**: `ai-review-sim.html`, `tests/run-pause.spec.js`
+**Files**: `src/**`, `e2e/run-pause.spec.js`
 **Commit**: `feat(sim): LOC-based tick engine with start/pause and elapsed hours`
 
 #### Step 1.3: Auto-pause on hidden tab
@@ -330,13 +347,13 @@ Feature: Run and pause the simulation
 **IMPLEMENT**: Add a `visibilitychange` listener that dispatches `pause` only when hidden. Remove the listener on unmount.
 **TEST**: The three hidden/visible scenarios. Tests override `document.visibilityState` and dispatch the event.
 **REFACTOR**: Group the effect hooks (interval, visibility) together.
-**Files**: `ai-review-sim.html`, `tests/run-pause.spec.js`
+**Files**: `src/**`, `e2e/run-pause.spec.js`
 **Commit**: `feat(sim): auto-pause when the tab is hidden`
 
 ### Slice 2: Live controls
 
 **Depends-on:** 1
-**Files:** `ai-review-sim.html`, `tests/controls.spec.js`
+**Files:** `src/**`, `e2e/controls.spec.js`
 
 **Behavior:**
 
@@ -417,7 +434,7 @@ Feature: Adjust the model live
 - Add the derived AI text from `laneParams`.
 **TEST**: All seven scenarios. The engine needs no change, because the reducer already reads the current settings.
 **REFACTOR**: Slider config comes from one table, matching the spec's State table.
-**Files**: `ai-review-sim.html`, `tests/controls.spec.js`
+**Files**: `src/**`, `e2e/controls.spec.js`
 **Commit**: `feat(sim): live model controls with derived AI size and speed`
 
 > Check: paused at 1 s, AI pending is 18.41 PRs. With `aiGen` 50, one tick adds 5 and reviews 0.159, giving 23.25, which displays 23.
@@ -425,7 +442,7 @@ Feature: Adjust the model live
 ### Slice 3: Reset
 
 **Depends-on:** 2
-**Files:** `ai-review-sim.html`, `tests/reset.spec.js`
+**Files:** `src/**`, `e2e/reset.spec.js`
 
 **Behavior:**
 
@@ -475,13 +492,13 @@ Feature: Reset the simulation
 **IMPLEMENT**: Add a `reset` reducer case. It sets both lanes to `emptyLane`, `ticks` to 0, and `isRunning` to false. Settings are untouched.
 **TEST**: All six scenarios.
 **REFACTOR**: Share `emptyLane` between the initial state and reset.
-**Files**: `ai-review-sim.html`, `tests/reset.spec.js`
+**Files**: `src/**`, `e2e/reset.spec.js`
 **Commit**: `feat(sim): reset clears lanes and pauses`
 
 ### Slice 4: Quality metrics and headline ratio
 
 **Depends-on:** 3
-**Files:** `ai-review-sim.html`, `tests/metrics.spec.js`
+**Files:** `src/**`, `e2e/metrics.spec.js`
 
 **Behavior:**
 
@@ -591,9 +608,11 @@ Feature: Review quality metrics
 
 **Complexity**: standard
 **IMPLEMENT**: Add the pure `sizeFactor`, `speedFactor`, and `detection` functions. Add the `LaneMetrics` grid (fixed row order), showing Defects caught from `laneParams` and Pending LOC.
-**TEST**: Defects caught at rest, both outlines, the two skim scenarios.
+**TEST**:
+- Vitest: `sizeFactor`, `speedFactor`, and `detection` table values (80/80/42/4/4, 80/44/22/8, AI 3/12, drained-queue display 6%).
+- Playwright: defects caught at rest, both outlines, the two skim scenarios.
 **REFACTOR**: Name the curve constants: `SIZE_KNEE=200`, `SIZE_WALL=400`, `SIZE_FLOOR=0.05`, `SPEED_KNEE=500`, `SPEED_WALL=1000`, `SPEED_FLOOR=0.1`, `BASE_DETECTION=0.8`, `DEFECTS_PER_LOC=0.02`.
-**Files**: `ai-review-sim.html`, `tests/metrics.spec.js`
+**Files**: `src/**`, `e2e/metrics.spec.js`
 **Commit**: `feat(sim): defects-caught rate from PR size and reviewer speed`
 
 #### Step 4.2: Incidents, pickup wait, and the headline ratio
@@ -604,15 +623,15 @@ Feature: Review quality metrics
 - Replace the `d = 0` stub with real escape accrual.
 - Display Incidents, Incidents per PR (with the "—" rule), and Pickup wait (`pendingLoc ÷ effSpeed`).
 - Add the headline-band ratio.
-**TEST**: Incident metrics at rest, default metrics at 10 s, the research effect, the "—" rule, larger PRs, the mid-run size change, queued sizes kept, drained queue, incidents never decrease, reset clears.
-**REFACTOR**: Keep the formatters (`floorShow`, `pct`, `perPr`, `hours`, `loc`, `ratio`) in the engine region.
-**Files**: `ai-review-sim.html`, `tests/metrics.spec.js`
+**TEST**: Vitest pins escape accrual (19/1.95, 107/6.79, 57/7.68, 53/6.94, ratio 3.48), with incidents per PR divided by *internal* Deployed (107.84 / 15.87, not 107 / 15), and pickup wait (116.0). Playwright covers incident metrics at rest, default metrics at 10 s, the research effect, the "—" rule, larger PRs, the mid-run size change, queued sizes kept, drained queue, incidents never decrease, reset clears.
+**REFACTOR**: Keep the formatters (`floorShow`, `pct`, `perPr`, `hours`, `loc`, `ratio`) in `src/engine.js`.
+**Files**: `src/**`, `e2e/metrics.spec.js`
 **Commit**: `feat(sim): incidents, pickup wait, and live AI-vs-human ratio`
 
 ### Slice 5: Warning threshold
 
 **Depends-on:** 4
-**Files:** `ai-review-sim.html`, `tests/warning.spec.js`
+**Files:** `src/**`, `e2e/warning.spec.js`
 
 **Behavior:**
 
@@ -688,13 +707,13 @@ Feature: Pending Review overload warning
 **IMPLEMENT**: Add the threshold slider to the header. The `QueueBox` warning state applies a red border and background, a `TriangleAlert` icon, `data-state="warning"`, and the lane's `role="status"` message. All of it is driven by `isOverThreshold(displayed, threshold)`.
 **TEST**: All nine scenarios. The red border is asserted through computed `border-color` `rgb(239, 68, 68)`.
 **REFACTOR**: `isOverThreshold` is the only place the comparison is made.
-**Files**: `ai-review-sim.html`, `tests/warning.spec.js`
+**Files**: `src/**`, `e2e/warning.spec.js`
 **Commit**: `feat(sim): adjustable warning threshold for both lanes`
 
 ### Slice 6: Tiles, overflow, and layout
 
 **Depends-on:** 5
-**Files:** `ai-review-sim.html`, `tests/tiles.spec.js`, `tests/layout.spec.js`
+**Files:** `src/**`, `e2e/tiles.spec.js`, `e2e/layout.spec.js`
 
 **Behavior:**
 
@@ -766,7 +785,7 @@ Feature: Pending Review tiles and layout
 **IMPLEMENT**: `QueueBox` renders `min(displayed, TILE_CAPACITY)` `aria-hidden` tiles, each with `data-tile`, plus "+N more", and exposes `data-capacity`. `TILE_CAPACITY` must be between 22 and 98 and fit at 375px.
 **TEST**: The four tile scenarios (tiles counted by `[data-tile]`).
 **REFACTOR**: Keep tile rendering a pure function of `displayed` and capacity.
-**Files**: `ai-review-sim.html`, `tests/tiles.spec.js`
+**Files**: `src/**`, `e2e/tiles.spec.js`
 **Commit**: `feat(sim): queue tiles with overflow indicator`
 
 > Check: with Human generation 10, PR size 1000, and speed 100, the lane displays n−1 after n ticks, so it hits every integer up to 99.
@@ -777,13 +796,13 @@ Feature: Pending Review tiles and layout
 **IMPLEMENT**: The type scale, the compact lane layout for 1280 × 720, the fixed-width metrics column, narrow stacking, header wrapping, and `:focus-visible` outlines.
 **TEST**: Projector fit, rows aligned, phone, wide, dark theme, keyboard and focus.
 **REFACTOR**: Consolidate the color tokens in lane config. Remove dead class strings.
-**Files**: `ai-review-sim.html`, `tests/layout.spec.js`
+**Files**: `src/**`, `e2e/layout.spec.js`
 **Commit**: `feat(sim): projector-fit responsive layout with aligned metrics`
 
 ### Slice 7: Research panel and docs
 
 **Depends-on:** 6
-**Files:** `ai-review-sim.html`, `tests/research.spec.js`, `tests/layout.spec.js`, `CLAUDE.md`
+**Files:** `src/**`, `e2e/research.spec.js`, `e2e/layout.spec.js`, `CLAUDE.md`
 
 **Behavior:**
 
@@ -831,16 +850,19 @@ Feature: Research behind the simulation
 #### Step 7.1: Collapsible research panel
 
 **Complexity**: standard
-**IMPLEMENT**: Add a `ResearchPanel` (`<details>`/`<summary>`) below the lanes, rendered from the `research-data` region (spec Panel wording, URLs, and the assumptions/calibration note). Add the toggle to the Slice 6 Tab-order test.
+**IMPLEMENT**: Add a `ResearchPanel` (`<details>`/`<summary>`) below the lanes, rendered from `src/research.js` (spec Panel wording, URLs, and the assumptions/calibration note). Add the toggle to the Slice 6 Tab-order test.
 **TEST**: All six scenarios, plus the updated keyboard scenario.
 **REFACTOR**: Keep the findings as data, separate from the markup.
-**Files**: `ai-review-sim.html`, `tests/research.spec.js`, `tests/layout.spec.js`
+**Files**: `src/**`, `e2e/research.spec.js`, `e2e/layout.spec.js`
 **Commit**: `feat(sim): collapsible research panel with verified citations`
 
 #### Step 7.2: Document the page in CLAUDE.md
 
 **Complexity**: trivial
-**IMPLEMENT**: Add `ai-review-sim.html`, `npm test`, and `npx playwright test tests/<file>` to `CLAUDE.md`, pointing to the spec for the model. Add a pre-talk note: open the page on the venue network, or save it while online, before presenting, because it loads React, Tailwind, and Lucide from CDNs. Re-check the research URLs before major talks.
+**IMPLEMENT**: Add to `CLAUDE.md`:
+- The app layout and the commands: `npm run dev`, `npm run build` (gives `dist/index.html`), `npm test`, `npx vitest run src/engine.test.js -t <name>`, `npm run test:e2e`, `npx playwright test e2e/<file>`, `npm run lint`, and `npm run format:check`.
+- A pointer to the spec for the model.
+- A talk note: present from the built `dist/index.html`, which works offline. Re-check the research URLs before major talks.
 **TEST**: The full suite stays green.
 **REFACTOR**: Keep the file list in `CLAUDE.md` consistent with the folder.
 **Files**: `CLAUDE.md`
@@ -868,7 +890,7 @@ graph TD
 | 6 | 6 |
 | 7 | 7 |
 
-The slices run in sequence on purpose: every slice edits `ai-review-sim.html`. The minimum viable demo is Slices 1–5 plus 7. Don't drop Slice 7 as "last": the cited research is a core requirement.
+The slices run in sequence on purpose: every slice edits `src/App.jsx` and `src/components/**`. The minimum viable demo is Slices 1–5 plus 7. Don't drop Slice 7 as "last": the cited research is a core requirement.
 
 ## Complexity Classification
 
@@ -880,9 +902,12 @@ The slices run in sequence on purpose: every slice edits `ai-review-sim.html`. T
 
 ## Pre-PR Quality Gate
 
-- [ ] All tests pass (`npm test`)
-- [ ] Type check: n/a (plain JS in HTML)
-- [ ] Linter: n/a (no linter configured)
+- [ ] Unit tests pass (`npm test`)
+- [ ] E2E tests pass (`npm run test:e2e`)
+- [ ] Lint passes (`npm run lint` and `npm run lint:deep`)
+- [ ] Formatting passes (`npm run format:check`)
+- [ ] Type check: n/a (JavaScript)
+- [ ] `npm run build` produces a single `dist/index.html`
 - [ ] `/code-review` passes
 - [ ] `CLAUDE.md` updated (Step 7.2)
 
@@ -899,9 +924,10 @@ The slices run in sequence on purpose: every slice edits `ai-review-sim.html`. T
 - **Model calibration is sensitive.** Changing the curve constants moves the 3.48× ratio. AC7a (3×–4×) guards the research story. The exact-number scenarios guard the formulas.
 - **Defects caught (display) vs. accrual.** The display uses the current settings. Accrual uses the average pending PR size. After a mid-run size change, the two can differ until the mixed-size queue drains. This is accepted, because the spec defines the display that way.
 - **Projector fit at 1280 × 720 is tight.** The header, headline, two lanes, tiles, and metric grids must all fit. Step 6.2 may need a smaller tile size or a two-column header. If it can't fit, the fallback is to shrink tiles before cutting any metric.
-- **Network-dependent tests and talks.** The tests need the CDNs, and so does a live talk. Step 7.2 documents a pre-talk check.
-- **Fake clock vs. CDN libraries.** Step 1.1 checks this first. The fallback is `install({ shouldAdvanceTime: false })` after render.
-- **Lucide version.** 0.468.0 is the intended pin. Step 1.1 verifies the five icon names and SRI hash, or records a substitute version.
+- **Tailwind 4 differences.** The config is CSS-first (`@theme`) and some utilities were renamed from v3. Step 1.1 establishes the palette tokens. Class strings must stay complete literals so Tailwind's scanner finds them.
+- **Single-file inlining.** `vite-plugin-singlefile` must inline everything. The offline scenario and the external-URL check in Step 1.1 guard this.
+- **Fake clock vs. React scheduler.** Step 1.1 checks this first. The fallback is `install({ shouldAdvanceTime: false })` after render.
+- **Build-before-e2e time.** With `reuseExistingServer: false`, Playwright's `webServer` rebuilds every run, which adds a few seconds. That's acceptable.
 - **Research figures drift.** The panel quotes sources as of 2026-10-12.
 
 ## Plan Review Summary
@@ -923,15 +949,29 @@ The slices run in sequence on purpose: every slice edits `ai-review-sim.html`. T
 - **Mixed PR sizes:** tested through Pending Review 26 / LOC 9,100.
 - **"—" rule:** applies to displayed Deployed.
 - **Average-size guard:** no division by zero on an empty queue.
-- **Per-host CDN failures:** each library's failure is tested, and the page degrades without icons when only Lucide fails.
+- **Per-host CDN failures:** each library's failure was tested. *Superseded by the Vite build revision: no runtime CDNs remain.*
 - **Verbatim research wording:** the panel's strings and links are checked exactly.
 - **Boundary tests:** the "+1 more" boundary, a speed-900 detection row (22%), visible-again-stays-paused, the exact header description, and slider value/attribute assertions.
 - **Test hooks:** explicit hooks plus computed-style checks for colors and focus.
-- **Engine structure:** the single `laneParams`, the tick order, the script regions, SRI hashes, and exact pins (React 18.3.1, htm 3.1.1, Lucide 0.468.0, Playwright 1.48.2).
+- **Engine structure:** the single `laneParams` and the tick order. *The script regions, SRI hashes, and CDN pins were superseded by the Vite build revision: modules plus `package-lock.json`.*
 - **Your decisions:** the hero ratio readout, the elapsed work hours readout, the "Defects caught" label, and the pickup-wait formula. All are recorded in the spec.
 - **Lane layout:** aligned metric grids, "(both lanes)" labels, projector fit at 1280×720, and a gap between Start/Pause and Reset.
 - **Assumptions note:** the panel now states the calibration plainly.
-- **Talk prep:** a pre-talk CDN check note.
+- **Talk prep:** a pre-talk note. *Superseded: the offline `dist/index.html` removes the CDN risk.*
+
+## Vite build revision (2026-10-12, during /build)
+
+At the build's project-init gate, you chose a build step instead of the single-HTML/CDN delivery. Your decisions:
+- Vite + React (JSX).
+- A single offline `dist/index.html` (`vite-plugin-singlefile`).
+- AC20 and every CDN item dropped.
+- Tailwind 4 via `@tailwindcss/vite`.
+
+**Behavior is unchanged.** Every scenario and number stays the same, except that Slice 1's failed-script outline is replaced by two build-output scenarios. Engine numbers are now also pinned in Vitest.
+
+**Revision review:**
+- **Design** (needs-revision, 5 warnings, folded in): `laneConfig.js` split plus the engine import rule, the pure `reducer.js`, `reuseExistingServer: false`, the favicon and `public/` removal, and an explicit icon map.
+- **Acceptance** (1 blocker, fixed; re-check approved): the single-file build scenario, plus the `file://` run, the shared external-request fixture, the split of the offline check between Steps 1.1 and 1.2, and the `floorShow` and internal-Deployed notes.
 
 ## Build Progress
 
@@ -940,7 +980,7 @@ The slices run in sequence on purpose: every slice edits `ai-review-sim.html`. T
 #### Wave 1
 
 - [ ] Slice 1: Two lanes that run and pause
-  - [ ] Step 1.1: Harness, script regions, loading message, and styled static shell
+  - [ ] Step 1.1: Replace the Vite demo with the styled static shell and offline single-file build
   - [ ] Step 1.2: Reducer, LOC-based tick, Start/Pause, and elapsed hours
   - [ ] Step 1.3: Auto-pause on hidden tab
 

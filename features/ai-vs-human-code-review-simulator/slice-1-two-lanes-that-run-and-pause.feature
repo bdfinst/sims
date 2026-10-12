@@ -76,15 +76,16 @@ Feature: Run and pause the simulation
     When the page becomes hidden
     Then the status reads "Paused" and all counts show 0
 
-  Scenario Outline: A failed script leaves a usable page or a clear message
-    Given requests for <library> fail
-    When I open the simulator
-    Then <outcome>
+  Scenario: The build is one self-contained file
+    Given the project is built
+    Then dist/index.html exists
+    And it has no script element with a src attribute, no stylesheet link, no modulepreload link, and no icon link to a file
+    And dist contains no other JS or CSS files
 
-    Examples:
-      | library  | outcome                                                                        |
-      | React    | the page shows "Loading simulator… if this stays, check your network"          |
-      | ReactDOM | the page shows "Loading simulator… if this stays, check your network"          |
-      | htm      | the page shows "Loading simulator… if this stays, check your network"          |
-      | Lucide   | the simulator renders with no icons, and pressing Start changes the AI count   |
-      | Tailwind | the simulator renders, and pressing Start changes the AI count                 |
+  Scenario: The built file runs from disk with no other requests
+    Given the project is built
+    When I open dist/index.html from the file system
+    Then the header title is visible
+    When I press Start and 1 second passes
+    Then the AI lane shows Pending Review 18
+    And the only request made was for the document itself

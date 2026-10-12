@@ -15,8 +15,14 @@ The audience is people watching a talk or a demo. The presenter changes generati
 
 **Delivery**
 
-- One self-contained HTML file in this folder (`ai-review-sim.html`). There is no build step. It follows the same pattern as `crt.html`.
-- React (UMD build), Tailwind (`cdn.tailwindcss.com`), and Lucide icons load from a CDN. Each script URL uses an exact version number. JSX is compiled in the browser (Babel standalone) or written as `htm` tagged templates. Choose one and use it for the whole file.
+- A Vite + React (JSX) project at the repo root. `npm run build` produces **one self-contained offline file**, `dist/index.html`, with all JS and CSS inlined by `vite-plugin-singlefile`. It needs no network at runtime and can be opened straight from disk or shared as a single file.
+- Dependencies come from npm, not CDNs: `react`/`react-dom` 19, `lucide-react` for icons, and Tailwind CSS 4 through `@tailwindcss/vite`.
+- Source layout:
+  - `src/engine.js`: pure model, with no React or DOM.
+  - `src/research.js`: findings data.
+  - `src/components/`: UI components.
+  - `src/App.jsx`: state, reducer, and effects.
+  - `src/main.jsx`: entry point.
 
 **Components**
 
@@ -66,7 +72,6 @@ The audience is people watching a talk or a demo. The presenter changes generati
 - `tick(lane, params) → lane` is a pure function implementing steps 1–4 above (§4, §6).
 - A `setInterval` of 100ms runs while `isRunning` is true. Each tick reads the current rates, so slider changes take effect on the next tick (§6).
 - When the browser tab becomes hidden (`visibilitychange`), the simulation pauses automatically.
-- The root element contains static text "Loading simulator… if this stays, check your network", which React replaces on mount.
 
 **Constraints**
 
@@ -81,7 +86,7 @@ The audience is people watching a talk or a demo. The presenter changes generati
 - AC2: Start begins the simulation. The same button then reads Pause, and pressing it stops all count changes. *(§2 "Start, Pause"; §3 `isRunning`)*
 - AC3: Reset sets all counts and metrics (pending, deployed, incidents) to 0 and pauses the simulation. Slider values do not change. *(§2 "Reset"; stakeholder: reset behavior)*
 - AC4: Each slider shows its current value with units, and uses the default, range, and step in the State table. *(§3; stakeholder: step; research amendment)*
-- AC5: Moving any slider while running changes the flow on the next tick, without a pause. *(§6 "Slider adjustments while running")*
+- AC5: After a slider change while running, the next tick's displayed counts reflect the new value, and the simulation keeps running. *(§6 "Slider adjustments while running")*
 - AC6: The warning-threshold slider (5–50, default 15) changes the threshold for both lanes. *(stakeholder: adjustable threshold)*
 
 **Engine**
@@ -94,7 +99,7 @@ The audience is people watching a talk or a demo. The presenter changes generati
 - AC7b: Detection rate follows the size and speed factors:
   - at reviewer speed 300 and PR size ≤ 200, the human lane shows 80%;
   - at PR size ≥ 400, the human lane shows 4%;
-  - at AI skim 3× (effective speed 900), the AI speed factor is 0.28.
+  - at PR size 200 and reviewer speed 900 (speed factor 0.28), the human lane shows 22%.
   *(research brief: 200–400 LOC wall, 500 LOC/hr limit, 70–90% baseline)*
 - AC7c: Changing PR size or reviewer speed while running changes the detection rate and the incident accrual from the next tick. *(§6; research amendment)*
 - AC8: A queue never shows a negative value, even when the review rate is higher than the generation rate. *(§6 "Queue cannot be negative")*
@@ -102,19 +107,19 @@ The audience is people watching a talk or a demo. The presenter changes generati
 
 **Display**
 
-- AC10: The Pending Review and Deployed counts show `Math.floor` of the internal value. *(stakeholder: count display)*
+- AC10: Every count shows `Math.floor(x + 1e-9)` of its internal value. *(stakeholder: count display; exactness revision)*
 - AC11: A queue box turns red and shows a warning icon when its displayed count is greater than `warningThreshold`. It returns to normal once the count drops back to the threshold or below. This applies to both lanes. *(§2 "turn red… >15"; stakeholder: both lanes)*
-- AC12: Each queue box shows one tile per displayed item. When the count exceeds the visible tile capacity, the box shows a "+N more" indicator. *(§5 "designed to overflow"; stakeholder: tiles)*
+- AC12: Each queue box shows `min(displayed, C)` tiles, where the tile capacity C is between 22 and 98. When displayed > C, the box shows "+N more" with N = displayed − C. *(§5 "designed to overflow"; stakeholder: tiles)*
 - AC13: The human lane uses blue/green colors with User and Eye icons. The AI lane uses purple with Bot and Eye icons, and red for its warning state. Each lane lays out generation → queue → review + deployed, left to right. *(§5)*
 - AC14: The header shows the title "AI vs. Human Code Review Simulator", a one-sentence description, and the global buttons on the right. *(§1 Name, §5 Header)*
 - AC15: The page has a dark theme and no horizontal scroll at 375px wide. On narrow screens, each lane stacks vertically. *(stakeholder: display)*
 - AC16: Every slider has a visible text label, and you can operate every slider and button with the keyboard. *(inference: native inputs; see log)*
 - AC17: Each lane shows pending LOC alongside pending PRs, and shows "Defects caught" %, incidents, incidents per PR, and pickup wait in hours. *(stakeholder: model all four findings; label "Defects caught")*
-- AC21: A headline readout shows the live AI ÷ Human incidents-per-PR ratio (for example "3.48×"), computed from the simulation and never hard-coded. It shows "—" until both lanes have deployed at least one PR. *(stakeholder: hero metric)*
+- AC21: A headline readout shows the live AI ÷ Human incidents-per-PR ratio (for example "3.48×"), computed from the simulation and never hard-coded. It shows "—" until both lanes *display* Deployed ≥ 1. *(stakeholder: hero metric)*
 - AC22: An elapsed-time readout shows work hours ("10.0 work hours") with a "1 s = 1 work hour" note. It resets to 0.0 on Reset. *(stakeholder: time scale on screen)*
-- AC18: A collapsible research panel below the lanes, collapsed by default, presents the four findings in the research brief. These are the 400-line and 500 LOC/hr limits; AI PR inflation, skim, and incidents; pickup wait; and local vs. global coherence. Every figure is attributed to the source recorded in Research Sources and worded exactly as verified there. *(stakeholder: collapsible panel; verification)*
+- AC18: A collapsible research panel below the lanes, collapsed by default, presents the five findings in Research Sources. It uses the Panel wording column verbatim, except the practitioner-observation finding, which uses its quoted paraphrase. Every figure links its source. *(stakeholder: collapsible panel; verification)*
 - AC19: When the tab becomes hidden while running, the simulation pauses and the status shows "Paused". *(stakeholder: auto-pause)*
-- AC20: If the page's scripts fail to load, the page shows "Loading simulator… if this stays, check your network" instead of a blank screen. *(stakeholder: CDN message)*
+- AC20 (revised): `npm run build` produces `dist/index.html` with all JS and CSS inlined (no `<script src>`, stylesheet link, `modulepreload`, or file icon link). Opened from `file://`, it renders and runs and requests nothing but the document itself. The original CDN-failure criterion is withdrawn because there are no runtime CDNs. *(stakeholder: build step + offline single file)*
 
 ## Glossary
 
@@ -136,7 +141,7 @@ The audience is people watching a talk or a demo. The presenter changes generati
 
 | Decision | Classification | Resolved By | Rationale / Answer |
 | ---------- | --------------- | ------------- | ------------------- |
-| Delivery format | `requires-stakeholder-input` | human | Single self-contained HTML file using CDN libraries, like `crt.html`. |
+| Delivery format | `requires-stakeholder-input` | human | **Revised 2026-10-12:** a Vite + React (JSX) build that outputs one self-contained offline `dist/index.html` (`vite-plugin-singlefile`), with Tailwind 4 via `@tailwindcss/vite` and `lucide-react`. It replaces the original "single HTML file with CDN libraries". |
 | Display of fractional counts | `requires-stakeholder-input` | human | Whole numbers, floor. Alternative considered: one decimal place. |
 | Warning scope and threshold | `requires-stakeholder-input` | human | Both lanes, with an adjustable threshold. |
 | Threshold control shape | `requires-stakeholder-input` | human | One global slider, 5–50, default 15. |
@@ -154,7 +159,7 @@ The audience is people watching a talk or a demo. The presenter changes generati
 | CRUD for lanes, queues, and rates | `inferable` | inference | The model is in memory only. Changesets are counts, not records. Create = the generation tick; Update = review tick or slider change; Delete = Reset (AC3); Read = always visible. Nothing is saved (no `localStorage`). |
 | Authentication / authorization | `inferable` | inference | Not applicable: a static, single-user demo page with no backend. |
 | Audit / logging | `inferable` | inference | Not applicable: there is no state that must be recorded. |
-| Dependency failure (CDN unavailable) | `requires-stakeholder-input` | human | No offline fallback. Show a static loading/network message that React replaces on mount. |
+| Dependency failure (CDN unavailable) | `requires-stakeholder-input` | human | **Withdrawn 2026-10-12:** with no runtime CDNs, AC20 and the loading message are dropped. |
 | Internal number representation | `requires-stakeholder-input` | human | Human chose exact display (10, not 9.999… → 9). Integer tenths was the original mechanism. **Revised (inference):** reviewed PRs = pending PRs × reviewed LOC ÷ pending LOC, which is not integer, so exactness now comes from `Math.floor(x + 1e-9)`. Same observable behavior. |
 | Research-driven model (sizes, curves, density, defaults) | `requires-stakeholder-input` | human | Approved as proposed. Defect density of 20/KLOC is an assumption, not from the research. The 0.05 and 0.1 floors stand in for "near zero". |
 | Review-rate sliders | `requires-stakeholder-input` | human | Replaced by one shared reviewer-speed slider (LOC/hr); throughput is derived. |
