@@ -481,6 +481,7 @@ describe('MODEL_ASSUMPTIONS', () => {
   it('reports the model constants the research panel discloses', () => {
     expect(MODEL_ASSUMPTIONS).toEqual({
       defectsPerKloc: 20,
+      baseDetection: 0.8,
       sizeFloor: 0.05,
       speedFloor: 0.1,
       sizeKnee: 200,

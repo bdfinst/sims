@@ -180,7 +180,7 @@ At 1280 × 720 with the panel collapsed, the header, the headline band, and both
 - **Auto-pause:** a `visibilitychange` event with `visibilityState === 'hidden'` dispatches `pause`. Becoming visible again does nothing.
 - **Research panel:** a `<details>`/`<summary>` element, collapsed by default.
   - Its text comes verbatim from the spec's Research Sources "Panel wording" column, with links to the five URLs (`target="_blank" rel="noopener"`).
-  - It includes a "Model assumptions" note: defect density 20/KLOC, the 0.05 and 0.1 detection floors, the curve knees and walls, and the 1.51 size multiplier are modeling choices, calibrated so the defaults land near Faros's +242.7% incidents per PR.
+  - It includes a "Model assumptions" note: defect density 20/KLOC, the 0.8 base detection rate (picked from SmartBear's 70–90% range), the 0.05 and 0.1 detection floors, the curve knees and walls, and the 1.51 size multiplier are modeling choices, calibrated so the defaults land near Faros's +242.7% incidents per PR.
   - The phrases "near zero", "coined", and "originated" never appear.
 
 ## Slices
@@ -831,7 +831,7 @@ Feature: Research behind the simulation
 
   Scenario: Model assumptions and calibration are stated
     Given I expand "Research behind this simulation"
-    Then the panel states that defect density, the detection floors, the curve thresholds, and the 1.51 size multiplier are modeling choices
+    Then the panel states that defect density, the base detection rate, the detection floors, the curve thresholds, and the 1.51 size multiplier are modeling choices
     And the panel states that the defaults were calibrated to land near Faros's +242.7% incidents per PR
 
   Scenario: Panel is keyboard operable and does not interrupt the simulation

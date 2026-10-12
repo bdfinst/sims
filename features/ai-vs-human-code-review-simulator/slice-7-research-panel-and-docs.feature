@@ -22,7 +22,7 @@ Feature: Research behind the simulation
 
   Scenario: Model assumptions and calibration are stated
     Given I expand "Research behind this simulation"
-    Then the panel states that defect density, the detection floors, the curve thresholds, and the 1.51 size multiplier are modeling choices
+    Then the panel states that defect density, the base detection rate, the detection floors, the curve thresholds, and the 1.51 size multiplier are modeling choices
     And the panel states that the defaults were calibrated to land near Faros's +242.7% incidents per PR
 
   Scenario: Panel is keyboard operable and does not interrupt the simulation

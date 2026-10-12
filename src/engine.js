@@ -68,6 +68,7 @@ const DEFECTS_PER_KLOC = DEFECTS_PER_LOC * 1000
 // note can never drift from what the simulation does.
 export const MODEL_ASSUMPTIONS = Object.freeze({
   defectsPerKloc: DEFECTS_PER_KLOC,
+  baseDetection: BASE_DETECTION,
   sizeFloor: SIZE_FLOOR,
   speedFloor: SPEED_FLOOR,
   sizeKnee: SIZE_KNEE,

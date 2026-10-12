@@ -16,6 +16,7 @@ describe('assumptionsNote', () => {
     const { choices } = assumptionsNote()
     const labelledPhrases = [
       '20 defects per 1,000 LOC',
+      'base detection rate (0.8,',
       '0.05 for large PRs',
       '0.1 for fast reviewing',
       'PR size 200 to 400 LOC',

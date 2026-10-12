@@ -58,6 +58,7 @@ const ASSUMPTIONS_START = 'Model assumptions'
 const ASSUMPTION_PHRASES = [
   'These are modeling choices, not research findings',
   'the defect density (20 defects per 1,000 LOC)',
+  "the base detection rate (0.8, picked from SmartBear's 70–90% range)",
   'the detection floors (0.05 for large PRs and 0.1 for fast reviewing)',
   'the curve thresholds (PR size 200 to 400 LOC, reviewer speed 500 to 1,000 LOC/hr)',
   'the 1.51 size multiplier',

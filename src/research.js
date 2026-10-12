@@ -63,7 +63,7 @@ export const FINDINGS = Object.freeze([
 
 // The note is two parts so the calibration figure can render as a link to its source (AC18).
 export const assumptionsNote = (assumptions = MODEL_ASSUMPTIONS) => ({
-  choices: `Model assumptions. These are modeling choices, not research findings: the defect density (${assumptions.defectsPerKloc} defects per 1,000 LOC), the detection floors (${assumptions.sizeFloor} for large PRs and ${assumptions.speedFloor} for fast reviewing), the curve thresholds (PR size ${assumptions.sizeKnee} to ${assumptions.sizeWall} LOC, reviewer speed ${formatCount(assumptions.speedKnee)} to ${formatCount(assumptions.speedWall)} LOC/hr), and the ${assumptions.aiSizeMultiplier} size multiplier for AI PRs.`,
+  choices: `Model assumptions. These are modeling choices, not research findings: the defect density (${assumptions.defectsPerKloc} defects per 1,000 LOC), the base detection rate (${assumptions.baseDetection}, picked from SmartBear's 70–90% range), the detection floors (${assumptions.sizeFloor} for large PRs and ${assumptions.speedFloor} for fast reviewing), the curve thresholds (PR size ${assumptions.sizeKnee} to ${assumptions.sizeWall} LOC, reviewer speed ${formatCount(assumptions.speedKnee)} to ${formatCount(assumptions.speedWall)} LOC/hr), and the ${assumptions.aiSizeMultiplier} size multiplier for AI PRs.`,
   calibration: {
     lead: 'The defaults were calibrated to land near',
     linkText: `Faros's ${FAROS_INCIDENTS_INCREASE} incidents per PR`,
