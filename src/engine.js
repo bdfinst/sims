@@ -5,11 +5,13 @@ export const LANE_IDS = Object.freeze({ human: 'human', ai: 'ai' })
 // Generation model constants. The Faros figures fix the AI lane's PR size (×1.51 the human PR
 // size) and the default AI code written, which gives about ×1.162 the human PRs per day at the
 // defaults. The AI default is fixed: it does not follow later changes to the human sliders. The
-// lane's "1.51×" text and the research panel's "+51%", "+16.2%", "1.51×", and "1.162×" all come
-// from these constants, so the model and its text cannot drift.
+// lane's "1.51×" text and the research panel's "+51%", "+16.2%", "+242.7%", "1.51×", and "1.162×"
+// all come from these constants, so the model and its text cannot drift.
 export const WORK_HOURS_PER_DAY = 8
 export const FAROS_PR_SIZE_INCREASE_PCT = 51
 export const FAROS_MERGE_RATE_INCREASE_PCT = 16.2
+// Display only: the model does not use it. The human defaults are calibrated to land near it.
+export const FAROS_INCIDENTS_PER_PR_INCREASE_PCT = 242.7
 const PERCENT = 100
 export const FAROS_PR_SIZE_MULTIPLIER = 1 + FAROS_PR_SIZE_INCREASE_PCT / PERCENT
 export const FAROS_MERGE_RATE_MULTIPLIER = 1 + FAROS_MERGE_RATE_INCREASE_PCT / PERCENT
@@ -102,8 +104,10 @@ const DISPLAY_EPSILON = 1e-9
 const LOC_PER_KLOC = 1000
 const DEFECTS_PER_KLOC = DEFECTS_PER_LOC * LOC_PER_KLOC
 
-// The modeling choices the research panel discloses, read from the model's own constants so the
-// note can never drift from what the simulation does.
+// The modeling choices and Faros inputs the model is built from, as the research panel discloses
+// them. aiMergeRateMultiplier is the Faros input, not the simulated result: the AI code-written
+// default is rounded to its slider step (53 LOC/hr), so the simulated AI-to-human PRs-per-day
+// ratio is about ×1.162, not exactly (53 ÷ 45.3 ≈ 1.170).
 export const MODEL_ASSUMPTIONS = Object.freeze({
   defectsPerKloc: DEFECTS_PER_KLOC,
   baseDetection: BASE_DETECTION,

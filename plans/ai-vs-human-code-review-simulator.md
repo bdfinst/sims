@@ -1516,8 +1516,8 @@ Your decisions (recorded in the spec's Ambiguity Log):
 
 #### Wave 9
 
-- [ ] Slice 10: Research assumptions for the generation model
-  - [ ] Step 10.1: Faros merge rate and the revised Model assumptions note
+- [x] Slice 10: Research assumptions for the generation model
+  - [x] Step 10.1: Faros merge rate and the revised Model assumptions note
 
 #### Wave 10
 

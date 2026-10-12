@@ -1,4 +1,5 @@
 import {
+  FAROS_INCIDENTS_PER_PR_INCREASE_PCT,
   FAROS_MERGE_RATE_INCREASE_PCT,
   FAROS_PR_SIZE_INCREASE_PCT,
   MODEL_ASSUMPTIONS,
@@ -9,14 +10,16 @@ import {
 
 // FINDINGS is data: each text is the spec's Research Sources "Panel wording", copied verbatim; the
 // practitioner observation is a quoted paraphrase with an example link, never an attributed source.
-// The Faros percentages and the assumptions note are derived: their numbers are read from the
-// engine's own constants.
+// Figures read from engine constants: the Faros finding's "+51%", "+16.2%", and "+242.7%"; the
+// calibration link's "+242.7%"; and every number in the assumptions note's modeling choices except
+// "70–90%" and "1,000" in "per 1,000 LOC". Every other figure, including the Faros "3×" (the
+// source's own rounded phrase), is literal text.
 export const RESEARCH_TITLE = 'Research behind this simulation'
 
 // The calibration target is quoted twice (the Faros finding and the assumptions note), so it is
 // defined once.
 const FAROS_URL = 'https://faros.ai/research/ai-acceleration-whiplash'
-const FAROS_INCIDENTS_INCREASE = '+242.7%'
+const FAROS_INCIDENTS_INCREASE = `+${FAROS_INCIDENTS_PER_PR_INCREASE_PCT}%`
 
 // Whether a finding is published research or a practitioner observation (never attributed to a source).
 export const FINDING_KIND = Object.freeze({ research: 'research', practitioner: 'practitioner' })
@@ -61,7 +64,7 @@ export const FINDINGS = Object.freeze([
   Object.freeze({
     id: 'local-vs-global',
     kind: FINDING_KIND.practitioner,
-    text: 'A practitioner observation, not a research finding: "AI code is often locally coherent but globally brittle."',
+    text: 'A practitioner observation, not a research finding: "AI code is often locally coherent but globally brittle".',
     source: Object.freeze({
       label: 'Example: Tian Pan, The AI Code Review Inversion',
       url: 'https://tianpan.co/blog/2026-05-07-ai-code-review-inversion-reviewing-machine-authored-code',

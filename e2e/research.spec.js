@@ -20,36 +20,43 @@ import {
 
 test.describe.configure({ mode: 'parallel' })
 
-// Independent oracles (see fixtures.js): the spec's Research Sources table, not src/research.js.
-// `wording` is the "Panel wording" column; `label` is how the link names its source.
+// The two phrases the Slice 7 scenario promises for the practitioner observation.
+const PRACTITIONER_PHRASES = ['practitioner observation', 'locally coherent but globally brittle']
+
+// Independent oracles (see fixtures.js): the spec's Research Sources table and the Slice 7
+// scenarios, not src/research.js. `shown` is what the panel shows for the finding: the spec's
+// "Panel wording" verbatim, or the scenario's phrases for the practitioner observation. `title` is
+// the source's title as the spec's Source column quotes it; the link is named by it.
 const SOURCES = [
   {
-    wording: '2,500 reviews of 3.2 million lines of code over 10 months',
-    label: 'SmartBear, Cisco Systems / Collaborator case study',
+    shown: ['2,500 reviews of 3.2 million lines of code over 10 months'],
+    title: 'Cisco Systems / Collaborator',
     url: 'https://smartbear.com/resources/case-studies/cisco-systems-collaborator/',
   },
   {
-    wording:
+    shown: [
       'Review no more than 200–400 LOC at a time; beyond 400 LOC the ability to find defects diminishes. 200–400 LOC over 60–90 minutes yields 70–90% defect discovery. Defect discovery drops significantly faster than 500 LOC/hour.',
-    label: 'SmartBear, Best Practices for Code Review',
+    ],
+    title: 'Best Practices for Code Review',
     url: 'https://smartbear.com/learn/code-review/best-practices-for-peer-code-review/',
   },
   {
-    wording:
+    shown: [
       'Across 22,000 developers in 4,000 teams, high AI adoption saw PR size +51%, PR merge rate +16.2%, and 3× incidents per PR (+242.7%), compared with low adoption.',
-    label: 'Faros AI, AI Engineering Report Q2 2026: The Acceleration Whiplash',
+    ],
+    title: 'AI Engineering Report Q2 2026: The Acceleration Whiplash',
     url: 'https://faros.ai/research/ai-acceleration-whiplash',
   },
   {
-    wording:
+    shown: [
       'AI PRs wait 4.6× longer before review, but are reviewed 2× faster once picked up (8.1M+ PRs, 4,800+ orgs).',
-    label: 'LinearB, 2026 Software Engineering Benchmarks Report',
+    ],
+    title: '2026 Software Engineering Benchmarks Report',
     url: 'https://linearb.io/blog/engineering-benchmarks-report',
   },
   {
-    wording:
-      'A practitioner observation, not a research finding: "AI code is often locally coherent but globally brittle."',
-    label: 'Example: Tian Pan, The AI Code Review Inversion',
+    shown: PRACTITIONER_PHRASES,
+    title: 'The AI Code Review Inversion',
     url: 'https://tianpan.co/blog/2026-05-07-ai-code-review-inversion-reviewing-machine-authored-code',
   },
 ]
@@ -58,17 +65,34 @@ const FORBIDDEN_PHRASES = ['near zero', 'coined', 'originated']
 const ASSUMPTIONS_START = 'Model assumptions'
 const CALIBRATION_SENTENCE =
   "The human defaults were chosen to land near Faros's +242.7% incidents per PR"
+// The plan's Page behavior: the calibration figure is the link "Faros's +242.7% incidents per PR".
+const CALIBRATION_LINK_TEXT = "Faros's +242.7% incidents per PR"
 const FAROS_URL = SOURCES[2].url
 const SECONDS_AFTER_EXPANDING = 1
 
 const assumptionsParagraph = (page) =>
   researchPanel(page).locator('p', { hasText: ASSUMPTIONS_START })
 
+const calibrationLink = (page) => assumptionsParagraph(page).locator('a')
+
 const expectPanelContains = (page, text) => expect(researchPanel(page)).toContainText(text)
 
-// The source's finding is visible in the panel, verbatim.
-const expectFindingShown = (page, { wording, label }) =>
-  expect(researchPanel(page).getByText(wording), label).toBeVisible()
+// The source's finding is visible in the panel.
+const expectFindingShown = async (page, { shown, url }) => {
+  for (const text of shown) await expect(researchPanel(page).getByText(text), url).toBeVisible()
+}
+
+const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+// The link opens in a new tab, protects the opener, and its accessible name contains `name` and
+// ends with the new-tab notice.
+const expectNewTabLink = async (link, { name, url }) => {
+  await expect(link, `${url} opens in a new tab`).toHaveAttribute('target', '_blank')
+  await expect(link, `${url} protects the opener`).toHaveAttribute('rel', /noopener/)
+  await expect(link, `${url} is named by ${name}`).toHaveAccessibleName(
+    new RegExp(`${escapeRegExp(name)}.*${escapeRegExp(NEW_TAB_NOTICE)}$`),
+  )
+}
 
 test.describe('Research behind the simulation', () => {
   test('Panel is collapsed by default', async ({ page }) => {
@@ -83,7 +107,7 @@ test.describe('Research behind the simulation', () => {
 
     await test.step('And no research findings are visible', async () => {
       const hiddenContent = [
-        ...SOURCES.map(({ wording }) => researchPanel(page).getByText(wording)),
+        ...SOURCES.flatMap(({ shown }) => shown.map((text) => researchPanel(page).getByText(text))),
         assumptionsParagraph(page),
       ]
       for (const content of hiddenContent) {
@@ -127,14 +151,10 @@ test.describe('Research behind the simulation', () => {
     })
 
     await test.step("And the panel links to all five source URLs from the spec's Research Sources table, each opening in a new tab", async () => {
-      for (const { label, url } of SOURCES) {
+      for (const { title, url } of SOURCES) {
         const link = sourceLink(page, url)
         await expect(link, url).toHaveCount(1)
-        await expect(link, `${url} opens in a new tab`).toHaveAttribute('target', '_blank')
-        await expect(link, `${url} protects the opener`).toHaveAttribute('rel', /noopener/)
-        await expect(link, `${url} is named by its source`).toHaveAccessibleName(
-          `${label}${NEW_TAB_NOTICE}`,
-        )
+        await expectNewTabLink(link, { name: title, url })
       }
     })
   })
@@ -144,9 +164,13 @@ test.describe('Research behind the simulation', () => {
     await openSimulator(page)
     await openResearchPanel(page)
 
-    for (const { url } of SOURCES) {
-      const ratio = contrastRatio(await textColors(sourceLink(page, url)))
-      expect(ratio, url).toBeGreaterThanOrEqual(MIN_TEXT_CONTRAST)
+    const links = [
+      ...SOURCES.map(({ url }) => ({ link: sourceLink(page, url), name: url })),
+      { link: calibrationLink(page), name: 'calibration link' },
+    ]
+    for (const { link, name } of links) {
+      const ratio = contrastRatio(await textColors(link))
+      expect(ratio, name).toBeGreaterThanOrEqual(MIN_TEXT_CONTRAST)
     }
   })
 
@@ -212,10 +236,10 @@ test.describe('Research behind the simulation', () => {
 
     await test.step('And the panel contains "The human defaults were chosen to land near Faros\'s +242.7% incidents per PR"', async () => {
       await expectPanelContains(page, CALIBRATION_SENTENCE)
-      await expect(
-        assumptionsParagraph(page).locator(`a[href="${FAROS_URL}"]`),
-        'the figure links its source',
-      ).toHaveCount(1)
+      const link = calibrationLink(page)
+      await expect(link, 'the figure is the only link in the note').toHaveCount(1)
+      await expect(link, 'the figure links its source').toHaveAttribute('href', FAROS_URL)
+      await expectNewTabLink(link, { name: CALIBRATION_LINK_TEXT, url: FAROS_URL })
     })
   })
 

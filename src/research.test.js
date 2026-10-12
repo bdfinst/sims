@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  FAROS_MERGE_RATE_INCREASE_PCT,
-  FAROS_PR_SIZE_INCREASE_PCT,
-  MODEL_ASSUMPTIONS,
-} from './engine.js'
+import { MODEL_ASSUMPTIONS } from './engine.js'
 import { FINDINGS, FINDING_KIND, assumptionsNote } from './research.js'
 
 const FORBIDDEN_PHRASES = ['near zero', 'coined', 'originated']
@@ -31,8 +27,13 @@ const PANEL_WORDING = [
       'AI PRs wait 4.6× longer before review, but are reviewed 2× faster once picked up (8.1M+ PRs, 4,800+ orgs).',
   },
 ]
-// The spec's quoted paraphrase for the practitioner observation.
-const PRACTITIONER_PARAPHRASE = '"AI code is often locally coherent but globally brittle.'
+// The practitioner observation: the spec's quoted paraphrase with the spec's punctuation (no period
+// inside the quotes), presented as a practitioner observation (spec Research Sources; AC18). Neither
+// the plan nor the spec gives the full sentence, so the "not a research finding" prefix is pinned too.
+const PRACTITIONER_TEXT =
+  'A practitioner observation, not a research finding: "AI code is often locally coherent but globally brittle".'
+// The Faros incidents figure, as the spec's Panel wording and the Slice 7 scenario state it.
+const FAROS_INCIDENTS_FIGURE = '+242.7%'
 
 // Independent oracle: the Slice 7 scenario "Model assumptions and calibration are stated".
 const ASSUMPTION_SCENARIO_PHRASES = [
@@ -98,21 +99,15 @@ describe('research data', () => {
     expect(findingFor(url).text).toBe(wording)
   })
 
-  it("takes the Faros finding's percentages from the engine constants", () => {
-    const { text } = findingFor(FAROS_URL)
-    expect(text).toContain(`PR size +${FAROS_PR_SIZE_INCREASE_PCT}%`)
-    expect(text).toContain(`PR merge rate +${FAROS_MERGE_RATE_INCREASE_PCT}%`)
-  })
-
   it('shares one Faros figure between the finding and the calibration', () => {
-    expect(findingFor(FAROS_URL).text).toContain('(+242.7%)')
+    expect(findingFor(FAROS_URL).text).toContain(`(${FAROS_INCIDENTS_FIGURE})`)
+    expect(assumptionsNote().calibration.linkText).toContain(FAROS_INCIDENTS_FIGURE)
   })
 
   it('marks exactly one finding as a practitioner observation, quoting the spec paraphrase', () => {
     const practitioner = FINDINGS.filter(({ kind }) => kind === FINDING_KIND.practitioner)
     expect(practitioner).toHaveLength(1)
-    expect(practitioner[0].text).toContain('practitioner observation')
-    expect(practitioner[0].text).toContain(PRACTITIONER_PARAPHRASE)
+    expect(practitioner[0].text).toBe(PRACTITIONER_TEXT)
   })
 
   it('never uses the unsupported or misattributing wording', () => {
