@@ -2,12 +2,9 @@ import { useEffect, useReducer } from 'react'
 import { Header } from './components/Header.jsx'
 import { HeadlineBand } from './components/HeadlineBand.jsx'
 import { Lane } from './components/Lane.jsx'
-import { TICK_HOURS } from './engine.js'
+import { TICK_MS } from './engine.js'
 import { LANE_ORDER } from './laneConfig.js'
 import { initialState, reducer } from './reducer.js'
-
-const MS_PER_HOUR_OF_WORK = 1000
-const TICK_MS = TICK_HOURS * MS_PER_HOUR_OF_WORK
 
 function App() {
   const [state, dispatch] = useReducer(reducer, initialState)

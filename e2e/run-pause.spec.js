@@ -10,14 +10,26 @@ const DESCRIPTION =
   'Watch AI-speed code generation swamp human reviewers and push more defects into production.'
 const HUMAN_BLUE = 'rgb(59, 130, 246)'
 const AI_PURPLE = 'rgb(168, 85, 247)'
-const LANE_IDS = ['human', 'ai']
+const LANE_ID_LIST = ['human', 'ai']
 
-const lane = (page, id) => page.locator(`[data-lane="${id}"]`)
-const metric = (page, laneId, name) => lane(page, laneId).locator(`[data-metric="${name}"]`)
-const iconNames = (laneLocator) =>
-  laneLocator.locator('[data-icon]').evaluateAll((els) => els.map((el) => el.dataset.icon))
+const laneLocator = (page, laneId) => page.locator(`[data-lane="${laneId}"]`)
+const metric = (page, laneId, name) => laneLocator(page, laneId).locator(`[data-metric="${name}"]`)
+const iconNames = (laneRoot) =>
+  laneRoot.locator('[data-icon]').evaluateAll((els) => els.map((el) => el.dataset.icon))
 
 const toggleButton = (page, name) => page.getByRole('button', { name, exact: true })
+
+// Waiting for the toggled label means React has committed (and registered or cleared the
+// interval) before the fake clock moves.
+const startSimulation = async (page) => {
+  await toggleButton(page, 'Start').click()
+  await expect(toggleButton(page, 'Pause')).toBeVisible()
+}
+
+const pauseSimulation = async (page) => {
+  await toggleButton(page, 'Pause').click()
+  await expect(toggleButton(page, 'Start')).toBeVisible()
+}
 
 const setVisibility = (page, visibilityState) =>
   page.evaluate((state) => {
@@ -31,7 +43,7 @@ const expectCounts = async (page, laneId, { pending, deployed }) => {
 }
 
 const expectEmptyLanes = async (page) => {
-  for (const laneId of LANE_IDS) {
+  for (const laneId of LANE_ID_LIST) {
     await expect(metric(page, laneId, 'pending')).toHaveText('0')
     await expect(metric(page, laneId, 'deployed')).toHaveText('0')
   }
@@ -42,7 +54,7 @@ test.describe('Run and pause the simulation', () => {
     await openSimulator(page)
 
     await expectEmptyLanes(page)
-    await expect(page.getByRole('button', { name: 'Start', exact: true })).toBeVisible()
+    await expect(toggleButton(page, 'Start')).toBeVisible()
     await expect(page.getByText('Paused', { exact: true })).toBeVisible()
     await expect(page.getByText('0.0 work hours', { exact: true })).toBeVisible()
     await expect(page.getByText('1 s = 1 work hour', { exact: true })).toBeVisible()
@@ -71,19 +83,19 @@ test.describe('Run and pause the simulation', () => {
   test('Start and Reset have a visible gap between them', async ({ page }) => {
     await openSimulator(page)
 
-    const start = await page.getByRole('button', { name: 'Start' }).boundingBox()
-    const reset = await page.getByRole('button', { name: 'Reset' }).boundingBox()
+    const startBox = await toggleButton(page, 'Start').boundingBox()
+    const resetBox = await toggleButton(page, 'Reset').boundingBox()
     const minimumGapPx = 8
-    expect(reset.x - (start.x + start.width)).toBeGreaterThanOrEqual(minimumGapPx)
+    expect(resetBox.x - (startBox.x + startBox.width)).toBeGreaterThanOrEqual(minimumGapPx)
   })
 
   test('Lane identity', async ({ page }) => {
     await openSimulator(page)
 
-    expect(await iconNames(lane(page, 'human'))).toEqual(['user', 'eye'])
-    expect(await iconNames(lane(page, 'ai'))).toEqual(['bot', 'eye'])
-    await expect(lane(page, 'human')).toHaveCSS('border-top-color', HUMAN_BLUE)
-    await expect(lane(page, 'ai')).toHaveCSS('border-top-color', AI_PURPLE)
+    expect(await iconNames(laneLocator(page, 'human'))).toEqual(['user', 'eye'])
+    expect(await iconNames(laneLocator(page, 'ai'))).toEqual(['bot', 'eye'])
+    await expect(laneLocator(page, 'human')).toHaveCSS('border-top-color', HUMAN_BLUE)
+    await expect(laneLocator(page, 'ai')).toHaveCSS('border-top-color', AI_PURPLE)
   })
 
   test('Nothing moves while paused', async ({ page }) => {
@@ -107,7 +119,7 @@ test.describe('Run and pause the simulation', () => {
   test('Default flow after 10 seconds', async ({ page }) => {
     await openSimulator(page)
 
-    await toggleButton(page, 'Start').click()
+    await startSimulation(page)
     await page.clock.runFor(10 * SECOND_MS)
 
     await expectCounts(page, 'human', { pending: 0, deployed: 10 })
@@ -118,7 +130,7 @@ test.describe('Run and pause the simulation', () => {
   test('A PR is not shown as deployed until it is fully reviewed', async ({ page }) => {
     await openSimulator(page)
 
-    await toggleButton(page, 'Start').click()
+    await startSimulation(page)
     await page.clock.runFor(0.9 * SECOND_MS)
     await expect(metric(page, 'human', 'deployed')).toHaveText('0')
 
@@ -128,24 +140,23 @@ test.describe('Run and pause the simulation', () => {
 
   test('Pause freezes the counts', async ({ page }) => {
     await openSimulator(page)
-    await toggleButton(page, 'Start').click()
+    await startSimulation(page)
     await page.clock.runFor(3 * SECOND_MS)
 
-    await toggleButton(page, 'Pause').click()
+    await pauseSimulation(page)
     await page.clock.runFor(5 * SECOND_MS)
 
     await expectCounts(page, 'ai', { pending: 55, deployed: 4 })
     await expect(page.getByText('3.0 work hours', { exact: true })).toBeVisible()
-    await expect(toggleButton(page, 'Start')).toBeVisible()
   })
 
   test('Resume continues from the frozen counts', async ({ page }) => {
     await openSimulator(page)
-    await toggleButton(page, 'Start').click()
+    await startSimulation(page)
     await page.clock.runFor(3 * SECOND_MS)
-    await toggleButton(page, 'Pause').click()
+    await pauseSimulation(page)
 
-    await toggleButton(page, 'Start').click()
+    await startSimulation(page)
     await page.clock.runFor(1 * SECOND_MS)
 
     await expectCounts(page, 'ai', { pending: 73, deployed: 6 })
@@ -153,7 +164,7 @@ test.describe('Run and pause the simulation', () => {
 
   test('Deployed never decreases while running', async ({ page }) => {
     await openSimulator(page)
-    await toggleButton(page, 'Start').click()
+    await startSimulation(page)
     const readDeployed = () =>
       page.evaluate(() =>
         [...document.querySelectorAll('[data-metric="deployed"]')].map((el) =>
@@ -169,17 +180,20 @@ test.describe('Run and pause the simulation', () => {
 
     const decreases = samples
       .slice(1)
-      .filter((now, i) => now.some((count, lane) => count < samples[i][lane]))
+      .filter((current, sampleIndex) =>
+        current.some((count, laneIndex) => count < samples[sampleIndex][laneIndex]),
+      )
     expect(decreases).toEqual([])
-    expect(samples.at(-1)).toEqual([10, 15])
+    await expect.poll(readDeployed).toEqual([10, 15])
   })
 
   test('Hiding the tab auto-pauses', async ({ page }) => {
     await openSimulator(page)
-    await toggleButton(page, 'Start').click()
+    await startSimulation(page)
     await page.clock.runFor(1 * SECOND_MS)
 
     await setVisibility(page, 'hidden')
+    await expect(toggleButton(page, 'Start')).toBeVisible()
     await page.clock.runFor(3 * SECOND_MS)
 
     await expect(page.getByText('Paused', { exact: true })).toBeVisible()
@@ -188,9 +202,10 @@ test.describe('Run and pause the simulation', () => {
 
   test('Showing the tab again stays paused', async ({ page }) => {
     await openSimulator(page)
-    await toggleButton(page, 'Start').click()
+    await startSimulation(page)
     await page.clock.runFor(1 * SECOND_MS)
     await setVisibility(page, 'hidden')
+    await expect(toggleButton(page, 'Start')).toBeVisible()
 
     await setVisibility(page, 'visible')
     await page.clock.runFor(2 * SECOND_MS)
@@ -214,7 +229,7 @@ test.describe('Run and pause the simulation', () => {
     page.on('request', (request) => requestedUrls.push(request.url()))
     await openSimulator(page, documentUrl)
 
-    await toggleButton(page, 'Start').click()
+    await startSimulation(page)
     await page.clock.runFor(1 * SECOND_MS)
 
     await expect(metric(page, 'ai', 'pending')).toHaveText('18')

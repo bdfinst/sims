@@ -2,7 +2,7 @@ import { Bot, ChevronDown, Eye, TriangleAlert, User } from 'lucide-react'
 
 const ICON_SIZE_PX = 28
 
-// Explicit named imports (never icons[name]) keep tree-shaking effective.
+// Explicit named imports; no dynamic lookup by name.
 const ICONS = Object.freeze({
   user: User,
   bot: Bot,

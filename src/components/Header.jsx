@@ -1,9 +1,9 @@
-import { elapsedHours } from '../engine.js'
+import { SECONDS_PER_WORK_HOUR, formatElapsedHours } from '../engine.js'
 
 const TITLE = 'AI vs. Human Code Review Simulator'
 const DESCRIPTION =
   'Watch AI-speed code generation swamp human reviewers and push more defects into production.'
-const ELAPSED_CAPTION = '1 s = 1 work hour'
+const ELAPSED_CAPTION = `${SECONDS_PER_WORK_HOUR} s = 1 work hour`
 
 export function Header({ isRunning, ticks, onToggleRunning }) {
   return (
@@ -30,7 +30,7 @@ export function Header({ isRunning, ticks, onToggleRunning }) {
           <span className="text-base text-gray-300">{isRunning ? 'Running' : 'Paused'}</span>
         </div>
         <p className="text-base">
-          <span className="text-xl font-semibold">{elapsedHours(ticks)} work hours</span>{' '}
+          <span className="text-xl font-semibold">{formatElapsedHours(ticks)} work hours</span>{' '}
           <span className="text-gray-400">{ELAPSED_CAPTION}</span>
         </p>
       </div>

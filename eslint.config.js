@@ -49,9 +49,9 @@ export default [
       'no-console': 'warn',
     },
   },
-  // The engine is pure: it must not reach into React, icons, or components.
+  // The engine and reducer are pure: no React, icons, components, or presentation config.
   {
-    files: ['src/engine.js'],
+    files: ['src/engine.js', 'src/reducer.js'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -67,8 +67,11 @@ export default [
                 'lucide-react/*',
                 './components/*',
                 '**/components/*',
+                './laneConfig*',
+                '**/laneConfig*',
               ],
-              message: 'engine.js must stay pure: no React, icons, or components.',
+              message:
+                'engine.js and reducer.js must stay pure: no React, icons, components, or laneConfig.',
             },
           ],
         },

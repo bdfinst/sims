@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { floorShow } from './engine.js'
+import { DEFAULT_SETTINGS } from './engine.js'
 import { initialState, reducer } from './reducer.js'
+import { shownCounts } from './testHelpers.js'
 
 const dispatchAll = (state, ...types) =>
   types.reduce((current, type) => reducer(current, { type }), state)
@@ -12,7 +13,7 @@ describe('initialState', () => {
     expect(initialState).toMatchObject({
       isRunning: false,
       ticks: 0,
-      settings: { humanGen: 1, aiGen: 20, prSize: 250, reviewerSpeed: 300, skim: 2, threshold: 15 },
+      settings: DEFAULT_SETTINGS,
       lanes: { human: { pendingPrs: 0, deployedPrs: 0 }, ai: { pendingPrs: 0, deployedPrs: 0 } },
     })
   })
@@ -42,8 +43,8 @@ describe('tick', () => {
     const state = dispatchAll(initialState, 'start', ...repeat('tick', 100))
     expect({
       ticks: state.ticks,
-      human: [floorShow(state.lanes.human.pendingPrs), floorShow(state.lanes.human.deployedPrs)],
-      ai: [floorShow(state.lanes.ai.pendingPrs), floorShow(state.lanes.ai.deployedPrs)],
+      human: shownCounts(state.lanes.human),
+      ai: shownCounts(state.lanes.ai),
     }).toEqual({ ticks: 100, human: [0, 10], ai: [184, 15] })
   })
 
@@ -59,10 +60,7 @@ describe('tick', () => {
   it('resumes from the frozen counts', () => {
     const paused = dispatchAll(initialState, 'start', ...repeat('tick', 30), 'pause')
     const resumed = dispatchAll(paused, 'start', ...repeat('tick', 10))
-    expect([
-      floorShow(resumed.lanes.ai.pendingPrs),
-      floorShow(resumed.lanes.ai.deployedPrs),
-    ]).toEqual([73, 6])
+    expect(shownCounts(resumed.lanes.ai)).toEqual([73, 6])
   })
 
   it('does not mutate the previous state', () => {
@@ -73,7 +71,10 @@ describe('tick', () => {
 })
 
 describe('unknown actions', () => {
-  it('leave the state unchanged', () => {
-    expect(reducer(initialState, { type: 'nope' })).toBe(initialState)
-  })
+  it.each(['nope', 'toString', 'constructor', '__proto__', 'hasOwnProperty'])(
+    'leave the state unchanged for type "%s"',
+    (type) => {
+      expect(reducer(initialState, { type })).toBe(initialState)
+    },
+  )
 })

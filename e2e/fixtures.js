@@ -13,16 +13,31 @@ export const isAllowedRequest = ({ url, isMainDocument }) => {
   return LOCAL_HOSTS.has(hostname)
 }
 
+// A popup's first navigation has no frame yet (request.frame() throws); treat it as not the
+// document under test, so only the host check can allow it.
+const isMainDocumentRequest = (request) => {
+  if (!request.isNavigationRequest()) return false
+  try {
+    return !request.frame().parentFrame()
+  } catch {
+    return false
+  }
+}
+
+// Guards every page in the context (popups included) and every WebSocket they open.
 export const test = base.extend({
   requestGuard: [
-    async ({ page }, use) => {
+    async ({ context }, use) => {
       const disallowedUrls = []
-      page.on('request', (request) => {
-        const isMainDocument = request.isNavigationRequest() && !request.frame().parentFrame()
-        if (!isAllowedRequest({ url: request.url(), isMainDocument })) {
-          disallowedUrls.push(request.url())
-        }
-      })
+      const record = (url, isMainDocument) => {
+        if (!isAllowedRequest({ url, isMainDocument })) disallowedUrls.push(url)
+      }
+      const watchSockets = (watchedPage) =>
+        watchedPage.on('websocket', (socket) => record(socket.url(), false))
+
+      context.on('request', (request) => record(request.url(), isMainDocumentRequest(request)))
+      context.pages().forEach(watchSockets)
+      context.on('page', watchSockets)
       await use()
       expect(disallowedUrls, 'requests to disallowed destinations').toEqual([])
     },

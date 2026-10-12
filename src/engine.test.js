@@ -4,12 +4,15 @@ import {
   LANE_IDS,
   LANE_MODELS,
   SLIDERS,
-  elapsedHours,
+  MS_PER_WORK_HOUR,
+  TICK_MS,
   emptyLane,
   floorShow,
+  formatElapsedHours,
   laneParams,
   tick,
 } from './engine.js'
+import { shownCounts } from './testHelpers.js'
 
 describe('laneParams at the default settings', () => {
   it('gives the Human lane its own generation rate, the base PR size, and the base reviewer speed', () => {
@@ -72,18 +75,32 @@ const defaultParams = (laneId) => laneParams(DEFAULT_SETTINGS, LANE_MODELS[laneI
 describe('tick at the default settings', () => {
   it('leaves the Human queue empty and deploys 10 PRs after 10 seconds', () => {
     const lane = runTicks(emptyLane(), defaultParams(LANE_IDS.human), 100)
-    expect([floorShow(lane.pendingPrs), floorShow(lane.deployedPrs)]).toEqual([0, 10])
+    expect(shownCounts(lane)).toEqual([0, 10])
   })
 
   it('backs up 184 PRs in the AI queue and deploys 15 after 10 seconds', () => {
     const lane = runTicks(emptyLane(), defaultParams(LANE_IDS.ai), 100)
-    expect([floorShow(lane.pendingPrs), floorShow(lane.deployedPrs)]).toEqual([184, 15])
+    expect(shownCounts(lane)).toEqual([184, 15])
   })
 
   it('holds 69,600 pending LOC in the AI queue after 10 seconds', () => {
     const lane = runTicks(emptyLane(), defaultParams(LANE_IDS.ai), 100)
     expect(Math.round(lane.pendingLoc)).toBe(69600)
   })
+})
+
+describe('tick accumulation at the default settings (detection still stubbed at 0)', () => {
+  it.each([
+    { laneId: LANE_IDS.human, reviewedLoc: 2500, escapedDefects: 50 },
+    { laneId: LANE_IDS.ai, reviewedLoc: 6000, escapedDefects: 120 },
+  ])(
+    'the $laneId lane reviews $reviewedLoc LOC and lets $escapedDefects defects escape in 10 seconds',
+    ({ laneId, reviewedLoc, escapedDefects }) => {
+      const lane = runTicks(emptyLane(), defaultParams(laneId), 100)
+      expect(lane.deployedLoc).toBeCloseTo(reviewedLoc, 6)
+      expect(lane.escapedDefects).toBeCloseTo(escapedDefects, 6)
+    },
+  )
 })
 
 describe('a PR counts as deployed only when fully reviewed', () => {
@@ -97,11 +114,18 @@ describe('a PR counts as deployed only when fully reviewed', () => {
 })
 
 describe('tick guards', () => {
-  it('never lets a queue go negative when review capacity exceeds the queue', () => {
+  it('empties a queue whose review capacity exceeds it', () => {
     const backlog = { ...emptyLane(), pendingPrs: 0.5, pendingLoc: 125 }
-    const params = { gen: 0, size: 250, effSpeed: 1500 }
-    const lane = tick(backlog, params)
+    const lane = tick(backlog, { gen: 0, size: 250, effSpeed: 1500 })
     expect([lane.pendingPrs, lane.pendingLoc]).toEqual([0, 0])
+  })
+
+  it('clamps float drift so Pending PRs never goes below zero', () => {
+    // (0.2 * 10.200000000000001) / 10.200000000000001 exceeds 0.2 by one rounding step,
+    // so subtracting the reviewed share would leave about -2.8e-17 without the clamp.
+    const drifting = { ...emptyLane(), pendingPrs: 0.2, pendingLoc: 10.200000000000001 }
+    const lane = tick(drifting, { gen: 0, size: 250, effSpeed: 1000 })
+    expect(lane.pendingPrs).toBe(0)
   })
 
   it('stays finite on an empty queue with no generation', () => {
@@ -126,12 +150,18 @@ describe('floorShow', () => {
   })
 })
 
-describe('elapsedHours', () => {
+describe('time scale', () => {
+  it('runs one tick every 100 ms at 1000 ms per work hour', () => {
+    expect([MS_PER_WORK_HOUR, TICK_MS]).toEqual([1000, 100])
+  })
+})
+
+describe('formatElapsedHours', () => {
   it.each([
     { ticks: 0, shown: '0.0' },
     { ticks: 30, shown: '3.0' },
     { ticks: 100, shown: '10.0' },
   ])('shows $shown for $ticks ticks', ({ ticks, shown }) => {
-    expect(elapsedHours(ticks)).toBe(shown)
+    expect(formatElapsedHours(ticks)).toBe(shown)
   })
 })

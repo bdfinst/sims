@@ -22,4 +22,5 @@ const HANDLERS = {
     state.isRunning ? { ...state, lanes: tickLanes(state), ticks: state.ticks + 1 } : state,
 }
 
-export const reducer = (state, action) => (HANDLERS[action.type] ?? ((current) => current))(state)
+export const reducer = (state, action) =>
+  Object.hasOwn(HANDLERS, action.type) ? HANDLERS[action.type](state) : state

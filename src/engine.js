@@ -36,18 +36,27 @@ export const laneParams = (settings, laneModel) => ({
 // --- Tick model ---------------------------------------------------------------
 
 export const TICK_HOURS = 0.1
+export const SECONDS_PER_WORK_HOUR = 1
+export const MS_PER_WORK_HOUR = SECONDS_PER_WORK_HOUR * 1000
+export const TICK_MS = TICK_HOURS * MS_PER_WORK_HOUR
 const DEFECTS_PER_LOC = 0.02
 const EMPTY_QUEUE_EPSILON = 1e-9
 const DISPLAY_EPSILON = 1e-9
 
-export const emptyLane = () => ({ pendingPrs: 0, pendingLoc: 0, deployedPrs: 0, escapedDefects: 0 })
+export const emptyLane = () => ({
+  pendingPrs: 0,
+  pendingLoc: 0,
+  deployedPrs: 0,
+  deployedLoc: 0,
+  escapedDefects: 0,
+})
 
 // Counts show the floor of the internal value; the epsilon absorbs float drift (9.9999999999 -> 10).
 export const floorShow = (value) => Math.floor(value + DISPLAY_EPSILON)
 
-export const elapsedHours = (ticks) => (ticks * TICK_HOURS).toFixed(1)
+export const formatElapsedHours = (ticks) => (ticks * TICK_HOURS).toFixed(1)
 
-// Stub until Step 4.1/4.2 introduces the real size/speed detection curves.
+// Placeholder: reviewers catch nothing until the size/speed detection curves exist.
 const detection = (_avgSize, _effSpeed) => 0
 
 export const tick = (lane, { gen, size, effSpeed }) => {
@@ -56,15 +65,19 @@ export const tick = (lane, { gen, size, effSpeed }) => {
   const pendingLoc = lane.pendingLoc + generatedPrs * size
 
   const avgSize = pendingPrs > EMPTY_QUEUE_EPSILON ? pendingLoc / pendingPrs : size
-  const detected = detection(avgSize, effSpeed)
+  const detectionRate = detection(avgSize, effSpeed)
 
   const reviewedLoc = Math.min(pendingLoc, effSpeed * TICK_HOURS)
-  const reviewedPrs = pendingLoc > EMPTY_QUEUE_EPSILON ? (pendingPrs * reviewedLoc) / pendingLoc : 0
+  const hasPendingWork = pendingLoc > EMPTY_QUEUE_EPSILON
+  // Plan's evaluation order: (PRs x reviewed LOC) / pending LOC. Float rounding can leave the
+  // result a hair above pendingPrs, which is why the queue is clamped below.
+  const reviewedPrs = hasPendingWork ? (pendingPrs * reviewedLoc) / pendingLoc : 0
 
   return {
     pendingPrs: Math.max(0, pendingPrs - reviewedPrs),
     pendingLoc: Math.max(0, pendingLoc - reviewedLoc),
     deployedPrs: lane.deployedPrs + reviewedPrs,
-    escapedDefects: lane.escapedDefects + reviewedLoc * DEFECTS_PER_LOC * (1 - detected),
+    deployedLoc: lane.deployedLoc + reviewedLoc,
+    escapedDefects: lane.escapedDefects + reviewedLoc * DEFECTS_PER_LOC * (1 - detectionRate),
   }
 }
