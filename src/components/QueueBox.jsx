@@ -1,5 +1,5 @@
 import { displayedPending, formatLoc, isOverThreshold, tileLayout } from '../engine.js'
-import { QUEUE_STATE, QUEUE_STATE_CLASS, TILE_CAPACITY } from '../laneConfig.js'
+import { COLOR_CLASS, QUEUE_STATE, QUEUE_STATE_CLASS, TILE_CAPACITY } from '../laneConfig.js'
 import { Icon } from './Icon.jsx'
 import { MetricValue } from './MetricValue.jsx'
 
@@ -27,20 +27,24 @@ export function QueueBox({ laneLabel, lane, threshold, tileClass }) {
     <div
       data-state={state}
       data-capacity={TILE_CAPACITY}
-      className={`rounded border p-4 ${boxClass}`}
+      className={`rounded border p-3 ${boxClass}`}
     >
       <div className="flex items-start justify-between gap-2">
         <dl>
-          <dt className="text-base">Pending Review</dt>
-          <dd className="text-4xl font-bold">
-            <MetricValue name="pending" value={displayed} />
-          </dd>
-          <dt className="text-base">Pending LOC</dt>
-          <dd className="text-xl font-semibold">
-            <MetricValue name="pendingLoc" value={formatLoc(lane.pendingLoc)} />
-          </dd>
+          <div>
+            <dt className="text-base">Pending Review</dt>
+            <dd className="text-4xl font-bold">
+              <MetricValue name="pending" value={displayed} />
+            </dd>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <dt className="text-base">Pending LOC</dt>
+            <dd className="text-xl font-semibold">
+              <MetricValue name="pendingLoc" value={formatLoc(lane.pendingLoc)} />
+            </dd>
+          </div>
         </dl>
-        {isWarning && <Icon name="triangle-alert" className="text-warning" />}
+        {isWarning && <Icon name="triangle-alert" className={COLOR_CLASS.warningText} />}
       </div>
       <div aria-hidden="true" className="mt-2 flex flex-wrap gap-1">
         {Array.from({ length: tiles }, (_, tileIndex) => (

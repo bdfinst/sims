@@ -27,7 +27,7 @@ function App() {
   }, [])
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6 p-6">
+    <div className="mx-auto flex max-w-7xl flex-col gap-3 px-6 py-4">
       <Header
         isRunning={isRunning}
         ticks={state.ticks}
@@ -36,7 +36,7 @@ function App() {
         onReset={() => dispatch({ type: ACTION.reset })}
         onSettingChange={changeSetting}
       />
-      <main className="flex flex-col gap-6">
+      <main className="flex flex-col gap-3">
         <HeadlineBand lanes={state.lanes} />
         {LANE_ORDER.map((laneId) => (
           <Lane

@@ -66,12 +66,25 @@ export const SLIDER_PRESENTATION = Object.freeze({
   }),
 })
 
+// Colour classes shared by components outside any one lane (complete literals for Tailwind).
+export const COLOR_CLASS = Object.freeze({
+  primaryButton: 'bg-human',
+  secondaryButtonBorder: 'border-gray-500',
+  neutralSliderAccent: 'accent-gray-300',
+  warningText: 'text-warning',
+  deployedText: 'text-deployed',
+  mutedText: 'text-gray-300',
+  faintText: 'text-gray-400',
+  lanePanel: 'bg-white/5',
+  idleBoxBorder: 'border-gray-600',
+})
+
 export const QUEUE_STATE = Object.freeze({ warning: 'warning', normal: 'normal' })
 
 // Complete class literals per state, so Tailwind's scanner finds them.
 export const QUEUE_STATE_CLASS = Object.freeze({
   [QUEUE_STATE.warning]: 'border-warning bg-warning/10',
-  [QUEUE_STATE.normal]: 'border-gray-600',
+  [QUEUE_STATE.normal]: COLOR_CLASS.idleBoxBorder,
 })
 
 // Tiles drawn per queue box before "+N more". Tiles are 12px with 4px gaps, so a phone's

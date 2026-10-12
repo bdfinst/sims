@@ -6,11 +6,18 @@
   --color-warning: #ef4444;
   --color-deployed: #22c55e;
   --color-canvas: #0b0d12;
+  --color-focus: #f8fafc;
 }
 
 @layer base {
   body {
     background-color: var(--color-canvas);
     color: #e5e7eb;
+  }
+
+  /* Keyboard focus is always visible: a light ring that contrasts with the dark canvas. */
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
   }
 }
