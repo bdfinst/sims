@@ -71,6 +71,19 @@ export const metric = (page, laneId, name) =>
 
 export const buttonNamed = (page, name) => page.getByRole('button', { name, exact: true })
 
+// Declared here on purpose, not imported from src/research.js: a rename of the title (or, in
+// research.spec.js, of a source URL) must fail the tests, so these are independent oracles.
+export const RESEARCH_TITLE = 'Research behind this simulation'
+export const researchToggle = (page) => page.locator('summary', { hasText: RESEARCH_TITLE })
+export const researchPanel = (page) => page.locator('details', { has: researchToggle(page) })
+// The link in a finding's list item (the assumptions note links Faros a second time).
+export const sourceLink = (page, url) =>
+  researchPanel(page).locator('li').locator(`a[href="${url}"]`)
+export const openResearchPanel = async (page) => {
+  await researchToggle(page).click()
+  await expect(researchPanel(page)).toHaveAttribute('open', '')
+}
+
 // Waiting for the toggled label means the click's render has committed. A click is a discrete
 // event, so React flushes that render and its interval effect synchronously. A pause caused by
 // visibilitychange is not a click: use flushPendingRenders after it instead.
@@ -84,13 +97,13 @@ export const pauseSimulation = async (page) => {
   await expect(buttonNamed(page, 'Start')).toBeVisible()
 }
 
-export const expectCounts = async (page, laneId, { pending, deployed }) => {
-  await expect(metric(page, laneId, 'pending')).toHaveText(String(pending))
-  await expect(metric(page, laneId, 'deployed')).toHaveText(String(deployed))
-}
-
 export const expectPending = (page, laneId, count) =>
   expect(metric(page, laneId, 'pending')).toHaveText(String(count))
+
+export const expectCounts = async (page, laneId, { pending, deployed }) => {
+  await expectPending(page, laneId, pending)
+  await expect(metric(page, laneId, 'deployed')).toHaveText(String(deployed))
+}
 
 const QUEUE_LABEL_BY_LANE = { human: 'Human', ai: 'AI' }
 
@@ -291,8 +304,7 @@ export const advanceSeconds = async (page, seconds, totalSeconds) => {
 // so the lanes are current too.
 export const startAndRunFor = async (page, seconds) => {
   await startSimulation(page)
-  await page.clock.runFor(seconds * SECOND_MS)
-  await expectElapsedAtTick(page, seconds * TICKS_PER_SECOND)
+  await advanceSeconds(page, seconds, seconds)
 }
 
 // Resolves after any render React has already queued. React schedules renders on a
@@ -309,6 +321,14 @@ export const flushPendingRenders = (page) =>
       }),
   )
 
+export const PHONE = { width: 375, height: 667 }
+export const NARROWEST_PHONE = { width: 320, height: 568 } // WCAG 1.4.10 reflow
+export const MIN_TEXT_CONTRAST = 4.5 // WCAG 1.4.3, normal-size text
+
+// The right and bottom edges of a bounding box.
+export const rightOf = ({ x, width }) => x + width
+export const bottomOf = ({ y, height }) => y + height
+
 export const expectNoHorizontalScroll = async (page) => {
   const scroll = await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,
@@ -318,7 +338,7 @@ export const expectNoHorizontalScroll = async (page) => {
 }
 
 // Text and background colours as sRGB bytes. A canvas converts any CSS colour (including the
-// oklch greys Tailwind uses); a transparent background falls back to the nearest opaque ancestor.
+// oklch greys Tailwind uses); translucent backgrounds are composited over the ancestors behind them.
 export const textColors = (locator) =>
   locator.evaluate((element) => {
     const toRgba = (cssColor) => {
@@ -344,10 +364,12 @@ export const textColors = (locator) =>
         ),
       [0, 0, 0],
     )
-    return {
-      foreground: toRgba(getComputedStyle(element).color).slice(0, 3),
-      background,
-    }
+    const [red, green, blue, alpha] = toRgba(getComputedStyle(element).color)
+    // A translucent text colour is seen blended with the background behind it.
+    const foreground = [red, green, blue].map(
+      (channel, index) => (channel * alpha + background[index] * (OPAQUE - alpha)) / OPAQUE,
+    )
+    return { foreground, background }
   })
 
 // WCAG 2 relative luminance and contrast ratio.
@@ -362,9 +384,5 @@ export const contrastRatio = ({ foreground, background }) => {
   const [lighter, darker] = [luminance(foreground), luminance(background)].sort((a, b) => b - a)
   return (lighter + 0.05) / (darker + 0.05)
 }
-
-export const RESEARCH_TITLE = 'Research behind this simulation'
-export const researchToggle = (page) => page.locator('summary', { hasText: RESEARCH_TITLE })
-export const researchPanel = (page) => page.locator('details')
 
 export { expect }

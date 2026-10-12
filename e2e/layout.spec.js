@@ -4,7 +4,10 @@ import {
   ALL_LANE_IDS,
   FULL_RUN_SECONDS,
   HUMAN_GEN_LABEL,
+  MIN_TEXT_CONTRAST,
+  NARROWEST_PHONE,
   PAGE_BACKGROUND,
+  PHONE,
   PR_SIZE_LABEL,
   RESEARCH_TITLE,
   REVIEWER_SPEED_LABEL,
@@ -19,8 +22,10 @@ import {
   openSimulator,
   overflowIn,
   queueBox,
+  bottomOf,
   researchPanel,
   researchToggle,
+  rightOf,
   slider,
   startAndRunFor,
   test,
@@ -32,11 +37,8 @@ test.describe.configure({ mode: 'parallel' })
 const PROJECTOR = { width: 1280, height: 720 }
 const DESKTOP = { width: 1280, height: 800 }
 const TABLET = { width: 768, height: 1024 }
-const PHONE = { width: 375, height: 667 }
-const NARROWEST_PHONE = { width: 320, height: 568 } // WCAG 1.4.10 reflow
 const FOCUS_RING_COLOR = 'rgb(248, 250, 252)' // --color-focus (#f8fafc) in src/index.css
-const MIN_TEXT_CONTRAST = 4.5 // WCAG 1.4.3, normal-size text
-// Plan line 146: the metrics grid keeps one fixed row order in both lanes.
+// Plan, "Layout": the metrics grid keeps one fixed row order in both lanes.
 const METRIC_ROWS_TOP_TO_BOTTOM = [
   'deployed',
   'defectsCaught',
@@ -62,16 +64,16 @@ const metricsGrid = (page, laneId) =>
 const expectInsideViewport = async (locator, viewport, label) => {
   const { x, y, width, height } = await boxOf(locator, label)
   expect(y, `${label} top`).toBeGreaterThanOrEqual(0)
-  expect(y + height, `${label} bottom`).toBeLessThanOrEqual(viewport.height)
+  expect(bottomOf({ y, height }), `${label} bottom`).toBeLessThanOrEqual(viewport.height)
   expect(x, `${label} left`).toBeGreaterThanOrEqual(0)
-  expect(x + width, `${label} right`).toBeLessThanOrEqual(viewport.width)
+  expect(rightOf({ x, width }), `${label} right`).toBeLessThanOrEqual(viewport.width)
 }
 
 const expectStackedBelow = (upper, lower, label) =>
-  expect(upper.y + upper.height, label).toBeLessThanOrEqual(lower.y)
+  expect(bottomOf(upper), label).toBeLessThanOrEqual(lower.y)
 
 const expectLeftOf = (left, right, label) =>
-  expect(left.x + left.width, label).toBeLessThanOrEqual(right.x)
+  expect(rightOf(left), label).toBeLessThanOrEqual(right.x)
 
 // The positions of a lane's groups: inputs (every generation slider), Pending Review box, review
 // controls, and metrics grid.
@@ -154,9 +156,7 @@ test.describe('Pending Review layout', () => {
       const title = await boxOf(page.getByRole('heading', { level: 1 }), 'title')
       for (const name of ['Start', 'Reset']) {
         const button = await boxOf(buttonNamed(page, name), name)
-        expect(button.x, `${name} is right of the title`).toBeGreaterThanOrEqual(
-          title.x + title.width,
-        )
+        expect(button.x, `${name} is right of the title`).toBeGreaterThanOrEqual(rightOf(title))
       }
     })
 
@@ -195,12 +195,10 @@ test.describe('Pending Review layout', () => {
         const grid = await boxOf(metricsGrid(page, laneId), `${laneId} metrics`)
         for (const row of METRIC_ROWS_TOP_TO_BOTTOM) {
           const value = await boxOf(metric(page, laneId, row), `${laneId} ${row}`)
-          expect(value.x + value.width, `${laneId} ${row} inside metrics grid`).toBeLessThanOrEqual(
-            grid.x + grid.width,
+          expect(rightOf(value), `${laneId} ${row} inside metrics grid`).toBeLessThanOrEqual(
+            rightOf(grid),
           )
-          expect(value.x + value.width, `${laneId} ${row} inside lane`).toBeLessThanOrEqual(
-            lane.x + lane.width,
-          )
+          expect(rightOf(value), `${laneId} ${row} inside lane`).toBeLessThanOrEqual(rightOf(lane))
         }
       }
     })

@@ -3,6 +3,7 @@ import {
   DEFAULT_SETTINGS,
   LANE_IDS,
   LANE_MODELS,
+  MODEL_ASSUMPTIONS,
   NO_VALUE,
   SLIDERS,
   detection,
@@ -12,6 +13,7 @@ import {
   emptyLane,
   floorShow,
   formatDefectsCaught,
+  formatCount,
   formatElapsedHours,
   formatHeadlineRatio,
   formatIncidentsPerPr,
@@ -448,4 +450,26 @@ describe('isOverThreshold', () => {
       expect(isOverThreshold(displayedPending(laneWithPending(internal)), threshold)).toBe(isOver)
     },
   )
+})
+
+describe('formatCount', () => {
+  it('groups thousands with commas', () => {
+    expect(formatCount(1000)).toBe('1,000')
+    expect(formatCount(999)).toBe('999')
+  })
+})
+
+describe('MODEL_ASSUMPTIONS', () => {
+  it('reports the model constants the research panel discloses', () => {
+    expect(MODEL_ASSUMPTIONS).toEqual({
+      defectsPerKloc: 20,
+      sizeFloor: 0.05,
+      speedFloor: 0.1,
+      sizeKnee: 200,
+      sizeWall: 400,
+      speedKnee: 500,
+      speedWall: 1000,
+      aiSizeMultiplier: 1.51,
+    })
+  })
 })

@@ -1,8 +1,14 @@
-import { MODEL_ASSUMPTIONS } from './engine.js'
+import { MODEL_ASSUMPTIONS, formatCount } from './engine.js'
 
-// Data only. The text is the spec's Research Sources "Panel wording", copied verbatim; the
+// FINDINGS is data: each text is the spec's Research Sources "Panel wording", copied verbatim; the
 // practitioner observation is a quoted paraphrase with an example link, never an attributed source.
+// The assumptions note is derived: its numbers are read from the engine's own constants.
 export const RESEARCH_TITLE = 'Research behind this simulation'
+
+// The calibration target is quoted twice (the Faros finding and the assumptions note), so it is
+// defined once.
+const FAROS_URL = 'https://faros.ai/research/ai-acceleration-whiplash'
+const FAROS_INCIDENTS_INCREASE = '+242.7%'
 
 export const FINDINGS = Object.freeze([
   Object.freeze({
@@ -23,10 +29,10 @@ export const FINDINGS = Object.freeze([
   }),
   Object.freeze({
     id: 'faros-incidents',
-    text: 'Across 22,000 developers in 4,000 teams, high AI adoption saw PR size +51% and 3× incidents per PR (+242.7%), compared with low adoption.',
+    text: `Across 22,000 developers in 4,000 teams, high AI adoption saw PR size +51% and 3× incidents per PR (${FAROS_INCIDENTS_INCREASE}), compared with low adoption.`,
     source: Object.freeze({
       label: 'Faros AI, AI Engineering Report Q2 2026: The Acceleration Whiplash',
-      url: 'https://faros.ai/research/ai-acceleration-whiplash',
+      url: FAROS_URL,
     }),
   }),
   Object.freeze({
@@ -47,7 +53,12 @@ export const FINDINGS = Object.freeze([
   }),
 ])
 
-const format = (number) => number.toLocaleString('en-US')
-
-export const assumptionsNote = (assumptions = MODEL_ASSUMPTIONS) =>
-  `Model assumptions. These are modeling choices, not research findings: the defect density (${assumptions.defectsPerKloc} defects per 1,000 LOC), the detection floors (${assumptions.sizeFloor} for large PRs and ${assumptions.speedFloor} for fast reviewing), the curve knees and walls (PR size ${assumptions.sizeKnee} to ${assumptions.sizeWall} LOC, reviewer speed ${format(assumptions.speedKnee)} to ${format(assumptions.speedWall)} LOC/hr), and the ${assumptions.aiSizeMultiplier} size multiplier for AI PRs. The defaults were calibrated so the AI lane lands near Faros's +242.7% incidents per PR.`
+// The note is two parts so the calibration figure can render as a link to its source (AC18).
+export const assumptionsNote = (assumptions = MODEL_ASSUMPTIONS) => ({
+  choices: `Model assumptions. These are modeling choices, not research findings: the defect density (${assumptions.defectsPerKloc} defects per 1,000 LOC), the detection floors (${assumptions.sizeFloor} for large PRs and ${assumptions.speedFloor} for fast reviewing), the curve thresholds (PR size ${assumptions.sizeKnee} to ${assumptions.sizeWall} LOC, reviewer speed ${formatCount(assumptions.speedKnee)} to ${formatCount(assumptions.speedWall)} LOC/hr), and the ${assumptions.aiSizeMultiplier} size multiplier for AI PRs.`,
+  calibration: {
+    lead: 'The defaults were calibrated to land near',
+    linkText: `Faros's ${FAROS_INCIDENTS_INCREASE} incidents per PR`,
+    url: FAROS_URL,
+  },
+})

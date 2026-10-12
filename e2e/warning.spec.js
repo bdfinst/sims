@@ -81,7 +81,7 @@ test.describe('Pending Review overload warning', () => {
     await expect(laneLocator(page, 'human').getByRole('status')).toHaveText('')
   })
 
-  // Plan line 173: counts have no aria-live, and each lane's role="status" is its only announcer.
+  // Plan, "Look, accessibility, and test hooks": counts have no aria-live, and each lane's role="status" is its only announcer.
   test('Each lane has exactly one status element, and counts are not live regions', async ({
     page,
   }) => {

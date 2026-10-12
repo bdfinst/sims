@@ -55,6 +55,7 @@ const SPEED_KNEE = 500
 const SPEED_WALL = 1000
 const SPEED_FLOOR = 0.1
 const EMPTY_QUEUE_EPSILON = 1e-9
+const DISPLAY_EPSILON = 1e-9
 const DEFECTS_PER_KLOC = DEFECTS_PER_LOC * 1000
 
 // The modeling choices the research panel discloses, read from the model's own constants so the
@@ -69,7 +70,6 @@ export const MODEL_ASSUMPTIONS = Object.freeze({
   speedWall: SPEED_WALL,
   aiSizeMultiplier: LANE_MODELS[LANE_IDS.ai].sizeMultiplier,
 })
-const DISPLAY_EPSILON = 1e-9
 
 // escapedDefects is the model's term; the UI calls it "Incidents".
 export const emptyLane = () => ({
@@ -107,7 +107,9 @@ export const formatPct = (share) => `${Math.round(share * 100)}%`
 // Defects caught is shown from the lane's nominal size and speed, not from the queue's mix.
 export const formatDefectsCaught = ({ size, effSpeed }) => formatPct(detection(size, effSpeed))
 
-export const formatLoc = (loc) => floorShow(loc).toLocaleString('en-US')
+export const formatCount = (count) => count.toLocaleString('en-US')
+
+export const formatLoc = (loc) => formatCount(floorShow(loc))
 
 export const NO_VALUE = '—'
 
