@@ -90,8 +90,11 @@ export const SECOND_MS = 1000
 export const TICK_MS = 100
 export const TICKS_PER_SECOND = SECOND_MS / TICK_MS
 
+export const HUMAN_GEN_LABEL = 'Human generation (PRs/hr)'
 export const AI_GEN_LABEL = 'AI generation (PRs/hr)'
 export const PR_SIZE_LABEL = 'PR size (LOC, both lanes)'
+export const REVIEWER_SPEED_LABEL = 'Reviewer speed (LOC/hr, both lanes)'
+export const AI_SKIM_LABEL = 'AI skim multiplier'
 
 // Expected values from the plan's reference model (plan, "Default arithmetic" under "Slices").
 // Per tick (0.1 h): a lane gains gen x 0.1 PRs of `size` LOC each, then reviews

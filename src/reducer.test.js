@@ -206,6 +206,12 @@ describe('reset', () => {
     })
   })
 
+  it('leaves the lanes frozen, so the shared empty lanes cannot be mutated', () => {
+    const reset = dispatchAll(runningWithCustomSettings(), ACTION.reset)
+    expect(Object.isFrozen(reset.lanes)).toBe(true)
+    expect(Object.values(reset.lanes).every(Object.isFrozen)).toBe(true)
+  })
+
   it('is idempotent on the initial state', () => {
     expect(dispatchAll(initialState, ACTION.reset)).toEqual(initialState)
   })

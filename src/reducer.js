@@ -18,7 +18,11 @@ export const ACTION = Object.freeze({
 })
 
 const emptyLanes = () =>
-  Object.freeze(Object.fromEntries(Object.values(LANE_IDS).map((laneId) => [laneId, emptyLane()])))
+  Object.freeze(
+    Object.fromEntries(
+      Object.values(LANE_IDS).map((laneId) => [laneId, Object.freeze(emptyLane())]),
+    ),
+  )
 
 export const initialState = Object.freeze({
   settings: DEFAULT_SETTINGS,

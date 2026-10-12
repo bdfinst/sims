@@ -1,6 +1,9 @@
 import {
   AI_GEN_LABEL,
+  AI_SKIM_LABEL,
+  HUMAN_GEN_LABEL,
   PR_SIZE_LABEL,
+  REVIEWER_SPEED_LABEL,
   REFERENCE,
   SECOND_MS,
   TICKS_PER_SECOND,
@@ -22,15 +25,12 @@ import {
   visibleValue,
 } from './fixtures.js'
 
-const HUMAN_GEN = 'Human generation (PRs/hr)'
-const REVIEWER_SPEED = 'Reviewer speed (LOC/hr, both lanes)'
-const AI_SKIM = 'AI skim multiplier'
 const DRAIN_START_SECONDS = 2
 const DRAIN_SECONDS = 6
 
 const DEFAULT_CONTROLS = [
   {
-    control: HUMAN_GEN,
+    control: HUMAN_GEN_LABEL,
     defaultValue: 1,
     min: 1,
     max: 10,
@@ -57,7 +57,7 @@ const DEFAULT_CONTROLS = [
     spoken: '250 lines of code',
   },
   {
-    control: REVIEWER_SPEED,
+    control: REVIEWER_SPEED_LABEL,
     defaultValue: 300,
     min: 100,
     max: 1000,
@@ -65,14 +65,22 @@ const DEFAULT_CONTROLS = [
     shown: '300 LOC/hr',
     spoken: '300 lines of code per hour',
   },
-  { control: AI_SKIM, defaultValue: 2, min: 1, max: 3, step: 0.5, shown: '2×', spoken: '2 times' },
+  {
+    control: AI_SKIM_LABEL,
+    defaultValue: 2,
+    min: 1,
+    max: 3,
+    step: 0.5,
+    shown: '2×',
+    spoken: '2 times',
+  },
 ]
 
 const BOUNDS = [
   { control: AI_GEN_LABEL, key: 'End', bound: 50 },
   { control: AI_GEN_LABEL, key: 'Home', bound: 5 },
-  { control: REVIEWER_SPEED, key: 'Home', bound: 100 },
-  { control: AI_SKIM, key: 'End', bound: 3 },
+  { control: REVIEWER_SPEED_LABEL, key: 'Home', bound: 100 },
+  { control: AI_SKIM_LABEL, key: 'End', bound: 3 },
 ]
 
 test.describe('Adjust the model live', () => {
@@ -102,10 +110,10 @@ test.describe('Adjust the model live', () => {
     await expect(derivedSpeed).toContainText('derived')
     await expect(aiLane.getByRole('slider')).toHaveCount(2)
     await expect(aiLane.getByRole('slider', { name: AI_GEN_LABEL })).toBeVisible()
-    await expect(aiLane.getByRole('slider', { name: AI_SKIM })).toBeVisible()
+    await expect(aiLane.getByRole('slider', { name: AI_SKIM_LABEL })).toBeVisible()
 
     await setSlider(page, PR_SIZE_LABEL, 200)
-    await setSlider(page, AI_SKIM, 3)
+    await setSlider(page, AI_SKIM_LABEL, 3)
 
     await expect(
       aiLane.locator('p', { hasText: `PR size ${REFERENCE.aiPrSizeAtPrSize200} LOC` }),
@@ -131,8 +139,8 @@ test.describe('Adjust the model live', () => {
     await page.clock.runFor(1 * SECOND_MS)
     await expect(metric(page, 'ai', 'deployed')).toHaveText(String(REFERENCE.aiDeployedAtTick10))
 
-    await setSlider(page, REVIEWER_SPEED, 1000)
-    await setSlider(page, AI_SKIM, 3)
+    await setSlider(page, REVIEWER_SPEED_LABEL, 1000)
+    await setSlider(page, AI_SKIM_LABEL, 3)
     await page.clock.runFor(TICK_MS)
 
     await expect(metric(page, 'ai', 'deployed')).toHaveText(
@@ -160,7 +168,7 @@ test.describe('Adjust the model live', () => {
 
   test('A backlog drains to zero and never below', async ({ page }) => {
     await openSimulator(page)
-    await setSlider(page, HUMAN_GEN, 10)
+    await setSlider(page, HUMAN_GEN_LABEL, 10)
     await startSimulation(page)
     await page.clock.runFor(DRAIN_START_SECONDS * SECOND_MS)
     await expectCounts(page, 'human', {
@@ -168,8 +176,8 @@ test.describe('Adjust the model live', () => {
       deployed: REFERENCE.humanDeployedAtTick20WithHumanGen10,
     })
 
-    await setSlider(page, HUMAN_GEN, 1)
-    await setSlider(page, REVIEWER_SPEED, 1000)
+    await setSlider(page, HUMAN_GEN_LABEL, 1)
+    await setSlider(page, REVIEWER_SPEED_LABEL, 1000)
     const sampledPending = await sampleEachTick(page, {
       startTick: DRAIN_START_SECONDS * TICKS_PER_SECOND,
       tickCount: (DRAIN_SECONDS * SECOND_MS) / TICK_MS,
@@ -182,7 +190,7 @@ test.describe('Adjust the model live', () => {
 
   test('Sliders are keyboard operable', async ({ page }) => {
     await openSimulator(page)
-    const reviewerSpeedSlider = slider(page, REVIEWER_SPEED)
+    const reviewerSpeedSlider = slider(page, REVIEWER_SPEED_LABEL)
 
     await tabTo(page, reviewerSpeedSlider)
     await page.keyboard.press('ArrowRight')

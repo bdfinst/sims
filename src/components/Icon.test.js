@@ -9,6 +9,12 @@ const ICON_ENTRIES = Object.entries(ICONS)
 const lucideExports = new Set(Object.values(lucide))
 
 describe('the icon map', () => {
+  it('holds exactly the five icons the plan allows', () => {
+    expect(Object.keys(ICONS).sort()).toEqual(
+      ['bot', 'chevron-down', 'eye', 'triangle-alert', 'user'].sort(),
+    )
+  })
+
   it.each(ICON_ENTRIES)(
     'maps "%s" to a component exported by the installed lucide-react',
     (_name, component) => {
