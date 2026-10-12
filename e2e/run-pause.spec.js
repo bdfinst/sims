@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
   INLINE_PROTOCOLS,
+  NO_VALUE,
   REFERENCE,
   SECOND_MS,
   SIMULATOR_TITLE as TITLE,
@@ -10,6 +11,9 @@ import {
   expectCounts,
   expectElapsedAtTick,
   expectEmptyLanes,
+  expectNeverDecreases,
+  flushPendingRenders,
+  headline,
   laneLocator,
   metric,
   metricValues,
@@ -50,7 +54,7 @@ test.describe('Run and pause the simulation', () => {
   test('Headline shows no ratio before any PR is deployed', async ({ page }) => {
     await openSimulator(page)
 
-    await expect(page.locator('[data-metric="headlineRatio"]')).toHaveText('—')
+    await expect(headline(page)).toHaveText(NO_VALUE)
   })
 
   test('Header content', async ({ page }) => {
@@ -122,6 +126,7 @@ test.describe('Run and pause the simulation', () => {
 
     await startSimulation(page)
     await page.clock.runFor(0.9 * SECOND_MS)
+    await expectElapsedAtTick(page, 0.9 * TICKS_PER_SECOND)
     await expect(metric(page, 'human', 'deployed')).toHaveText('0')
 
     await page.clock.runFor(0.1 * SECOND_MS)
@@ -135,6 +140,7 @@ test.describe('Run and pause the simulation', () => {
 
     await pauseSimulation(page)
     await page.clock.runFor(5 * SECOND_MS)
+    await flushPendingRenders(page)
 
     await expectCounts(page, 'ai', {
       pending: REFERENCE.aiPendingAtTick30,
@@ -172,12 +178,7 @@ test.describe('Run and pause the simulation', () => {
       })),
     ]
 
-    const decreases = samples
-      .slice(1)
-      .filter((current, sampleIndex) =>
-        Object.entries(current).some(([laneId, count]) => count < samples[sampleIndex][laneId]),
-      )
-    expect(decreases).toEqual([])
+    expectNeverDecreases(samples)
     await expect.poll(readDeployed).toEqual({
       human: REFERENCE.humanDeployedAtTick100,
       ai: REFERENCE.aiDeployedAtTick100,
@@ -192,6 +193,7 @@ test.describe('Run and pause the simulation', () => {
     await setVisibility(page, 'hidden')
     await expect(buttonNamed(page, 'Start')).toBeVisible()
     await page.clock.runFor(3 * SECOND_MS)
+    await flushPendingRenders(page)
 
     await expect(page.getByText('Paused', { exact: true })).toBeVisible()
     await expect(metric(page, 'ai', 'pending')).toHaveText(String(REFERENCE.aiPendingAtTick10))
@@ -206,6 +208,7 @@ test.describe('Run and pause the simulation', () => {
 
     await setVisibility(page, 'visible')
     await page.clock.runFor(2 * SECOND_MS)
+    await flushPendingRenders(page)
 
     await expect(page.getByText('Paused', { exact: true })).toBeVisible()
     await expect(metric(page, 'ai', 'pending')).toHaveText(String(REFERENCE.aiPendingAtTick10))

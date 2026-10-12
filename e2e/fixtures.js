@@ -1,4 +1,5 @@
 import { test as base, expect } from '@playwright/test'
+import { TICK_MS } from '../src/engine.js'
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1'])
 export const INLINE_PROTOCOLS = new Set(['data:', 'blob:'])
@@ -60,7 +61,8 @@ export const openSimulator = async (page, url = '/') => {
   await page.clock.pauseAt(FIXED_START_MS + CLOCK_PAUSE_OFFSET_MS)
 }
 
-const LANE_ID_LIST = ['human', 'ai']
+export const ALL_LANE_IDS = ['human', 'ai']
+export const NO_VALUE = '—'
 
 export const laneLocator = (page, laneId) => page.locator(`[data-lane="${laneId}"]`)
 
@@ -69,8 +71,9 @@ export const metric = (page, laneId, name) =>
 
 export const buttonNamed = (page, name) => page.getByRole('button', { name, exact: true })
 
-// Waiting for the toggled label means React has committed (and registered or cleared the
-// interval) before the fake clock moves.
+// Waiting for the toggled label means the click's render has committed. A click is a discrete
+// event, so React flushes that render and its interval effect synchronously. A pause caused by
+// visibilitychange is not a click: use flushPendingRenders after it instead.
 export const startSimulation = async (page) => {
   await buttonNamed(page, 'Start').click()
   await expect(buttonNamed(page, 'Pause')).toBeVisible()
@@ -87,7 +90,7 @@ export const expectCounts = async (page, laneId, { pending, deployed }) => {
 }
 
 export const SECOND_MS = 1000
-export const TICK_MS = 100
+export { TICK_MS }
 export const TICKS_PER_SECOND = SECOND_MS / TICK_MS
 
 export const HUMAN_GEN_LABEL = 'Human generation (PRs/hr)'
@@ -116,8 +119,9 @@ export const REFERENCE = Object.freeze({
   aiPendingAtTick100: 184,
   aiDeployedAtTick100: 15,
   humanDeployedAtTick100: 10,
-  // Incidents = reviewed LOC x 0.02 x (1 - detection). Human at the defaults: 2500 x 0.02 x 0.39 = 19.5
-  // over 10 deployed PRs. AI: 107.84 over 15.87 internal deployed PRs (not the displayed 15).
+  // Incidents = reviewed LOC x 0.02 x (1 - detection). Internal values at 10 s: Human 19.5 escaped
+  // over 10 deployed PRs (1.95 per PR); AI 107.84 over 15.87 deployed PRs (6.79 per PR, not
+  // 107 / 15). The displayed Incidents are those escapes floored: 19 and 107.
   humanIncidentsAtTick100: 19,
   humanIncidentsPerPrAtTick100: '1.95',
   aiIncidentsAtTick100: 107,
@@ -150,8 +154,20 @@ export const REFERENCE = Object.freeze({
   aiDeployedAtTick30WithAiGen40AndPrSize300: 3,
 })
 
+export const headline = (page) => page.locator('[data-metric="headlineRatio"]')
+
+// samples are { human, ai } values read once per tick; none may be lower than the one before.
+export const expectNeverDecreases = (samples) => {
+  const decreases = samples
+    .slice(1)
+    .filter((current, sampleIndex) =>
+      Object.entries(current).some(([laneId, value]) => value < samples[sampleIndex][laneId]),
+    )
+  expect(decreases).toEqual([])
+}
+
 export const expectEmptyLanes = async (page) => {
-  for (const laneId of LANE_ID_LIST) {
+  for (const laneId of ALL_LANE_IDS) {
     await expectCounts(page, laneId, { pending: 0, deployed: 0 })
   }
 }

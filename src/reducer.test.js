@@ -1,13 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import {
   DEFAULT_SETTINGS,
+  LANE_MODELS,
+  NO_VALUE,
+  displayedPending,
   floorShow,
   formatHeadlineRatio,
   formatIncidentsPerPr,
   formatLoc,
-  formatPickupWait,
+  formatPickupWaitHours,
   laneParams,
-  LANE_MODELS,
 } from './engine.js'
 import { ACTION, initialState, reducer } from './reducer.js'
 import { shownCounts } from './testHelpers.js'
@@ -17,6 +19,13 @@ const dispatchAll = (state, ...types) =>
 
 const setSetting = (state, settingKey, value) =>
   reducer(state, { type: ACTION.setSetting, settingKey, value })
+
+const ONE_SECOND_IN_TICKS = 10
+const TWO_SECONDS_IN_TICKS = 20
+const TEN_SECONDS_IN_TICKS = 100
+const DRAIN_TICKS = 60 // six seconds
+const BUSY_HUMAN_GEN = 10
+const OVERSIZED_PR = 400
 
 const repeat = (type, count) => Array.from({ length: count }, () => type)
 
@@ -132,6 +141,14 @@ describe('setSetting', () => {
   })
 })
 
+// Human lane generating 10 PRs/hr for two seconds: 17 PRs (4,400 LOC) waiting, still running.
+const queuedHumanBacklog = () =>
+  dispatchAll(
+    setSetting(initialState, 'humanGen', BUSY_HUMAN_GEN),
+    ACTION.start,
+    ...repeat(ACTION.tick, TWO_SECONDS_IN_TICKS),
+  )
+
 describe('changing settings mid-run', () => {
   it('leaves a paused queue as it was, then applies the new rate on the next tick', () => {
     const paused = dispatchAll(initialState, ACTION.start, ...repeat(ACTION.tick, 10), ACTION.pause)
@@ -157,14 +174,13 @@ describe('changing settings mid-run', () => {
   })
 
   it('drains a backlog to zero without ever going below zero', () => {
-    const backlogged = setSetting(initialState, 'humanGen', 10)
-    const atTwoSeconds = dispatchAll(backlogged, ACTION.start, ...repeat(ACTION.tick, 20))
-    expect(shownCounts(atTwoSeconds.lanes.human)[0]).toBe(17)
+    const backlog = queuedHumanBacklog()
+    expect(shownCounts(backlog.lanes.human)[0]).toBe(17)
 
-    const draining = setSetting(setSetting(atTwoSeconds, 'humanGen', 1), 'reviewerSpeed', 1000)
+    const draining = setSetting(setSetting(backlog, 'humanGen', 1), 'reviewerSpeed', 1000)
     const pendingEachTick = []
     let state = draining
-    for (let tickIndex = 0; tickIndex < 60; tickIndex += 1) {
+    for (let tickIndex = 0; tickIndex < DRAIN_TICKS; tickIndex += 1) {
       state = reducer(state, { type: ACTION.tick })
       pendingEachTick.push(state.lanes.human.pendingPrs)
     }
@@ -175,72 +191,85 @@ describe('changing settings mid-run', () => {
 })
 
 describe('incidents across a run', () => {
-  const running = (...settings) =>
-    settings.reduce(
-      (state, [key, value]) => setSetting(state, key, value),
-      reducer(initialState, { type: ACTION.start }),
-    )
+  const runningState = reducer(initialState, { type: ACTION.start })
+  const afterTicks = (state, count) => dispatchAll(state, ...repeat(ACTION.tick, count))
   const incidents = (lane) => floorShow(lane.escapedDefects)
+  const afterTenDefaultSeconds = afterTicks(runningState, TEN_SECONDS_IN_TICKS)
 
   it('Larger PRs accrue more incidents: PR size 400 gives Human 2 / 7 / 57 / 7.68', () => {
-    const human = dispatchAll(running(['prSize', 400]), ...repeat(ACTION.tick, 100)).lanes.human
+    const oversized = setSetting(runningState, 'prSize', OVERSIZED_PR)
+    const human = afterTicks(oversized, TEN_SECONDS_IN_TICKS).lanes.human
     expect(shownCounts(human)).toEqual([2, 7])
     expect([incidents(human), formatIncidentsPerPr(human)]).toEqual([57, '7.68'])
   })
 
   it('a size change while running changes accrual from the next tick: 53 incidents, 6.94 per PR', () => {
-    const atOneSecond = dispatchAll(running(), ...repeat(ACTION.tick, 10))
-    const resized = setSetting(atOneSecond, 'prSize', 400)
+    const afterOneSecond = afterTicks(runningState, ONE_SECOND_IN_TICKS)
+    const resized = setSetting(afterOneSecond, 'prSize', OVERSIZED_PR)
 
-    const human = dispatchAll(resized, ...repeat(ACTION.tick, 90)).lanes.human
+    const human = afterTicks(resized, TEN_SECONDS_IN_TICKS - ONE_SECOND_IN_TICKS).lanes.human
 
     expect([incidents(human), formatIncidentsPerPr(human)]).toEqual([53, '6.94'])
   })
 
   it('queued PRs keep their size when PR size changes: Pending 17 / 4,400 LOC becomes 26 / 9,100', () => {
-    const queued = dispatchAll(running(['humanGen', 10]), ...repeat(ACTION.tick, 20))
+    const queued = queuedHumanBacklog()
     expect([
-      floorShow(queued.lanes.human.pendingPrs),
+      displayedPending(queued.lanes.human),
       formatLoc(queued.lanes.human.pendingLoc),
     ]).toEqual([17, '4,400'])
 
-    const resized = dispatchAll(setSetting(queued, 'prSize', 500), ...repeat(ACTION.tick, 10))
+    const resized = afterTicks(setSetting(queued, 'prSize', 500), ONE_SECOND_IN_TICKS)
 
     expect([
-      floorShow(resized.lanes.human.pendingPrs),
+      displayedPending(resized.lanes.human),
       formatLoc(resized.lanes.human.pendingLoc),
     ]).toEqual([26, '9,100'])
   })
 
   it('a drained queue shows no wait', () => {
-    const queued = dispatchAll(running(['humanGen', 10]), ...repeat(ACTION.tick, 20))
-    const draining = setSetting(setSetting(queued, 'humanGen', 1), 'reviewerSpeed', 1000)
+    const draining = setSetting(
+      setSetting(queuedHumanBacklog(), 'humanGen', 1),
+      'reviewerSpeed',
+      1000,
+    )
 
-    const drained = dispatchAll(draining, ...repeat(ACTION.tick, 60))
+    const drained = afterTicks(draining, DRAIN_TICKS)
 
-    const { effSpeed } = laneParams(drained.settings, LANE_MODELS.human)
+    const params = laneParams(drained.settings, LANE_MODELS.human)
     expect([
-      floorShow(drained.lanes.human.pendingPrs),
-      formatPickupWait(drained.lanes.human.pendingLoc, effSpeed),
-    ]).toEqual([0, '0.0 h'])
+      displayedPending(drained.lanes.human),
+      formatPickupWaitHours(drained.lanes.human, params),
+    ]).toEqual([0, '0.0'])
   })
 
-  it('never lets an incident count decrease while running', () => {
-    let state = running()
-    let previous = [0, 0]
-    for (let tickIndex = 0; tickIndex < 100; tickIndex += 1) {
+  it('never lets an incident count decrease while running, and ends above zero', () => {
+    const samples = []
+    let state = runningState
+    for (let tickIndex = 0; tickIndex < TEN_SECONDS_IN_TICKS; tickIndex += 1) {
       state = reducer(state, { type: ACTION.tick })
-      const current = [state.lanes.human.escapedDefects, state.lanes.ai.escapedDefects]
-      expect(current[0]).toBeGreaterThanOrEqual(previous[0])
-      expect(current[1]).toBeGreaterThanOrEqual(previous[1])
-      previous = current
+      samples.push({ human: state.lanes.human.escapedDefects, ai: state.lanes.ai.escapedDefects })
     }
+
+    const decreases = samples
+      .slice(1)
+      .filter(
+        (current, sampleIndex) =>
+          current.human < samples[sampleIndex].human || current.ai < samples[sampleIndex].ai,
+      )
+    expect(decreases).toEqual([])
+    expect(samples.at(-1).human).toBeGreaterThan(0)
+    expect(samples.at(-1).ai).toBeGreaterThan(0)
   })
 
-  it('shows the headline ratio 3.48x after 10 default seconds, and blank at 9 ticks', () => {
-    const at = (ticks) => dispatchAll(running(), ...repeat(ACTION.tick, ticks)).lanes
-    expect(formatHeadlineRatio(at(100).ai, at(100).human)).toBe('3.48×')
-    expect(formatHeadlineRatio(at(9).ai, at(9).human)).toBe('—')
+  it('shows the headline ratio 3.48x after 10 default seconds', () => {
+    const { ai, human } = afterTenDefaultSeconds.lanes
+    expect(formatHeadlineRatio(ai, human)).toBe('3.48×')
+  })
+
+  it('shows a blank headline ratio before the Human lane has deployed a whole PR (9 ticks)', () => {
+    const { ai, human } = afterTicks(runningState, ONE_SECOND_IN_TICKS - 1).lanes
+    expect(formatHeadlineRatio(ai, human)).toBe(NO_VALUE)
   })
 })
 

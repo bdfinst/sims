@@ -1,6 +1,8 @@
 import {
   AI_SKIM_LABEL,
+  ALL_LANE_IDS,
   HUMAN_GEN_LABEL,
+  NO_VALUE,
   PR_SIZE_LABEL,
   REFERENCE,
   REVIEWER_SPEED_LABEL,
@@ -11,6 +13,9 @@ import {
   expect,
   expectCounts,
   expectElapsedAtTick,
+  expectNeverDecreases,
+  headline,
+  laneLocator,
   metric,
   metricValues,
   openSimulator,
@@ -45,9 +50,7 @@ const AI_CAUGHT_AT_HUMAN_PACE = '12%'
 const MAX_SKIM = 3
 const HUMAN_PACE_SKIM = 1
 
-const NO_VALUE = '—'
 const NO_WAIT = '0.0 h'
-const LANE_IDS = ['human', 'ai']
 const DEFAULT_RUN_SECONDS = 10
 const SIZE_CHANGE_AT_SECONDS = 1
 const OVERSIZED_PR = 400
@@ -57,16 +60,25 @@ const RESIZED_QUEUE_PR_SIZE = 500
 const RESIZED_QUEUE_SECONDS = 1
 const FAST_REVIEWER_SPEED = 1000
 const DRAIN_SECONDS = 6
-const LOWEST_RESEARCH_RATIO = 3
-const HIGHEST_RESEARCH_RATIO = 4
-const HEADLINE_HOOK = '[data-metric="headlineRatio"]'
+const RESEARCH_RATIO_FLOOR = 3
+const RESEARCH_RATIO_CEILING = 4
+const QUIET_HUMAN_GEN = 1
+const NEARLY_A_PR_SECONDS = 0.9
+const LAST_TENTH_SECONDS = 0.1
+const FIRST_PR_DEPLOYED = 1
+const TICK_AFTER_SIZE_CHANGE = 11
+const UNAVAILABLE_TEXT = 'Not yet available'
 
-const headline = (page) => page.locator(HEADLINE_HOOK)
+const pendingReviewList = (page, laneId) =>
+  laneLocator(page, laneId).locator('dl', { has: page.locator('[data-metric="pending"]') })
+const metricsList = (page, laneId) =>
+  laneLocator(page, laneId).locator('dl', { has: page.locator('[data-metric="incidents"]') })
+
 const expectMetric = (page, laneId, name, shown) =>
   expect(metric(page, laneId, name)).toHaveText(String(shown))
 
 const expectNoIncidents = async (page) => {
-  for (const laneId of LANE_IDS) {
+  for (const laneId of ALL_LANE_IDS) {
     await expectMetric(page, laneId, 'incidents', 0)
     await expectMetric(page, laneId, 'incidentsPerPr', NO_VALUE)
     await expectMetric(page, laneId, 'pickupWait', NO_WAIT)
@@ -76,6 +88,8 @@ const expectNoIncidents = async (page) => {
 
 const expectDefectsCaught = (page, laneId, shown) =>
   expect(metric(page, laneId, 'defectsCaught')).toHaveText(shown)
+
+test.describe.configure({ mode: 'parallel' })
 
 test.describe('Review quality metrics', () => {
   test('Defects caught and pending LOC at rest', async ({ page }) => {
@@ -126,6 +140,54 @@ test.describe('Review quality metrics', () => {
     await expectDefectsCaught(page, 'ai', AI_CAUGHT_AT_HUMAN_PACE)
   })
 
+  test('Terms pair with their definitions at rest in the Human lane', async ({ page }) => {
+    await openSimulator(page)
+
+    await expect(pendingReviewList(page, 'human')).toMatchAriaSnapshot(`
+      - term: Pending Review
+      - definition: "0"
+      - term: Pending LOC
+      - definition: "0"
+    `)
+    await expect(metricsList(page, 'human')).toMatchAriaSnapshot(`
+      - term: Deployed
+      - definition: "0"
+      - term: Defects caught
+      - definition: ${HUMAN_CAUGHT_AT_REST}
+      - term: Incidents
+      - definition: "0"
+      - term: Incidents per PR
+      - definition: ${UNAVAILABLE_TEXT}
+      - term: Pickup wait
+      - definition: 0.0 h
+    `)
+  })
+
+  test('Terms pair with their definitions at rest in the AI lane', async ({ page }) => {
+    await openSimulator(page)
+
+    await expect(metricsList(page, 'ai')).toMatchAriaSnapshot(`
+      - term: Deployed
+      - definition: "0"
+      - term: Defects caught
+      - definition: ${AI_CAUGHT_AT_REST}
+      - term: Incidents
+      - definition: "0"
+      - term: Incidents per PR
+      - definition: ${UNAVAILABLE_TEXT}
+      - term: Pickup wait
+      - definition: 0.0 h
+    `)
+  })
+
+  test('The headline ratio reads as not yet available at rest', async ({ page }) => {
+    await openSimulator(page)
+
+    await expect(page.getByRole('region', { name: 'Headline ratio' })).toMatchAriaSnapshot(`
+      - region "Headline ratio": ${UNAVAILABLE_TEXT} more incidents per PR from AI-generated code
+    `)
+  })
+
   test('Incident metrics at rest', async ({ page }) => {
     await openSimulator(page)
 
@@ -153,22 +215,22 @@ test.describe('Review quality metrics', () => {
     await startAndRunFor(page, DEFAULT_RUN_SECONDS)
 
     const ratio = Number.parseFloat(await headline(page).textContent())
-    expect(ratio).toBeGreaterThan(LOWEST_RESEARCH_RATIO)
-    expect(ratio).toBeLessThan(HIGHEST_RESEARCH_RATIO)
+    expect(ratio).toBeGreaterThan(RESEARCH_RATIO_FLOOR)
+    expect(ratio).toBeLessThan(RESEARCH_RATIO_CEILING)
   })
 
   test('Incidents per PR waits for a whole deployed PR', async ({ page }) => {
     await openSimulator(page)
     await startSimulation(page)
 
-    await page.clock.runFor(0.9 * SECOND_MS)
-    await expectElapsedAtTick(page, 0.9 * TICKS_PER_SECOND)
+    await page.clock.runFor(NEARLY_A_PR_SECONDS * SECOND_MS)
+    await expectElapsedAtTick(page, NEARLY_A_PR_SECONDS * TICKS_PER_SECOND)
     await expectMetric(page, 'human', 'deployed', REFERENCE.humanDeployedAtTick9)
     await expectMetric(page, 'human', 'incidentsPerPr', NO_VALUE)
     await expect(headline(page)).toHaveText(NO_VALUE)
 
-    await page.clock.runFor(0.1 * SECOND_MS)
-    await expectMetric(page, 'human', 'deployed', 1)
+    await page.clock.runFor(LAST_TENTH_SECONDS * SECOND_MS)
+    await expectMetric(page, 'human', 'deployed', FIRST_PR_DEPLOYED)
     await expectMetric(page, 'human', 'incidentsPerPr', REFERENCE.humanIncidentsPerPrAtTick10)
   })
 
@@ -198,7 +260,9 @@ test.describe('Review quality metrics', () => {
     await startAndRunFor(page, SIZE_CHANGE_AT_SECONDS)
 
     await setSlider(page, PR_SIZE_LABEL, OVERSIZED_PR)
+    await expectMetric(page, 'human', 'defectsCaught', REFERENCE.humanDefectsCaughtAtPrSize400)
     await page.clock.runFor(TICK_MS)
+    await expectElapsedAtTick(page, TICK_AFTER_SIZE_CHANGE)
     await expectMetric(page, 'human', 'defectsCaught', REFERENCE.humanDefectsCaughtAtPrSize400)
 
     await page.clock.runFor((DEFAULT_RUN_SECONDS - SIZE_CHANGE_AT_SECONDS) * SECOND_MS - TICK_MS)
@@ -252,7 +316,7 @@ test.describe('Review quality metrics', () => {
     await setSlider(page, HUMAN_GEN_LABEL, BUSY_HUMAN_GEN)
     await startAndRunFor(page, QUEUE_BUILDING_SECONDS)
 
-    await setSlider(page, HUMAN_GEN_LABEL, 1)
+    await setSlider(page, HUMAN_GEN_LABEL, QUIET_HUMAN_GEN)
     await setSlider(page, REVIEWER_SPEED_LABEL, FAST_REVIEWER_SPEED)
     await page.clock.runFor(DRAIN_SECONDS * SECOND_MS)
     await expectElapsedAtTick(page, (QUEUE_BUILDING_SECONDS + DRAIN_SECONDS) * TICKS_PER_SECOND)
@@ -272,12 +336,7 @@ test.describe('Review quality metrics', () => {
       read: () => metricValues(page, 'incidents'),
     })
 
-    const decreases = samples
-      .slice(1)
-      .filter((current, sampleIndex) =>
-        Object.entries(current).some(([laneId, count]) => count < samples[sampleIndex][laneId]),
-      )
-    expect(decreases).toEqual([])
+    expectNeverDecreases(samples)
     expect(samples.at(-1).ai).toBeGreaterThan(0)
   })
 

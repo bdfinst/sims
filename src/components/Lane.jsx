@@ -1,7 +1,8 @@
-import { LANE_MODELS, floorShow, laneParams } from '../engine.js'
+import { LANE_MODELS, displayedPending, formatLoc, laneParams } from '../engine.js'
 import { LANE_PRESENTATION } from '../laneConfig.js'
 import { Icon } from './Icon.jsx'
 import { LaneMetrics } from './LaneMetrics.jsx'
+import { MetricValue } from './MetricValue.jsx'
 import { RateSlider } from './RateSlider.jsx'
 
 function DerivedValue({ children }) {
@@ -23,7 +24,7 @@ export function Lane({ laneId, lane, settings, onSettingChange }) {
       key={settingKey}
       settingKey={settingKey}
       value={settings[settingKey]}
-      onChange={onSettingChange}
+      onSettingChange={onSettingChange}
       accentClass={presentation.accentSliderClass}
     />
   )
@@ -48,8 +49,12 @@ export function Lane({ laneId, lane, settings, onSettingChange }) {
       </div>
       <dl className="rounded border border-gray-600 p-4">
         <dt className="text-base">Pending Review</dt>
-        <dd data-metric="pending" className="text-4xl font-bold">
-          {floorShow(lane.pendingPrs)}
+        <dd className="text-4xl font-bold">
+          <MetricValue name="pending" value={displayedPending(lane)} />
+        </dd>
+        <dt className="text-base">Pending LOC</dt>
+        <dd className="text-xl font-semibold">
+          <MetricValue name="pendingLoc" value={formatLoc(lane.pendingLoc)} />
         </dd>
       </dl>
       <div className="flex flex-col gap-3">
@@ -59,12 +64,6 @@ export function Lane({ laneId, lane, settings, onSettingChange }) {
         </div>
         {presentation.reviewSliders.map(renderSlider)}
         {hasDerivedValues && <DerivedValue>Effective speed {params.effSpeed} LOC/hr</DerivedValue>}
-        <dl>
-          <dt className="text-base">Deployed</dt>
-          <dd data-metric="deployed" className="text-4xl font-bold text-deployed">
-            {floorShow(lane.deployedPrs)}
-          </dd>
-        </dl>
         <LaneMetrics lane={lane} params={params} />
       </div>
     </section>

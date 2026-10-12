@@ -1,7 +1,7 @@
 import { SLIDERS } from '../engine.js'
 import { SLIDER_PRESENTATION } from '../laneConfig.js'
 
-export function RateSlider({ settingKey, value, onChange, accentClass }) {
+export function RateSlider({ settingKey, value, onSettingChange, accentClass }) {
   const { min, max, step } = SLIDERS[settingKey]
   const { label, unit, spokenUnit } = SLIDER_PRESENTATION[settingKey]
   const inputId = `slider-${settingKey}`
@@ -19,7 +19,7 @@ export function RateSlider({ settingKey, value, onChange, accentClass }) {
           step={step}
           value={value}
           aria-valuetext={`${value} ${spokenUnit}`}
-          onChange={(event) => onChange(settingKey, event.target.valueAsNumber)}
+          onChange={(event) => onSettingChange(settingKey, event.target.valueAsNumber)}
           className={`w-full ${accentClass}`}
         />
         <span

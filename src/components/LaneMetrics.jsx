@@ -1,36 +1,44 @@
 import {
-  detection,
-  floorShow,
+  displayedDeployed,
+  formatDefectsCaught,
   formatIncidentsPerPr,
-  formatLoc,
-  formatPct,
-  formatPickupWait,
+  formatPickupWaitHours,
+  floorShow,
 } from '../engine.js'
+import { MetricValue } from './MetricValue.jsx'
 
-// Rows keep a fixed order so both lanes line up row for row.
+// One list of rows, so both lanes show the same rows in the same order.
+const metricRows = (lane, params) => [
+  {
+    name: 'deployed',
+    label: 'Deployed',
+    value: displayedDeployed(lane),
+    valueClass: 'text-4xl font-bold text-deployed',
+  },
+  { name: 'defectsCaught', label: 'Defects caught', value: formatDefectsCaught(params) },
+  { name: 'incidents', label: 'Incidents', value: floorShow(lane.escapedDefects) },
+  { name: 'incidentsPerPr', label: 'Incidents per PR', value: formatIncidentsPerPr(lane) },
+  {
+    name: 'pickupWait',
+    label: 'Pickup wait',
+    value: formatPickupWaitHours(lane, params),
+    unit: 'h',
+  },
+]
+
+const DEFAULT_VALUE_CLASS = 'text-xl font-semibold'
+
 export function LaneMetrics({ lane, params }) {
   return (
-    <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-      <dt className="text-base">Defects caught</dt>
-      <dd data-metric="defectsCaught" className="text-xl font-semibold">
-        {formatPct(detection(params.size, params.effSpeed))}
-      </dd>
-      <dt className="text-base">Incidents</dt>
-      <dd data-metric="incidents" className="text-xl font-semibold">
-        {floorShow(lane.escapedDefects)}
-      </dd>
-      <dt className="text-base">Incidents per PR</dt>
-      <dd data-metric="incidentsPerPr" className="text-xl font-semibold">
-        {formatIncidentsPerPr(lane)}
-      </dd>
-      <dt className="text-base">Pending LOC</dt>
-      <dd data-metric="pendingLoc" className="text-xl font-semibold">
-        {formatLoc(lane.pendingLoc)}
-      </dd>
-      <dt className="text-base">Pickup wait</dt>
-      <dd data-metric="pickupWait" className="text-xl font-semibold">
-        {formatPickupWait(lane.pendingLoc, params.effSpeed)}
-      </dd>
+    <dl className="grid grid-cols-[auto_1fr] items-baseline gap-x-4 gap-y-1">
+      {metricRows(lane, params).map(({ name, label, value, valueClass, unit }) => (
+        <div key={name} className="contents">
+          <dt className="text-base">{label}</dt>
+          <dd className={valueClass ?? DEFAULT_VALUE_CLASS}>
+            <MetricValue name={name} value={value} unit={unit} />
+          </dd>
+        </div>
+      ))}
     </dl>
   )
 }

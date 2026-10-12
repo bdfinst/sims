@@ -57,11 +57,11 @@ const SPEED_FLOOR = 0.1
 const EMPTY_QUEUE_EPSILON = 1e-9
 const DISPLAY_EPSILON = 1e-9
 
+// escapedDefects is the model's term; the UI calls it "Incidents".
 export const emptyLane = () => ({
   pendingPrs: 0,
   pendingLoc: 0,
   deployedPrs: 0,
-  deployedLoc: 0,
   escapedDefects: 0,
 })
 
@@ -89,11 +89,18 @@ export const detection = (prSizeLoc, locPerHour) =>
 
 export const formatPct = (share) => `${Math.round(share * 100)}%`
 
+// Defects caught is shown from the lane's nominal size and speed, not from the queue's mix.
+export const formatDefectsCaught = ({ size, effSpeed }) => formatPct(detection(size, effSpeed))
+
 export const formatLoc = (loc) => floorShow(loc).toLocaleString('en-US')
 
 export const NO_VALUE = '—'
 
-const hasDeployedWholePr = (lane) => floorShow(lane.deployedPrs) >= 1
+// The one rule for the PR counts a lane shows; the warning check and the "—" rules use it too.
+export const displayedPending = (lane) => floorShow(lane.pendingPrs)
+export const displayedDeployed = (lane) => floorShow(lane.deployedPrs)
+
+const hasDeployedWholePr = (lane) => displayedDeployed(lane) >= 1
 
 // Escaped defects per deployed PR, from the internal (unfloored) Deployed count.
 const incidentsPerPr = (lane) => lane.escapedDefects / lane.deployedPrs
@@ -101,7 +108,8 @@ const incidentsPerPr = (lane) => lane.escapedDefects / lane.deployedPrs
 export const formatIncidentsPerPr = (lane) =>
   hasDeployedWholePr(lane) ? incidentsPerPr(lane).toFixed(2) : NO_VALUE
 
-export const formatPickupWait = (pendingLoc, effSpeed) => `${(pendingLoc / effSpeed).toFixed(1)} h`
+// Hours until the queue is cleared at the lane's effective speed (the unit is added by the view).
+export const formatPickupWaitHours = (lane, { effSpeed }) => (lane.pendingLoc / effSpeed).toFixed(1)
 
 // How many times more incidents per PR the AI lane has; blank until both lanes have shipped a PR.
 export const formatHeadlineRatio = (aiLane, humanLane) => {
@@ -120,15 +128,15 @@ export const tick = (lane, { gen, size, effSpeed }) => {
 
   const reviewedLoc = Math.min(queuedLoc, effSpeed * TICK_HOURS)
   const hasQueuedWork = queuedLoc > EMPTY_QUEUE_EPSILON
-  // Plan's evaluation order: (queued PRs x reviewed LOC) / queued LOC. Float rounding can leave the
-  // result a hair above queuedPrs, which is why the queue is clamped below.
+  // PRs leave the queue in proportion to the LOC reviewed, so a queue of mixed sizes deploys PRs
+  // in step with its LOC. Written as (PRs x reviewed LOC) / queued LOC, float rounding can leave
+  // the result a hair above queuedPrs, which is why the queue is clamped below.
   const reviewedPrs = hasQueuedWork ? (queuedPrs * reviewedLoc) / queuedLoc : 0
 
   return {
     pendingPrs: Math.max(0, queuedPrs - reviewedPrs),
     pendingLoc: Math.max(0, queuedLoc - reviewedLoc),
     deployedPrs: lane.deployedPrs + reviewedPrs,
-    deployedLoc: lane.deployedLoc + reviewedLoc,
     escapedDefects: lane.escapedDefects + reviewedLoc * DEFECTS_PER_LOC * (1 - detectionRate),
   }
 }
