@@ -966,7 +966,7 @@ describe('MODEL_ASSUMPTIONS', () => {
       humanDefaultLocPerHour: 30,
       humanDefaultPrsPerDay: 1,
       aiSizeMultiplier: 1.51,
-      aiMergeRateMultiplier: 1.162,
+      aiPrsPerDayRatio: expect.closeTo(53 / 45.3, 10),
     })
   })
 })

@@ -28,7 +28,7 @@ Feature: Research behind the simulation
     And the panel contains "the detection floors (0.05 for large PRs and 0.1 for fast reviewing)"
     And the panel contains "the curve thresholds (PR size 200 to 400 LOC, reviewer speed 500 to 1,000 LOC/hr)"
     And the panel contains "the human-lane defaults, an assumption (30 LOC/hr and 1 PR per day)"
-    And the panel contains "The AI lane's PR size (1.51× the human PR size) and default volume (giving 1.162× the human PRs per day) come from Faros"
+    And the panel contains "The AI lane's PR size (1.51× the human PR size) and default volume (giving 1.17× the human PRs per day) come from Faros"
     And the panel contains "The human defaults were chosen to land near Faros's +242.7% incidents per PR"
 
   Scenario: Panel is keyboard operable and does not interrupt the simulation

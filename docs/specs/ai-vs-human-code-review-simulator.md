@@ -249,7 +249,7 @@ Verified by web search on 2026-10-12. The panel uses the **Panel wording** colum
 **Model notes:**
 
 - The sim's size-factor floor (0.05 above 400 LOC) is a modeling assumption for "diminishes". The panel must not describe it as a research finding.
-- The AI lane's PR size (×1.51) and default volume (giving ×1.162 PRs per day) come from Faros. The human defaults are an assumption, chosen so the AI/human incidents-per-PR ratio (≈3.65×) sits close to Faros's +242.7% (≈3.43×).
+- The AI lane's PR size (×1.51) and default volume come from Faros. The panel states the volume as the ratio the model shows at the defaults (×1.17 the human PRs per day), not the Faros input ×1.162, which the rounded AI default only approximates. The human defaults are an assumption, chosen so the AI/human incidents-per-PR ratio (≈3.65×) sits close to Faros's +242.7% (≈3.43×).
 
 ## Consistency Gate
 

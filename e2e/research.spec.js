@@ -246,10 +246,10 @@ test.describe('Research behind the simulation', () => {
       )
     })
 
-    await test.step('And the panel contains "The AI lane\'s PR size (1.51× the human PR size) and default volume (giving 1.162× the human PRs per day) come from Faros"', async () => {
+    await test.step('And the panel contains "The AI lane\'s PR size (1.51× the human PR size) and default volume (giving 1.17× the human PRs per day) come from Faros"', async () => {
       await expectPanelContains(
         page,
-        "The AI lane's PR size (1.51× the human PR size) and default volume (giving 1.162× the human PRs per day) come from Faros",
+        "The AI lane's PR size (1.51× the human PR size) and default volume (giving 1.17× the human PRs per day) come from Faros",
       )
       const link = noteLink(page, FAROS_MULTIPLIERS_LINK_TEXT)
       await expect(link, 'the multipliers link their source').toHaveAttribute('href', FAROS_URL)

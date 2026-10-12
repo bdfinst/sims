@@ -45,7 +45,7 @@ const ASSUMPTION_SCENARIO_PHRASES = [
   'the detection floors (0.05 for large PRs and 0.1 for fast reviewing)',
   'the curve thresholds (PR size 200 to 400 LOC, reviewer speed 500 to 1,000 LOC/hr)',
   'the human-lane defaults, an assumption (30 LOC/hr and 1 PR per day)',
-  "The AI lane's PR size (1.51× the human PR size) and default volume (giving 1.162× the human PRs per day) come from Faros",
+  "The AI lane's PR size (1.51× the human PR size) and default volume (giving 1.17× the human PRs per day) come from Faros",
   "The human defaults were chosen to land near Faros's +242.7% incidents per PR",
 ]
 
@@ -73,13 +73,13 @@ describe('assumptionsNote', () => {
       assumptionsNote({
         ...MODEL_ASSUMPTIONS,
         aiSizeMultiplier: 2.25,
-        aiMergeRateMultiplier: 1.4,
+        aiPrsPerDayRatio: 1.4,
       }),
     )
     expect(note).toContain('PR size (2.25× the human PR size)')
     expect(note).toContain('default volume (giving 1.4× the human PRs per day)')
     expect(note).not.toContain('1.51')
-    expect(note).not.toContain('1.162')
+    expect(note).not.toContain('1.17')
   })
 
   it('is built from the human defaults it is given, with a plural for more than one PR', () => {

@@ -3,9 +3,9 @@
 export const LANE_IDS = Object.freeze({ human: 'human', ai: 'ai' })
 
 // Generation model constants. The Faros figures fix the AI lane's PR size (×1.51 the human PR
-// size) and the default AI code written, which gives about ×1.162 the human PRs per day at the
-// defaults. The AI default is fixed: it does not follow later changes to the human sliders. The
-// lane's "1.51×" text and the research panel's "+51%", "+16.2%", "+242.7%", "1.51×", and "1.162×"
+// size) and the default AI code written (the human default × 1.51 × 1.162, rounded), which gives
+// ×1.17 the human PRs per day at the defaults. The AI default is fixed: it does not follow later changes to the human sliders. The
+// lane's "1.51×" text and the research panel's "+51%", "+16.2%", "+242.7%", "1.51×", and "1.17×"
 // all come from these constants, so the model and its text cannot drift.
 export const WORK_HOURS_PER_DAY = 8
 export const FAROS_PR_SIZE_INCREASE_PCT = 51
@@ -104,10 +104,15 @@ const DISPLAY_EPSILON = 1e-9
 const LOC_PER_KLOC = 1000
 const DEFECTS_PER_KLOC = DEFECTS_PER_LOC * LOC_PER_KLOC
 
-// The modeling choices and Faros inputs the model is built from, as the research panel discloses
-// them. aiMergeRateMultiplier is the Faros input, not the simulated result: the AI code-written
-// default is rounded to its slider step (53 LOC/hr), so the simulated AI-to-human PRs-per-day
-// ratio is 53 ÷ 45.3 ≈ ×1.170, not exactly the Faros input ×1.162.
+// The AI-to-human PRs-per-day ratio the model shows at the defaults. The AI code-written default
+// is rounded to its slider step (53 LOC/hr), so this is 53 ÷ 45.3 ≈ ×1.170, not exactly the Faros
+// input ×1.162.
+const defaultPrsPerDay = (laneId) => laneParams(DEFAULT_SETTINGS, LANE_MODELS[laneId]).prsPerDay
+const DEFAULT_AI_PRS_PER_DAY_RATIO =
+  defaultPrsPerDay(LANE_IDS.ai) / defaultPrsPerDay(LANE_IDS.human)
+
+// The modeling choices and Faros-derived values the model is built from, as the research panel
+// discloses them.
 export const MODEL_ASSUMPTIONS = Object.freeze({
   defectsPerKloc: DEFECTS_PER_KLOC,
   baseDetection: BASE_DETECTION,
@@ -120,7 +125,7 @@ export const MODEL_ASSUMPTIONS = Object.freeze({
   humanDefaultLocPerHour: DEFAULT_SETTINGS.humanLocPerHour,
   humanDefaultPrsPerDay: DEFAULT_SETTINGS.humanPrsPerDay,
   aiSizeMultiplier: LANE_MODELS[LANE_IDS.ai].sizeMultiplier,
-  aiMergeRateMultiplier: FAROS_MERGE_RATE_MULTIPLIER,
+  aiPrsPerDayRatio: DEFAULT_AI_PRS_PER_DAY_RATIO,
 })
 
 // escapedDefects is the model's term; the UI calls it "Incidents".
