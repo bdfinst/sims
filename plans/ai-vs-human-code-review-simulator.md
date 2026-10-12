@@ -996,9 +996,9 @@ At the build's project-init gate, you chose a build step instead of the single-H
 
 #### Wave 4
 
-- [ ] Slice 4: Quality metrics and headline ratio
-  - [ ] Step 4.1: Detection functions and "Defects caught" display
-  - [ ] Step 4.2: Incidents, pickup wait, and the headline ratio
+- [x] Slice 4: Quality metrics and headline ratio
+  - [x] Step 4.1: Detection functions and "Defects caught" display
+  - [x] Step 4.2: Incidents, pickup wait, and the headline ratio
 
 #### Wave 5
 
