@@ -1560,10 +1560,10 @@ Your decisions (recorded in the spec's Ambiguity Log):
 #### Wave 8
 
 - [ ] Slice 8: Generation from code written and PR frequency
-  - [ ] Step 8.0: Gherkin sync honours `@wip`
-  - [ ] Step 8.1: Derived generation parameters and formatters in the engine
-  - [ ] Step 8.2: New slider keys, lane-model fields, and reducer handling (additive)
-  - [ ] Step 8.3: Cut over the model and the UI to the new sliders
+  - [x] Step 8.0: Gherkin sync honours `@wip`
+  - [x] Step 8.1: Derived generation parameters and formatters in the engine
+  - [x] Step 8.2: New slider keys, lane-model fields, and reducer handling (additive)
+  - [x] Step 8.3: Cut over the model and the UI to the new sliders
   - [ ] Step 8.4: Revised run, pause, reset, and controls scenarios
   - [ ] Step 8.5: Revised metrics and warning scenarios
   - [ ] Step 8.6: Revised tile and layout scenarios
